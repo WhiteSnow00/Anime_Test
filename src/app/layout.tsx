@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     siteName: 'Ayaya Webpage',
     images: [
       {
-        url: 'http://ayaya-kana.id.vn/images/thumb.jpg',
+        url: 'public\images\thumb.jpg',
         width: 1200,
         height: 630,
         alt: 'Web coi anime thay gdrive!',
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Xem Anime Online',
     description: 'Web coi anime thay gdrive!',
-    images: ['http://ayaya-kana.id.vn/images/thumb.jpg'],
+    images: ['public\images\thumb.jpg'],
   },
 };
 
