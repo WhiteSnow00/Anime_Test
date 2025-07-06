@@ -20,7 +20,6 @@ export default function AnimePage() {
   const handleSelectEpisode = (episode: Episode) => {
     setCurrentEpisode(episode);
     setCurrentSection('video');
-    // Scroll to top when new episode is selected
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -29,7 +28,6 @@ export default function AnimePage() {
     
     switch (section) {
       case 'video':
-        // Scroll to top of page when video is selected
         window.scrollTo({ top: 0, behavior: 'smooth' });
         break;
       case 'episodes':

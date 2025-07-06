@@ -13,11 +13,11 @@ export interface Anime {
   posterUrl: string;
   summary: string;
   genres: string[];
-  status: 'Completed' | 'Ongoing' | 'Upcoming';
+  status: 'Hoàn Thành' | 'Đang Tiến Hành' | 'Sắp Ra Mắt';
   episodeCount: number;
   releaseYear: number;
   studio: string;
-  rating: number; // out of 5
+  rating: number; 
   duration: string;
   episodes: Episode[];
 }
