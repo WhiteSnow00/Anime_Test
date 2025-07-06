@@ -39,6 +39,6 @@ export const animeData: Anime = {
   rating: 5,
   duration: '24 phút/tập',
   episodes: [
-    { id: 1, title: 'Episode 1', videoId: 'TZicI5qwX' },
+    { id: 1, title: 'Episode 1', videoId: 'kBo9MXg-C' },
   ],
 };
