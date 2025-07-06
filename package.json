@@ -9,7 +9,14 @@
     "build": "next build",
     "start": "next start -p 4000",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "lint:fix": "next lint --fix",
+    "typecheck": "tsc --noEmit",
+    "typecheck:watch": "tsc --noEmit --watch",
+    "analyze": "cross-env ANALYZE=true next build",
+    "clean": "rimraf .next out",
+    "test": "echo \"No tests specified\" && exit 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.13.0",
