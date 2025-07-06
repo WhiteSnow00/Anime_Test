@@ -3,8 +3,30 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 
 export const metadata: Metadata = {
-  title: 'Kana Webpage',
-  description: 'Test Da Tinh Sau!',
+  title: 'Xem Anime Online',
+  description: 'Web coi anime thay gdrive!',
+  openGraph: {
+    title: 'Xem Anime Online',
+    description: 'Web coi anime thay gdrive!',
+    url: 'https://ayaya.del4yowo.id.vn',
+    siteName: 'Ayaya Webpage',
+    images: [
+      {
+        url: '/images/thumb.jpg',
+        width: 1200,
+        height: 630,
+        alt: 'Web coi anime thay gdrive!',
+      },
+    ],
+    locale: 'vi_VN',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Xem Anime Online',
+    description: 'Web coi anime thay gdrive!',
+    images: ['/images/thumb.jpg'],
+  },
 };
 
 export default function RootLayout({
