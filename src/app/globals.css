@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 6 100% 94%; /* misty rose */
+    --foreground: 349 71% 23%; /* dark pink/brown */
+
+    --card: 0 0% 100%; /* white */
+    --card-foreground: 349 71% 23%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 349 71% 23%;
+
+    --primary: 351 100% 86%; /* light pink */
+    --primary-foreground: 349 71% 23%;
+
+    --secondary: 351 100% 92%; /* lighter pink */
+    --secondary-foreground: 349 71% 23%;
+
+    --muted: 351 100% 92%;
+    --muted-foreground: 351 40% 50%; /* muted pink */
+
+    --accent: 240 67% 94%; /* lavender */
+    --accent-foreground: 240 30% 25%; /* dark lavender */
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 351 100% 88%; /* slightly darker pink border */
+    --input: 351 100% 90%;
+    --ring: 351 100% 75%;
+
+    --radius: 0.8rem; /* more rounded corners for kawaii feel */
+  }
+
+  .dark {
+    --background: 240 10% 10%;
+    --foreground: 240 5% 95%;
+
+    --card: 240 10% 12%;
+    --card-foreground: 240 5% 95%;
+
+    --popover: 240 10% 12%;
+    --popover-foreground: 240 5% 95%;
+
+    --primary: 351 80% 70%;
+    --primary-foreground: 351 90% 15%;
+
+    --secondary: 240 10% 20%;
+    --secondary-foreground: 240 5% 95%;
+
+    --muted: 240 10% 20%;
+    --muted-foreground: 240 5% 65%;
+
+    --accent: 240 30% 80%;
+    --accent-foreground: 240 90% 15%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 10% 25%;
+    --input: 240 10% 25%;
+    --ring: 351 80% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
