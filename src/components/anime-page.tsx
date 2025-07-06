@@ -18,14 +18,6 @@ export default function AnimePage() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-2 sm:p-4 lg:p-6">
-      <header className="w-full max-w-7xl mx-auto my-6 text-center">
-        <h1 className="text-4xl md:text-5xl font-bold font-headline text-primary flex items-center justify-center gap-3">
-          <Heart className="w-8 h-8 md:w-10 md:h-10 text-primary/70 animate-pulse" />
-          Kana Webpage
-          <Heart className="w-8 h-8 md:w-10 md:h-10 text-primary/70 animate-pulse" />
-        </h1>
-        <p className="text-muted-foreground mt-2">Test Da Tinh Sau!</p>
-      </header>
       <div className="w-full max-w-7xl mx-auto space-y-6">
         <VideoPlayer videoId={currentEpisode.videoId} />
         <EpisodeSelector

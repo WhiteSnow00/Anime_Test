@@ -14,7 +14,7 @@ const animeData = {
         japanese: '薫る花は凛と咲く',
         english: 'Kaoru Hana wa Rin to Saku'
     },
-    posterUrl: 'https://i.ibb.co/JjnPC57p/kaoru-hana-wa-rin-to-saku-31f7a06918.png',
+    posterUrl: '/images/kaoruhana.jpg',
     summary: "Tsugumi Rintaro, một nam sinh to lớn, trầm tính và có hơi “hung dữ” do vẻ ngoài của mình. Cậu tới từ trường cấp 3 Chidori, ngôi trường nam sinh cấp thấp hội tụ đủ những thành phần “bất hảo”. Bên cạnh trường của cậu là trường nữ sinh Kikyo, một trường cấp 3 vô cùng danh giá. Cậu thường xuyên bắt gặp Waguri Kaoruko, một khách hàng tại cửa hàng bánh nhà mình. Rintaro cảm thấy thoải mái khi dành thời gian bên Kaoruko. Tuy nhiên, học sinh của trường Kikyo lại cực kỳ căm ghét trường Chidori khiến mối quan hệ giữa cả hai trở nên khó xử. Đây là câu chuyện về 2 con người ở rất gần nhưng lại rất xa.",
     genres: [
         'Slice of Life',
@@ -22,12 +22,12 @@ const animeData = {
         'Comedy',
         'School'
     ],
-    status: 'On-Going',
+    status: 'Đang Tiến Hành',
     episodeCount: 13,
     releaseYear: 2025,
     studio: 'CloverWorks',
-    rating: 4.5 / 5,
-    duration: '24 min per ep',
+    rating: 5,
+    duration: '24 phút/tập',
     episodes: [
         {
             id: 1,
@@ -291,7 +291,7 @@ function EpisodeSelector({ episodes, currentEpisode, onSelectEpisode }) {
                             lineNumber: 20,
                             columnNumber: 11
                         }, this),
-                        "Episodes"
+                        "Tập"
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/episode-selector.tsx",
@@ -609,14 +609,14 @@ function AnimeInfo({ anime }) {
                             children: [
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(InfoItem, {
                                     icon: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$star$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Star$3e$__["Star"],
-                                    label: "Rating",
-                                    children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$rating$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Rating"], {
+                                    label: "Đánh Giá",
+                                    value: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$rating$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Rating"], {
                                         rating: anime.rating
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/anime-info.tsx",
-                                        lineNumber: 62,
-                                        columnNumber: 15
-                                    }, this)
+                                        lineNumber: 61,
+                                        columnNumber: 59
+                                    }, void 0)
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/anime-info.tsx",
                                     lineNumber: 61,
@@ -624,29 +624,29 @@ function AnimeInfo({ anime }) {
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(InfoItem, {
                                     icon: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$tv$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Tv$3e$__["Tv"],
-                                    label: "Status",
+                                    label: "Tình Trạng",
                                     value: anime.status
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/anime-info.tsx",
-                                    lineNumber: 64,
+                                    lineNumber: 62,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(InfoItem, {
                                     icon: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$list$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__List$3e$__["List"],
-                                    label: "Episodes",
+                                    label: "Số Tập",
                                     value: anime.episodeCount
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/anime-info.tsx",
-                                    lineNumber: 65,
+                                    lineNumber: 63,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(InfoItem, {
                                     icon: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$calendar$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Calendar$3e$__["Calendar"],
-                                    label: "Released",
+                                    label: "Ra mắt",
                                     value: anime.releaseYear
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/anime-info.tsx",
-                                    lineNumber: 66,
+                                    lineNumber: 64,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(InfoItem, {
@@ -655,16 +655,16 @@ function AnimeInfo({ anime }) {
                                     value: anime.studio
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/anime-info.tsx",
-                                    lineNumber: 67,
+                                    lineNumber: 65,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(InfoItem, {
                                     icon: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$clock$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Clock$3e$__["Clock"],
-                                    label: "Duration",
+                                    label: "Thời Lượng",
                                     value: anime.duration
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/anime-info.tsx",
-                                    lineNumber: 68,
+                                    lineNumber: 66,
                                     columnNumber: 13
                                 }, this)
                             ]
@@ -733,47 +733,6 @@ function AnimePage() {
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
         className: "flex flex-col items-center justify-center min-h-screen p-2 sm:p-4 lg:p-6",
         children: [
-            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("header", {
-                className: "w-full max-w-7xl mx-auto my-6 text-center",
-                children: [
-                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h1", {
-                        className: "text-4xl md:text-5xl font-bold font-headline text-primary flex items-center justify-center gap-3",
-                        children: [
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$heart$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Heart$3e$__["Heart"], {
-                                className: "w-8 h-8 md:w-10 md:h-10 text-primary/70 animate-pulse"
-                            }, void 0, false, {
-                                fileName: "[project]/src/components/anime-page.tsx",
-                                lineNumber: 23,
-                                columnNumber: 11
-                            }, this),
-                            "Kana Webpage",
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$heart$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Heart$3e$__["Heart"], {
-                                className: "w-8 h-8 md:w-10 md:h-10 text-primary/70 animate-pulse"
-                            }, void 0, false, {
-                                fileName: "[project]/src/components/anime-page.tsx",
-                                lineNumber: 25,
-                                columnNumber: 11
-                            }, this)
-                        ]
-                    }, void 0, true, {
-                        fileName: "[project]/src/components/anime-page.tsx",
-                        lineNumber: 22,
-                        columnNumber: 9
-                    }, this),
-                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                        className: "text-muted-foreground mt-2",
-                        children: "Test Da Tinh Sau!"
-                    }, void 0, false, {
-                        fileName: "[project]/src/components/anime-page.tsx",
-                        lineNumber: 27,
-                        columnNumber: 9
-                    }, this)
-                ]
-            }, void 0, true, {
-                fileName: "[project]/src/components/anime-page.tsx",
-                lineNumber: 21,
-                columnNumber: 7
-            }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 className: "w-full max-w-7xl mx-auto space-y-6",
                 children: [
@@ -781,7 +740,7 @@ function AnimePage() {
                         videoId: currentEpisode.videoId
                     }, void 0, false, {
                         fileName: "[project]/src/components/anime-page.tsx",
-                        lineNumber: 30,
+                        lineNumber: 22,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$episode$2d$selector$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["EpisodeSelector"], {
@@ -790,20 +749,20 @@ function AnimePage() {
                         onSelectEpisode: handleSelectEpisode
                     }, void 0, false, {
                         fileName: "[project]/src/components/anime-page.tsx",
-                        lineNumber: 31,
+                        lineNumber: 23,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$anime$2d$info$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["AnimeInfo"], {
                         anime: animeDetails
                     }, void 0, false, {
                         fileName: "[project]/src/components/anime-page.tsx",
-                        lineNumber: 36,
+                        lineNumber: 28,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/anime-page.tsx",
-                lineNumber: 29,
+                lineNumber: 21,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("footer", {
@@ -815,18 +774,18 @@ function AnimePage() {
                             className: "inline w-4 h-4 text-primary fill-current"
                         }, void 0, false, {
                             fileName: "[project]/src/components/anime-page.tsx",
-                            lineNumber: 39,
+                            lineNumber: 31,
                             columnNumber: 25
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/anime-page.tsx",
-                    lineNumber: 39,
+                    lineNumber: 31,
                     columnNumber: 9
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/components/anime-page.tsx",
-                lineNumber: 38,
+                lineNumber: 30,
                 columnNumber: 7
             }, this)
         ]

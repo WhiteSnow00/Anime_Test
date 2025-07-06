@@ -58,14 +58,12 @@ export function AnimeInfo({ anime }: AnimeInfoProps) {
           </Card>
 
           <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-6">
-            <InfoItem icon={Star} label="Rating">
-              <Rating rating={anime.rating} />
-            </InfoItem>
-            <InfoItem icon={Tv} label="Status" value={anime.status} />
-            <InfoItem icon={List} label="Episodes" value={anime.episodeCount} />
-            <InfoItem icon={Calendar} label="Released" value={anime.releaseYear} />
+            <InfoItem icon={Star} label="Đánh Giá" value={<Rating rating={anime.rating} />} />
+            <InfoItem icon={Tv} label="Tình Trạng" value={anime.status} />
+            <InfoItem icon={List} label="Số Tập" value={anime.episodeCount} />
+            <InfoItem icon={Calendar} label="Ra mắt" value={anime.releaseYear} />
             <InfoItem icon={Clapperboard} label="Studio" value={anime.studio} />
-            <InfoItem icon={Clock} label="Duration" value={anime.duration} />
+            <InfoItem icon={Clock} label="Thời Lượng" value={anime.duration} />
           </dl>
         </div>
       </div>

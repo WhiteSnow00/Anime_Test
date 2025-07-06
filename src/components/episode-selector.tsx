@@ -18,7 +18,7 @@ export function EpisodeSelector({ episodes, currentEpisode, onSelectEpisode }: E
       <CardHeader>
         <CardTitle className="flex items-center gap-2 font-headline">
           <Tv className="w-6 h-6 text-primary" />
-          Episodes
+          Tập
         </CardTitle>
       </CardHeader>
       <CardContent>

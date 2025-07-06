@@ -297,6 +297,16 @@ img, video {
 body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
+  font-feature-settings: "liga" 1, "calt" 1;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-family: Inter, sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-feature-settings: "liga" 1, "calt" 1;
+  font-family: Poppins, sans-serif;
 }
 
 .sr-only {
@@ -1213,7 +1223,11 @@ body {
   vertical-align: middle;
 }
 
-.font-body, .font-headline {
+.font-body {
+  font-family: Inter, sans-serif;
+}
+
+.font-headline {
   font-family: Poppins, sans-serif;
 }
 
