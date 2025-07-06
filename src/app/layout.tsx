@@ -8,11 +8,11 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Xem Anime Online',
     description: 'Web coi anime thay gdrive!',
-    url: 'https://ayaya.del4yowo.id.vn',
+    url: 'http://ayaya-kana.id.vn/',
     siteName: 'Ayaya Webpage',
     images: [
       {
-        url: 'https://ayaya.del4yowo.id.vn/images/thumb.jpg',
+        url: 'http://ayaya-kana.id.vn/images/thumb.jpg',
         width: 1200,
         height: 630,
         alt: 'Web coi anime thay gdrive!',
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Xem Anime Online',
     description: 'Web coi anime thay gdrive!',
-    images: ['https://ayaya.del4yowo.id.vn/images/thumb.jpg'],
+    images: ['http://ayaya-kana.id.vn/images/thumb.jpg'],
   },
 };
 
