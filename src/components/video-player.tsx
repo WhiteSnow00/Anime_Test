@@ -174,18 +174,6 @@ function VideoPlayerComponent({
           {...iframeProps} 
           suppressHydrationWarning={true}
         />
-        
-        {/* Enhanced Mobile Controls Overlay - only show after hydration */}
-        {isHydrated && viewport.isMobile && (
-          <div className="lg:hidden absolute inset-0 pointer-events-none">
-            <div className="absolute top-4 left-4 right-4 flex justify-between items-start pointer-events-auto">
-              {/* Mobile-specific controls can be added here */}
-              <div className="bg-black/50 rounded px-2 py-1 text-white text-xs">
-                Episode {videoId}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </Card>
   );
