@@ -43,13 +43,6 @@ export function EpisodeSelector({ episodes, currentEpisode, onSelectEpisode }: E
             </Button>
           ))}
         </div>
-        
-        {/* Mobile Episode Info */}
-        <div className="lg:hidden mt-4 p-3 bg-muted/50 rounded-lg">
-          <div className="flex items-center justify-center">
-            <span className="text-lg font-bold text-primary vietnamese-text">Tập {currentEpisode.id}</span>
-          </div>
-        </div>
       </CardContent>
     </Card>
   );
