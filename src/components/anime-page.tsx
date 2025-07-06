@@ -20,7 +20,8 @@ export default function AnimePage() {
   const handleSelectEpisode = (episode: Episode) => {
     setCurrentEpisode(episode);
     setCurrentSection('video');
-    videoRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Scroll to top when new episode is selected
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleNavigate = (section: string) => {
@@ -28,7 +29,8 @@ export default function AnimePage() {
     
     switch (section) {
       case 'video':
-        videoRef.current?.scrollIntoView({ behavior: 'smooth' });
+        // Scroll to top of page when video is selected
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         break;
       case 'episodes':
         episodesRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -43,6 +45,9 @@ export default function AnimePage() {
     const currentIndex = animeData.episodes.findIndex(ep => ep.id === currentEpisode.id);
     if (currentIndex > 0) {
       setCurrentEpisode(animeData.episodes[currentIndex - 1]);
+      setCurrentSection('video');
+      // Scroll to top when episode changes
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -50,6 +55,9 @@ export default function AnimePage() {
     const currentIndex = animeData.episodes.findIndex(ep => ep.id === currentEpisode.id);
     if (currentIndex < animeData.episodes.length - 1) {
       setCurrentEpisode(animeData.episodes[currentIndex + 1]);
+      setCurrentSection('video');
+      // Scroll to top when episode changes
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -63,7 +71,6 @@ export default function AnimePage() {
       {/* Mobile Header */}
       <MobileHeader 
         title={animeDetails.title}
-        onNavigate={handleNavigate}
       />
       {/* Main Content */}
       <div className="w-full max-w-7xl mx-auto space-y-6 px-2 sm:px-4 lg:px-6 pb-32 lg:pb-6">
