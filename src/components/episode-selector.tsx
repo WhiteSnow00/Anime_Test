@@ -16,7 +16,7 @@ export function EpisodeSelector({ episodes, currentEpisode, onSelectEpisode }: E
   return (
     <Card className="w-full shadow-lg rounded-lg">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 font-headline">
+        <CardTitle className="flex items-center gap-2 font-headline vietnamese-text">
           <Tv className="w-6 h-6 text-primary" />
           Tập
         </CardTitle>
@@ -47,7 +47,7 @@ export function EpisodeSelector({ episodes, currentEpisode, onSelectEpisode }: E
         {/* Mobile Episode Info */}
         <div className="lg:hidden mt-4 p-3 bg-muted/50 rounded-lg">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Tập hiện tại:</span>
+            <span className="text-sm font-medium vietnamese-text">Tập hiện tại:</span>
             <span className="text-lg font-bold text-primary">#{currentEpisode.id}</span>
           </div>
           <p className="text-sm text-muted-foreground mt-1">{currentEpisode.title}</p>

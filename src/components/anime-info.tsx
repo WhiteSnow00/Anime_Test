@@ -12,11 +12,11 @@ interface AnimeInfoProps {
 function InfoItem({ icon: Icon, label, value }: { icon: React.ElementType, label: string, value: React.ReactNode }) {
   return (
     <div className="flex flex-col">
-      <dt className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+      <dt className="text-sm font-medium text-muted-foreground flex items-center gap-2 vietnamese-text">
         <Icon className="w-4 h-4" />
         {label}
       </dt>
-      <dd className="mt-1 text-base font-semibold text-foreground">{value}</dd>
+      <dd className="mt-1 text-base font-semibold text-foreground vietnamese-text">{value}</dd>
     </div>
   );
 }
@@ -38,7 +38,7 @@ export function AnimeInfo({ anime }: AnimeInfoProps) {
           </div>
         </div>
         <div className="md:col-span-8 lg:col-span-9 p-4 md:p-6">
-          <h1 className="text-3xl lg:text-4xl font-bold font-headline text-primary">{anime.title}</h1>
+          <h1 className="text-3xl lg:text-4xl font-bold font-headline text-primary vietnamese-text">{anime.title}</h1>
           <p className="text-md lg:text-lg text-muted-foreground mb-4">
             {anime.alternativeTitles.japanese} / {anime.alternativeTitles.english}
           </p>

@@ -78,9 +78,20 @@
     -moz-osx-font-smoothing: grayscale;
   }
   
-  /* Ensure proper Vietnamese text rendering */
+  /* Enhanced Vietnamese text rendering */
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Poppins', sans-serif;
+    font-family: 'Noto Sans', 'Open Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
     font-feature-settings: "liga" 1, "calt" 1;
+    font-synthesis: weight style;
+    text-rendering: optimizeLegibility;
+  }
+  
+  /* Specific Vietnamese text optimization */
+  .vietnamese-text {
+    font-family: 'Noto Sans', 'Open Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-feature-settings: "liga" 1, "calt" 1, "kern" 1;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }

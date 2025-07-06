@@ -13,7 +13,7 @@ export function MobileHeader({ title }: MobileHeaderProps) {
       <div className="flex h-14 items-center justify-between px-4">
         <div className="flex items-center gap-2">
           <Heart className="w-6 h-6 text-primary" />
-          <h1 className="font-headline font-semibold text-lg truncate">{title}</h1>
+          <h1 className="font-headline font-semibold text-lg truncate vietnamese-text">{title}</h1>
         </div>
       </div>
     </header>

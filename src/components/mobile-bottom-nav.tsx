@@ -42,11 +42,11 @@ export function MobileBottomNav({
           )}
         >
           <ChevronLeft className="w-4 h-4" />
-          Tập trước
+          <span className="vietnamese-text">Tập trước</span>
         </Button>
 
         <div className="text-sm font-medium text-center">
-          <span className="text-muted-foreground">Điều hướng tập</span>
+          <span className="text-muted-foreground vietnamese-text">Điều hướng tập</span>
         </div>
 
         <Button
@@ -59,7 +59,7 @@ export function MobileBottomNav({
             !canGoNext && "opacity-50 cursor-not-allowed"
           )}
         >
-          Tập sau
+          <span className="vietnamese-text">Tập sau</span>
           <ChevronRight className="w-4 h-4" />
         </Button>
       </div>
@@ -78,7 +78,7 @@ export function MobileBottomNav({
             )}
           >
             <item.icon className="w-5 h-5" />
-            <span className="text-xs font-medium">{item.label}</span>
+            <span className="text-xs font-medium vietnamese-text">{item.label}</span>
           </Button>
         ))}
       </div>
