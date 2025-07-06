@@ -46,11 +46,9 @@ export function EpisodeSelector({ episodes, currentEpisode, onSelectEpisode }: E
         
         {/* Mobile Episode Info */}
         <div className="lg:hidden mt-4 p-3 bg-muted/50 rounded-lg">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium vietnamese-text">Tập hiện tại:</span>
-            <span className="text-lg font-bold text-primary">#{currentEpisode.id}</span>
+          <div className="flex items-center justify-center">
+            <span className="text-lg font-bold text-primary vietnamese-text">Tập {currentEpisode.id}</span>
           </div>
-          <p className="text-sm text-muted-foreground mt-1">{currentEpisode.title}</p>
         </div>
       </CardContent>
     </Card>
