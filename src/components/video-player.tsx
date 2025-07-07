@@ -6,8 +6,11 @@ import { useViewport } from '@/hooks/use-viewport';
 import { withPerformanceOptimization, withErrorBoundary } from '@/lib/higher-order-components';
 import { fp, performanceUtils } from '@/lib/advanced-utils';
 
+export type ServerType = 'hydax' | 'mxdrop';
+
 interface VideoPlayerProps {
   videoId: string;
+  server?: ServerType;
   autoPlay?: boolean;
   muted?: boolean;
   controls?: boolean;
@@ -18,6 +21,7 @@ interface VideoPlayerProps {
 
 function VideoPlayerComponent({ 
   videoId,
+  server = 'hydax',
   autoPlay = false,
   muted = false,
   controls = true,
@@ -36,6 +40,12 @@ function VideoPlayerComponent({
 
   // Memoized iframe URL with advanced parameters
   const iframeUrl = useMemo(() => {
+    if (server === 'mxdrop') {
+      // MxDrop server URL
+      return `//mxdrop.to/e/${videoId}`;
+    }
+    
+    // Hydax server URL (default)
     const baseUrl = `https://short.icu/${videoId}`;
     
     let quality = 'hd1080'; 
@@ -51,7 +61,7 @@ function VideoPlayerComponent({
     });
     
     return `${baseUrl}?${params.toString()}`;
-  }, [videoId, autoPlay, muted, controls, isHydrated, viewport.width]);
+  }, [videoId, server, autoPlay, muted, controls, isHydrated, viewport.width]);
 
   // Advanced iframe load handler with error handling
   const handleIframeLoad = useCallback(
@@ -141,6 +151,7 @@ function VideoPlayerComponent({
     frameBorder: "0",
     scrolling: "no" as const,
     allowFullScreen: true,
+    allow: "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share", // Required for YouTube
     onLoad: handleIframeLoad,
     onError: () => handleIframeError(`Failed to load video: ${videoId}`),
     className: "w-full h-full touch-manipulation",
@@ -170,7 +181,7 @@ function VideoPlayerComponent({
     <Card className={`w-full overflow-hidden shadow-lg rounded-lg ${className}`}>
       <div className="aspect-video bg-muted relative">
         <iframe 
-          key={videoId} 
+          key={`${server}-${videoId}`} 
           {...iframeProps} 
           suppressHydrationWarning={true}
         />

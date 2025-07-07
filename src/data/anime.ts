@@ -2,6 +2,11 @@ export interface Episode {
   id: number;
   title: string;
   videoId: string;
+  servers: {
+    hydax: string;
+    mxdrop: string;
+  };
+  downloadUrl?: string; // Optional download link
 }
 
 export interface Anime {
@@ -39,6 +44,15 @@ export const animeData: Anime = {
   rating: 5,
   duration: '24 phút/tập',
   episodes: [
-    { id: 1, title: 'Episode 1', videoId: 'kBo9MXg-C' },
+    { 
+      id: 1, 
+      title: 'Episode 1', 
+      videoId: 'kBo9MXg-C',
+      servers: {
+        hydax: 'kBo9MXg-C',
+        mxdrop: 'eler0ndjt8nnzv'
+      },
+      downloadUrl: 'https://drive.google.com/file/d/1-iRgvZnyAbOKf4470JSfNa5T9zwo5ehW/view?usp=sharing'
+    },
   ],
 };

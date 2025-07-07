@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { animeData, type Episode } from '@/data/anime';
 import { VideoPlayer } from './video-player';
 import { EpisodeSelector } from './episode-selector';
+import { ServerSelector, type ServerType } from './server-selector';
 import { AnimeInfo } from './anime-info';
 import { MobileHeader } from './mobile-header';
 import { MobileBottomNav } from './mobile-bottom-nav';
@@ -24,6 +25,19 @@ function AnimePageComponent() {
   useEffect(() => {
     setIsHydrated(true);
   }, []);
+
+  // Server state management
+  const [currentServer, setCurrentServer] = useState<ServerType>('hydax');
+
+  // Handle server change
+  const handleServerChange = useCallback((server: ServerType) => {
+    setCurrentServer(server);
+  }, []);
+
+  // Get current video ID based on selected server
+  const getCurrentVideoId = useCallback((episode: Episode) => {
+    return episode.servers[currentServer];
+  }, [currentServer]);
   // Initialize advanced state management
   const { state, actions, computed } = useAnimeState(animeData);
   
@@ -150,7 +164,19 @@ function AnimePageComponent() {
       <div className={`w-full max-w-7xl mx-auto ${layoutConfig.spacing} ${layoutConfig.containerClass}`}>
         {/* Video Section */}
         <div ref={refs.videoRef} id="video-section" data-section="video">
-          <VideoPlayer videoId={navState.currentEpisode?.videoId || episodes[0].videoId} />
+          <VideoPlayer 
+            videoId={getCurrentVideoId(navState.currentEpisode || episodes[0])} 
+            server={currentServer}
+          />
+        </div>
+
+        {/* Server Selection */}
+        <div id="server-section" data-section="server">
+          <ServerSelector
+            currentServer={currentServer}
+            onServerChange={handleServerChange}
+            currentEpisode={navState.currentEpisode || episodes[0]}
+          />
         </div>
 
         {/* Episodes Section */}
