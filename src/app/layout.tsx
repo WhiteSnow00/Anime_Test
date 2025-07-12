@@ -2,6 +2,13 @@ import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 
+// Initialize sample comments for development
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  import('@/lib/sample-comments').then(({ initializeSampleComments }) => {
+    initializeSampleComments();
+  });
+}
+
 export const metadata: Metadata = {
   title: 'Xem Anime Online',
   description: 'Web coi anime thay gdrive!',

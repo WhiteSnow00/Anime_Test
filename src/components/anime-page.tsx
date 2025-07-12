@@ -8,6 +8,7 @@ import { ServerSelector, type ServerType } from './server-selector';
 import { AnimeInfo } from './anime-info';
 import { MobileHeader } from './mobile-header';
 import { MobileBottomNav } from './mobile-bottom-nav';
+import { CommentSection } from './comment-section';
 import { Heart } from 'lucide-react';
 
 // Import advanced hooks and utilities
@@ -200,6 +201,14 @@ function AnimePageComponent() {
         {/* Info Section */}
         <div ref={refs.infoRef} id="info-section" data-section="info">
           <AnimeInfo anime={animeDetails} />
+        </div>
+
+        {/* Comment Section */}
+        <div ref={refs.commentRef} id="comment-section" data-section="comment" className="mt-6">
+          <CommentSection 
+            episodeId={(navState.currentEpisode || episodes[0]).id}
+            episodeTitle={`Tập ${(navState.currentEpisode || episodes[0]).id}`}
+          />
         </div>
       </div>
 

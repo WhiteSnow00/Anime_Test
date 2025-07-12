@@ -1,0 +1,79 @@
+/* Comment Section Styles */
+.comment-content {
+  word-wrap: break-word;
+  word-break: break-word;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+.comment-username {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Vietnamese text optimization */
+.vietnamese-text {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.6;
+}
+
+/* Mobile comment adjustments */
+@media (max-width: 768px) {
+  .comment-content {
+    font-size: 0.875rem;
+  }
+  
+  .comment-username {
+    max-width: 120px;
+  }
+}
+
+/* Admin panel enhancements */
+.admin-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+.admin-comment-card {
+  transition: all 0.2s ease-in-out;
+}
+
+.admin-comment-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+/* Loading animations */
+@keyframes commentFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.comment-item {
+  animation: commentFadeIn 0.3s ease-out;
+}
+
+/* Success message animation */
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.success-message {
+  animation: slideInDown 0.3s ease-out;
+}

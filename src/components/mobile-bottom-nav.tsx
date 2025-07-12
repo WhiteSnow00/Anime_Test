@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from '@/components/ui/button';
-import { Play, List, Info, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Play, List, Info, ChevronLeft, ChevronRight, MessageCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface MobileBottomNavProps {
@@ -25,6 +25,7 @@ export function MobileBottomNav({
     { id: 'video', label: 'Video', icon: Play },
     { id: 'episodes', label: 'Tập', icon: List },
     { id: 'info', label: 'Thông tin', icon: Info },
+    { id: 'comment', label: 'Bình luận', icon: MessageCircle },
   ];
 
   return (
@@ -73,12 +74,12 @@ export function MobileBottomNav({
             size="sm"
             onClick={() => onNavigate(item.id)}
             className={cn(
-              "flex flex-col items-center gap-1 h-auto py-2 px-3 min-w-0",
+              "flex flex-col items-center gap-1 h-auto py-2 px-2 min-w-0 flex-1",
               currentSection === item.id && "text-primary bg-primary/10"
             )}
           >
-            <item.icon className="w-5 h-5" />
-            <span className="text-xs font-medium vietnamese-text">{item.label}</span>
+            <item.icon className="w-4 h-4" />
+            <span className="text-xs font-medium vietnamese-text truncate">{item.label}</span>
           </Button>
         ))}
       </div>

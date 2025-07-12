@@ -95,3 +95,60 @@
     -moz-osx-font-smoothing: grayscale;
   }
 }
+
+/* Comment Section Styles */
+.comment-content {
+  word-wrap: break-word;
+  word-break: break-word;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+.comment-username {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Mobile comment adjustments */
+@media (max-width: 768px) {
+  .comment-content {
+    font-size: 0.875rem;
+  }
+  
+  .comment-username {
+    max-width: 120px;
+  }
+}
+
+/* Loading animations for comments */
+@keyframes commentFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.comment-item {
+  animation: commentFadeIn 0.3s ease-out;
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.success-message {
+  animation: slideInDown 0.3s ease-out;
+}

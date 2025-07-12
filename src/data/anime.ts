@@ -6,7 +6,7 @@ export interface Episode {
     hydax: string;
     mxdrop: string;
   };
-  downloadUrl?: string; // Optional download link
+  downloadUrl?: string; 
 }
 
 export interface Anime {
@@ -50,6 +50,16 @@ export const animeData: Anime = {
       videoId: 'kBo9MXg-C',
       servers: {
         hydax: 'kBo9MXg-C',
+        mxdrop: 'eler0ndjt8nnzv'
+      },
+      downloadUrl: 'https://drive.google.com/file/d/1-iRgvZnyAbOKf4470JSfNa5T9zwo5ehW/view?usp=sharing'
+    },
+    { 
+      id: 2, 
+      title: 'Episode 2', 
+      videoId: 'WVLKhnFOj',
+      servers: {
+        hydax: 'WVLKhnFOj',
         mxdrop: 'eler0ndjt8nnzv'
       },
       downloadUrl: 'https://drive.google.com/file/d/1-iRgvZnyAbOKf4470JSfNa5T9zwo5ehW/view?usp=sharing'

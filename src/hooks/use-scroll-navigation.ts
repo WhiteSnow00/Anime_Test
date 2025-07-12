@@ -6,6 +6,7 @@ export interface ScrollSectionRefs {
   videoRef: React.RefObject<HTMLDivElement>;
   episodesRef: React.RefObject<HTMLDivElement>;
   infoRef: React.RefObject<HTMLDivElement>;
+  commentRef: React.RefObject<HTMLDivElement>;
 }
 
 export interface ScrollActions {
@@ -35,6 +36,7 @@ export function useScrollNavigation(options: UseScrollNavigationOptions = {}) {
   const videoRef = useRef<HTMLDivElement>(null);
   const episodesRef = useRef<HTMLDivElement>(null);
   const infoRef = useRef<HTMLDivElement>(null);
+  const commentRef = useRef<HTMLDivElement>(null);
 
   // Intersection Observer for tracking visible sections
   const observerRef = useRef<IntersectionObserver | null>(null);
@@ -69,6 +71,7 @@ export function useScrollNavigation(options: UseScrollNavigationOptions = {}) {
       video: videoRef,
       episodes: episodesRef,
       info: infoRef,
+      comment: commentRef,
     };
 
     const targetRef = sectionMap[section];
@@ -128,6 +131,7 @@ export function useScrollNavigation(options: UseScrollNavigationOptions = {}) {
     videoRef,
     episodesRef,
     infoRef,
+    commentRef,
   };
 
   const actions: ScrollActions = {
