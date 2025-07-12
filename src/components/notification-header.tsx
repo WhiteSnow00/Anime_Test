@@ -21,16 +21,51 @@ interface NotificationHeaderProps {
 }
 
 export function NotificationHeader({ className }: NotificationHeaderProps) {
-  const [isVisible, setIsVisible] = useState(true);
+  const [isVisible, setIsVisible] = useState(false);
   const [isAnimated, setIsAnimated] = useState(false);
 
   useEffect(() => {
-    // Add entrance animation
-    const timer = setTimeout(() => setIsAnimated(true), 100);
-    return () => clearTimeout(timer);
+    // Check if notification was dismissed in the last 24 hours
+    const checkNotificationStatus = () => {
+      try {
+        const dismissedAt = localStorage.getItem('notification-dismissed-at');
+        if (dismissedAt) {
+          const dismissedTime = new Date(dismissedAt);
+          const now = new Date();
+          const hoursSinceDismissed = (now.getTime() - dismissedTime.getTime()) / (1000 * 60 * 60);
+          
+          // If less than 24 hours have passed, keep it hidden
+          if (hoursSinceDismissed < 24) {
+            setIsVisible(false);
+            return;
+          }
+        }
+        
+        // Show notification if it hasn't been dismissed or 24+ hours have passed
+        setIsVisible(true);
+        
+        // Add entrance animation after showing
+        const timer = setTimeout(() => setIsAnimated(true), 100);
+        return () => clearTimeout(timer);
+      } catch (error) {
+        // If localStorage fails, default to showing the notification
+        console.warn('Failed to check notification status:', error);
+        setIsVisible(true);
+        const timer = setTimeout(() => setIsAnimated(true), 100);
+        return () => clearTimeout(timer);
+      }
+    };
+
+    checkNotificationStatus();
   }, []);
 
   const handleClose = () => {
+    try {
+      localStorage.setItem('notification-dismissed-at', new Date().toISOString());
+    } catch (error) {
+      console.warn('Failed to save notification dismissal:', error);
+    }
+    
     setIsAnimated(false);
     setTimeout(() => setIsVisible(false), 300);
   };
@@ -106,13 +141,13 @@ export function NotificationHeader({ className }: NotificationHeaderProps) {
                 </div>
 
                 {/* Schedule info */}
-                <div className="mt-4 p-3 bg-white/50 dark:bg-gray-900/20 rounded-lg border border-pink-100 dark:border-pink-900/30">
-                  <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-muted-foreground">
+                <div className="mt-4 p-3 bg-white/50 dark:bg-gray-900/20 rounded-lg border border-pink-100 dark:border-pink-900/30 w-fit">
+                  <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm text-muted-foreground">
                     <div className="flex items-center gap-1.5">
                       <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-pink-500" />
                       <span className="vietnamese-text">Lịch phát sóng cố định (hoặc không)</span>
                     </div>
-                    <div className="hidden sm:block w-px h-4 bg-pink-200 dark:bg-pink-800" />
+                    <div className="w-px h-3 bg-pink-200 dark:bg-pink-800" />
                     <div className="flex items-center gap-1.5">
                       <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-purple-500" />
                       <span className="vietnamese-text">Cập nhật đều đặn hàng tuần (hoặc không)</span>
@@ -127,7 +162,7 @@ export function NotificationHeader({ className }: NotificationHeaderProps) {
                 size="sm"
                 onClick={handleClose}
                 className="flex-shrink-0 h-8 w-8 p-0 hover:bg-pink-100 dark:hover:bg-pink-900/50 rounded-full transition-all duration-200 hover:scale-110"
-                title="Đóng thông báo"
+                title="Ẩn thông báo trong 24 giờ"
               >
                 <X className="h-4 w-4 text-muted-foreground hover:text-pink-600" />
               </Button>

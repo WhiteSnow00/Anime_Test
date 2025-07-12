@@ -48,10 +48,10 @@ export const animeData: Anime = {
     { 
       id: 1, 
       title: 'Episode 1', 
-      videoId: 'kBo9MXg-C',
+      videoId: 'McHS0ZLgg',
       servers: {
-        hydax: 'kBo9MXg-C',
-        mxdrop: 'eler0ndjt8nnzv'
+        hydax: 'McHS0ZLgg',
+        mxdrop: 'pjm8lxzob8q387'
       },
       downloadUrl: 'https://drive.google.com/file/d/1-iRgvZnyAbOKf4470JSfNa5T9zwo5ehW/view?usp=sharing',
       rawDownloadUrl: 'https://drive.google.com/file/d/1CHh6EMCr2Lg2q76NHnUSyYClA3si0SO2/view?usp=sharing'
