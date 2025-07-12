@@ -205,7 +205,7 @@ function AnimePageComponent() {
 
         {/* Comment Section */}
         <div ref={refs.commentRef} id="comment-section" data-section="comment" className="mt-6">
-          <CommentSection />
+          <CommentSection currentEpisodeId={(navState.currentEpisode || episodes[0]).id} />
         </div>
       </div>
 

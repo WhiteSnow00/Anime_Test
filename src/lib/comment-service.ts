@@ -53,7 +53,8 @@ export class CommentService {
       timestamp: new Date(),
       isApproved: true, // Auto-approve for now, can be changed to false for moderation
       userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
-      ipAddress: 'localhost' // In real app, get from server
+      ipAddress: 'localhost', // In real app, get from server
+      episodeViewing: formData.episodeViewing // Track episode user was watching
     };
 
     comments.unshift(newComment); // Add to beginning for newest first
@@ -184,7 +185,6 @@ export class CommentService {
     // Check for spam patterns
     const spamPatterns = [
       /(.)\1{10,}/, // Repeated characters
-      /https?:\/\/[^\s]+/gi, // URLs
       /\b(?:spam|bot|fake)\b/gi, // Spam keywords
     ];
 
@@ -194,5 +194,126 @@ export class CommentService {
     }
 
     return errors;
+  }
+
+  // Convert text shortcuts to emojis
+  static processEmojis(text: string): string {
+    const emojiMap: Record<string, string> = {
+      // Hearts and love
+      '<3': '❤️',
+      '</3': '💔',
+      ':heart:': '❤️',
+      ':love:': '💕',
+      
+      // Happy emotions
+      ':)': '😊',
+      ':-)': '😊',
+      ':D': '😃',
+      ':-D': '😃',
+      ':happy:': '😊',
+      ':smile:': '😊',
+      ':laugh:': '😂',
+      ':joy:': '😂',
+      
+      // Sad emotions  
+      ':(':  '😢',
+      ':-(':  '😢',
+      ':sad:': '😢',
+      ':cry:': '😭',
+      
+      // Other emotions
+      ':o': '😮',
+      ':-o': '😮',
+      ':surprised:': '😮',
+      ':angry:': '😠',
+      ':mad:': '😡',
+      ':cool:': '😎',
+      ':wink:': '😉',
+      ';)': '😉',
+      ';-)': '😉',
+      
+      // Anime/manga specific
+      ':kawaii:': '🥰',
+      ':cute:': '🥰',
+      ':anime:': '🎌',
+      ':manga:': '📚',
+      ':otaku:': '🤓',
+      
+      // Thumbs
+      ':thumbsup:': '👍',
+      ':thumbsdown:': '👎',
+      ':like:': '👍',
+      ':dislike:': '👎',
+      
+      // Vietnamese specific
+      ':vietnam:': '🇻🇳',
+      ':vn:': '🇻🇳',
+      
+      // Popular ones
+      ':fire:': '🔥',
+      ':star:': '⭐',
+      ':sparkle:': '✨',
+      ':100:': '💯',
+      ':clap:': '👏',
+      ':pray:': '🙏',
+      ':think:': '🤔',
+      ':wow:': '😱'
+    };
+
+    let processedText = text;
+    
+    // Replace emoji shortcuts
+    Object.entries(emojiMap).forEach(([shortcut, emoji]) => {
+      const regex = new RegExp(shortcut.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+      processedText = processedText.replace(regex, emoji);
+    });
+
+    return processedText;
+  }
+
+  // Get available emoji shortcuts for UI help
+  static getEmojiShortcuts(): Array<{category: string, emojis: Array<{shortcut: string, emoji: string, name: string}>}> {
+    return [
+      {
+        category: 'Cảm xúc cơ bản',
+        emojis: [
+          { shortcut: ':)', emoji: '😊', name: 'Vui vẻ' },
+          { shortcut: ':D', emoji: '😃', name: 'Cười to' },
+          { shortcut: ':(', emoji: '😢', name: 'Buồn' },
+          { shortcut: ':o', emoji: '😮', name: 'Ngạc nhiên' },
+          { shortcut: ';)', emoji: '😉', name: 'Nháy mắt' },
+          { shortcut: ':cool:', emoji: '😎', name: 'Ngầu' }
+        ]
+      },
+      {
+        category: 'Yêu thích',
+        emojis: [
+          { shortcut: '<3', emoji: '❤️', name: 'Yêu' },
+          { shortcut: ':kawaii:', emoji: '🥰', name: 'Dễ thương' },
+          { shortcut: ':fire:', emoji: '🔥', name: 'Xuất sắc' },
+          { shortcut: ':star:', emoji: '⭐', name: 'Tuyệt vời' },
+          { shortcut: ':100:', emoji: '💯', name: 'Hoàn hảo' },
+          { shortcut: ':clap:', emoji: '👏', name: 'Vỗ tay' }
+        ]
+      },
+      {
+        category: 'Anime/Manga',
+        emojis: [
+          { shortcut: ':anime:', emoji: '🎌', name: 'Anime' },
+          { shortcut: ':manga:', emoji: '📚', name: 'Manga' },
+          { shortcut: ':otaku:', emoji: '🤓', name: 'Otaku' },
+          { shortcut: ':vn:', emoji: '🇻🇳', name: 'Việt Nam' }
+        ]
+      },
+      {
+        category: 'Phản ứng',
+        emojis: [
+          { shortcut: ':thumbsup:', emoji: '👍', name: 'Thích' },
+          { shortcut: ':wow:', emoji: '😱', name: 'Wow' },
+          { shortcut: ':think:', emoji: '🤔', name: 'Suy nghĩ' },
+          { shortcut: ':pray:', emoji: '🙏', name: 'Cầu nguyện' }
+        ]
+      }
+    ];
   }
 }

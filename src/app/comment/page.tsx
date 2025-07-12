@@ -22,7 +22,8 @@ import {
   BarChart3,
   Calendar,
   TrendingUp,
-  Lock
+  Lock,
+  Play
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -248,6 +249,12 @@ export default function CommentManagement() {
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="font-medium">{comment.userName}</span>
+                          {comment.episodeViewing && (
+                            <Badge variant="outline" className="text-xs flex items-center gap-1">
+                              <Play className="h-3 w-3" />
+                              Đang xem Tập {comment.episodeViewing}
+                            </Badge>
+                          )}
                           <Badge variant={comment.isApproved ? 'default' : 'secondary'}>
                             {comment.isApproved ? (
                               <>
