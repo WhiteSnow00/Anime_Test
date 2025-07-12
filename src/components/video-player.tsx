@@ -3,8 +3,11 @@
 import { memo, useCallback, useMemo, useRef, useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { useViewport } from '@/hooks/use-viewport';
+import { useVideoTransition } from '@/hooks/use-video-transition';
 import { withPerformanceOptimization, withErrorBoundary } from '@/lib/higher-order-components';
 import { fp, performanceUtils } from '@/lib/advanced-utils';
+import { Loader2, Play, AlertCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export type ServerType = 'hydax' | 'mxdrop';
 
@@ -16,6 +19,7 @@ interface VideoPlayerProps {
   controls?: boolean;
   onLoad?: () => void;
   onError?: (error: string) => void;
+  episodeTitle?: string;
   className?: string;
 }
 
@@ -27,11 +31,26 @@ function VideoPlayerComponent({
   controls = true,
   onLoad,
   onError,
+  episodeTitle = 'Episode',
   className 
 }: VideoPlayerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const viewport = useViewport();
   const [isHydrated, setIsHydrated] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Use video transition hook for smooth episode switching
+  const {
+    state: transitionState,
+    actions: transitionActions,
+    styles: transitionStyles,
+    computed: transitionComputed,
+  } = useVideoTransition(videoId, {
+    transitionDuration: 300,
+    loadingDelay: 150,
+    fadeInDuration: 250,
+    preloadNext: true,
+  });
 
   // Track hydration to avoid hydration mismatch
   useEffect(() => {
@@ -40,13 +59,15 @@ function VideoPlayerComponent({
 
   // Memoized iframe URL with advanced parameters
   const iframeUrl = useMemo(() => {
+    const currentVideoId = transitionComputed.currentVideoId || videoId;
+    
     if (server === 'mxdrop') {
       // MxDrop server URL
-      return `//mxdrop.to/e/${videoId}`;
+      return `//mxdrop.to/e/${currentVideoId}`;
     }
     
     // Hydax server URL (default)
-    const baseUrl = `https://short.icu/${videoId}`;
+    const baseUrl = `https://short.icu/${currentVideoId}`;
     
     let quality = 'hd1080'; 
     if (isHydrated && viewport.width > 0) {
@@ -61,26 +82,34 @@ function VideoPlayerComponent({
     });
     
     return `${baseUrl}?${params.toString()}`;
-  }, [videoId, server, autoPlay, muted, controls, isHydrated, viewport.width]);
+  }, [transitionComputed.currentVideoId, server, autoPlay, muted, controls, isHydrated, viewport.width]);
 
-  // Advanced iframe load handler with error handling
+  // Advanced iframe load handler with transition state management
   const handleIframeLoad = useCallback(
     fp.debounce(() => {
       if (iframeRef.current) {
+        setLoadError(null);
         onLoad?.();
-        console.log(`Video player loaded: ${videoId}`);
+        console.log(`Video player loaded: ${transitionComputed.currentVideoId}`);
+        // Complete transition when iframe loads
+        if (transitionState.isTransitioning) {
+          setTimeout(() => transitionActions.completeTransition(), 100);
+        }
       }
-    }, 100),
-    [videoId, onLoad]
+    }, 200),
+    [transitionComputed.currentVideoId, transitionState.isTransitioning, transitionActions, onLoad]
   );
 
-  // Error handling for iframe
+  // Error handling for iframe with transition state management
   const handleIframeError = useCallback(
     fp.throttle((error: string) => {
+      setLoadError(error);
       onError?.(error);
       console.error(`Video player error: ${error}`);
+      // Reset transition on error
+      transitionActions.resetTransition();
     }, 1000),
-    [onError]
+    [onError, transitionActions]
   );
 
   // Responsive iframe dimensions - use consistent default to avoid hydration mismatch
@@ -125,7 +154,7 @@ function VideoPlayerComponent({
     return () => observer.disconnect();
   }, []);
 
-  // Performance monitoring
+  // Performance monitoring with transition tracking
   const performanceProfiler = useMemo(
     () => performanceUtils.createProfiler('VideoPlayer'),
     []
@@ -138,11 +167,12 @@ function VideoPlayerComponent({
       performanceProfiler.end(start);
       if (process.env.NODE_ENV === 'development') {
         console.log('VideoPlayer performance stats:', performanceProfiler.getStats());
+        console.log('Transition state:', transitionState.transitionPhase);
       }
     };
-  }, [performanceProfiler, videoId]);
+  }, [performanceProfiler, videoId, transitionState.transitionPhase]);
 
-  // Memoized iframe props for performance
+  // Memoized iframe props for performance with transition support
   const iframeProps = useMemo(() => ({
     ref: iframeRef,
     width: iframeDimensions.width,
@@ -151,37 +181,97 @@ function VideoPlayerComponent({
     frameBorder: "0",
     scrolling: "no" as const,
     allowFullScreen: true,
-    allow: "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share", // Required for YouTube
+    allow: "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share",
     onLoad: handleIframeLoad,
     onError: () => handleIframeError(`Failed to load video: ${videoId}`),
     className: "w-full h-full touch-manipulation",
     style: {
       border: 'none',
       outline: 'none',
+      ...transitionStyles.getTransitionStyles(),
     },
     // Enhanced accessibility
-    title: `Video player for episode ${videoId}`,
-    'aria-label': `Video content for episode ${videoId}`,
+    title: `Video player for ${episodeTitle}`,
+    'aria-label': `Video content for ${episodeTitle}`,
   }), [
     videoId,
+    episodeTitle,
     iframeDimensions,
     iframeUrl,
     handleIframeLoad,
     handleIframeError,
+    transitionStyles,
   ]);
 
-  // Loading state component
-  const LoadingOverlay = memo(() => (
-    <div className="absolute inset-0 flex items-center justify-center bg-muted/50">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-    </div>
-  ));
+  // Enhanced loading overlay component with transition support
+  const LoadingOverlay = memo(() => {
+    const overlayProps = transitionStyles.getLoadingOverlayProps();
+    
+    if (!overlayProps.isVisible && !transitionComputed.shouldShowLoader) {
+      return null;
+    }
+
+    return (
+      <div 
+        className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm z-10"
+        style={{
+          opacity: overlayProps.opacity,
+          transition: overlayProps.transition,
+        }}
+      >
+        <div className="flex flex-col items-center space-y-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <div className="text-sm text-muted-foreground">
+            Loading {episodeTitle}...
+          </div>
+          {transitionState.transitionPhase !== 'idle' && (
+            <div className="w-24 h-1 bg-muted rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-primary transition-all duration-300 ease-out"
+                style={{ width: `${transitionComputed.transitionProgress}%` }}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  });
+
+  LoadingOverlay.displayName = 'LoadingOverlay';
 
   return (
-    <Card className={`w-full overflow-hidden shadow-lg rounded-lg ${className}`}>
-      <div className="aspect-video bg-muted relative">
+    <Card className={cn("w-full overflow-hidden shadow-lg rounded-lg transition-all duration-300", className)}>
+      <div 
+        className={cn(
+          "aspect-video bg-muted relative",
+          transitionStyles.getContainerClasses()
+        )}
+      >
+        {/* Enhanced Loading Overlay */}
+        <LoadingOverlay />
+        
+        {/* Error State */}
+        {loadError && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-destructive/10 z-20">
+            <AlertCircle className="h-12 w-12 text-destructive mb-2" />
+            <p className="text-sm text-destructive text-center px-4">
+              Failed to load video
+            </p>
+            <button
+              onClick={() => {
+                setLoadError(null);
+                transitionActions.resetTransition();
+              }}
+              className="mt-2 px-3 py-1 bg-destructive text-destructive-foreground rounded text-xs hover:bg-destructive/90 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+        
+        {/* Video iframe with smooth transitions */}
         <iframe 
-          key={`${server}-${videoId}`} 
+          key={`${server}-${transitionComputed.currentVideoId}`} 
           {...iframeProps} 
           suppressHydrationWarning={true}
         />

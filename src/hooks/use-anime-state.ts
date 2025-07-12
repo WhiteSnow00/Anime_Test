@@ -305,8 +305,8 @@ export function useAnimeState(initialAnime?: Anime) {
         }
       }
     }
-  }, []); // Only run on mount
-
+  }, []); 
+  
   return {
     state,
     actions,

@@ -14,7 +14,7 @@ export type ServerType = 'hydax' | 'mxdrop';
 interface ServerSelectorProps {
   currentServer: ServerType;
   onServerChange: (server: ServerType) => void;
-  currentEpisode?: Episode; // Add current episode for download functionality
+  currentEpisode?: Episode; 
   className?: string;
 }
 

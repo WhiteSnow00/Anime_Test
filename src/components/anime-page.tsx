@@ -81,13 +81,18 @@ function AnimePageComponent() {
     [animeData.episodes]
   );
 
-  // Advanced episode selection with analytics
+  // Advanced episode selection with video transition
   const handleSelectEpisode = useCallback(
     fp.compose(
       utils.performance.measure,
       (episode: Episode) => {
+        // Only update episode state, video player will handle transition automatically
         navActions.selectEpisode(episode);
         scrollActions.scrollToTop();
+        
+        // Optional: Add analytics or user feedback
+        console.log(`Switching to episode ${episode.id}: ${episode.title}`);
+        
         return episode;
       }
     ),
@@ -162,11 +167,15 @@ function AnimePageComponent() {
 
       {/* Main Content */}
       <div className={`w-full max-w-7xl mx-auto ${layoutConfig.spacing} ${layoutConfig.containerClass}`}>
-        {/* Video Section */}
+        {/* Video Section with Enhanced Transitions */}
         <div ref={refs.videoRef} id="video-section" data-section="video">
           <VideoPlayer 
             videoId={getCurrentVideoId(navState.currentEpisode || episodes[0])} 
             server={currentServer}
+            episodeTitle={`Episode ${(navState.currentEpisode || episodes[0]).id}: ${(navState.currentEpisode || episodes[0]).title}`}
+            autoPlay={true}
+            onLoad={() => console.log(`Episode ${(navState.currentEpisode || episodes[0]).id} loaded successfully`)}
+            onError={(error) => console.error(`Episode ${(navState.currentEpisode || episodes[0]).id} error:`, error)}
           />
         </div>
 
