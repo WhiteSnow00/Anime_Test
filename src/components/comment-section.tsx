@@ -128,7 +128,7 @@ export function CommentSection({ currentEpisodeId, className }: CommentSectionPr
           <div className="relative">
             <Textarea
               id="content"
-              placeholder="Chia sẻ cảm nghĩ của bạn về bộ anime này... (Hỗ trợ emoji: :) :D <3 :fire: v.v.)"
+              placeholder="Comment cái gì đó(có vấn đề gì về dịch thuật thì góp ý luôn)"
               value={formData.content}
               onChange={(e) => handleInputChange('content', e.target.value)}
               className="min-h-[100px] resize-none pr-12"
