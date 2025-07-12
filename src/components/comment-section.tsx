@@ -12,17 +12,14 @@ import { MessageCircle, User, Clock, Send, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface CommentSectionProps {
-  episodeId: number;
-  episodeTitle: string;
   className?: string;
 }
 
-export function CommentSection({ episodeId, episodeTitle, className }: CommentSectionProps) {
-  const { comments, isLoading, isSubmitting, addComment } = useComments(episodeId);
+export function CommentSection({ className }: CommentSectionProps) {
+  const { comments, isLoading, isSubmitting, addComment } = useComments();
   const [formData, setFormData] = useState({
     userName: '',
-    content: '',
-    episodeId
+    content: ''
   });
   const [errors, setErrors] = useState<string[]>([]);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -35,7 +32,7 @@ export function CommentSection({ episodeId, episodeTitle, className }: CommentSe
     const result = await addComment(formData);
     
     if (result.success) {
-      setFormData({ userName: '', content: '', episodeId });
+      setFormData({ userName: '', content: '' });
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
     } else {
@@ -58,7 +55,7 @@ export function CommentSection({ episodeId, episodeTitle, className }: CommentSe
         <MessageCircle className="h-6 w-6 text-primary" />
         <div>
           <h3 className="text-lg font-semibold">Bình luận</h3>
-          <p className="text-sm text-muted-foreground">{episodeTitle}</p>
+          <p className="text-sm text-muted-foreground">Hoa Thơm Kiêu Hãnh</p>
         </div>
       </div>
 
@@ -103,21 +100,19 @@ export function CommentSection({ episodeId, episodeTitle, className }: CommentSe
               )}
             </Button>
           </div>
-        </div>
-
-        <div className="space-y-2">
-          <label htmlFor="content" className="text-sm font-medium">
-            Nội dung bình luận *
-          </label>
-          <Textarea
-            id="content"
-            placeholder="Chia sẻ cảm nghĩ của bạn về tập này..."
-            value={formData.content}
-            onChange={(e) => handleInputChange('content', e.target.value)}
-            className="min-h-[100px] resize-none"
-            maxLength={1000}
-            disabled={isSubmitting}
-          />
+        </div>          <div className="space-y-2">
+            <label htmlFor="content" className="text-sm font-medium">
+              Nội dung bình luận *
+            </label>
+            <Textarea
+              id="content"
+              placeholder="Chia sẻ cảm nghĩ của bạn về bộ anime này..."
+              value={formData.content}
+              onChange={(e) => handleInputChange('content', e.target.value)}
+              className="min-h-[100px] resize-none"
+              maxLength={1000}
+              disabled={isSubmitting}
+            />
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>Tối đa 1000 ký tự</span>
             <span>{formData.content.length}/1000</span>
@@ -166,7 +161,7 @@ export function CommentSection({ episodeId, episodeTitle, className }: CommentSe
         ) : comments.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <MessageCircle className="h-12 w-12 mx-auto mb-3 opacity-50" />
-            <p>Chưa có bình luận nào cho tập này</p>
+            <p>Chưa có bình luận nào cho bộ anime này</p>
             <p className="text-sm">Hãy là người đầu tiên bình luận!</p>
           </div>
         ) : (

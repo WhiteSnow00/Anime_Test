@@ -48,7 +48,6 @@ export class CommentService {
     
     const newComment: Comment = {
       id: this.generateId(),
-      episodeId: formData.episodeId,
       userName: formData.userName.trim(),
       content: formData.content.trim(),
       timestamp: new Date(),
@@ -63,10 +62,10 @@ export class CommentService {
     return newComment;
   }
 
-  // Get comments for specific episode
-  static getCommentsForEpisode(episodeId: number): Comment[] {
+  // Get all approved comments for public display
+  static getApprovedComments(): Comment[] {
     return this.getComments()
-      .filter(comment => comment.episodeId === episodeId && comment.isApproved)
+      .filter(comment => comment.isApproved)
       .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
   }
 
@@ -106,14 +105,10 @@ export class CommentService {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     
-    const commentsByEpisode: Record<number, number> = {};
     let commentsToday = 0;
     let approvedComments = 0;
 
     comments.forEach(comment => {
-      // Count by episode
-      commentsByEpisode[comment.episodeId] = (commentsByEpisode[comment.episodeId] || 0) + 1;
-      
       // Count today's comments
       if (comment.timestamp >= today) {
         commentsToday++;
@@ -129,8 +124,7 @@ export class CommentService {
       totalComments: comments.length,
       approvedComments,
       pendingComments: comments.length - approvedComments,
-      commentsToday,
-      commentsByEpisode
+      commentsToday
     };
   }
 

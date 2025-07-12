@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useComments } from '@/hooks/use-comments';
+import { useAdminComments } from '@/hooks/use-comments';
 import { CommentService } from '@/lib/comment-service';
 import { 
   Shield, 
@@ -33,7 +33,7 @@ export default function CommentManagement() {
   const [filter, setFilter] = useState<'all' | 'approved' | 'pending'>('all');
   const [searchTerm, setSearchTerm] = useState('');
 
-  const { comments, toggleApproval, deleteComment, refreshComments } = useComments();
+  const { comments, toggleApproval, deleteComment, refreshComments } = useAdminComments();
 
   useEffect(() => {
     // Check if already authenticated in session
@@ -263,7 +263,6 @@ export default function CommentManagement() {
                           </Badge>
                         </div>
                         <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1">
-                          <span>Tập {comment.episodeId}</span>
                           <span className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
                             {comment.timestamp.toLocaleString('vi-VN')}
@@ -332,22 +331,21 @@ export default function CommentManagement() {
           </div>
         </Card>
 
-        {/* Episodes Statistics */}
+        {/* Overall Statistics */}
         <Card className="p-6">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <BarChart3 className="h-5 w-5" />
-            Thống kê theo tập
+            Tổng quan
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Object.entries(stats.commentsByEpisode)
-              .sort(([a], [b]) => parseInt(a) - parseInt(b))
-              .map(([episodeId, count]) => (
-                <div key={episodeId} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                  <span className="font-medium">Tập {episodeId}</span>
-                  <Badge variant="secondary">{count} bình luận</Badge>
-                </div>
-              ))
-            }
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+              <span className="font-medium">Tổng số bình luận</span>
+              <Badge variant="secondary">{stats.totalComments}</Badge>
+            </div>
+            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+              <span className="font-medium">Bình luận hôm nay</span>
+              <Badge variant="secondary">{stats.commentsToday}</Badge>
+            </div>
           </div>
         </Card>
       </div>

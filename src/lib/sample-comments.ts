@@ -7,9 +7,8 @@ import { Comment } from '@/types/comment';
 const SAMPLE_COMMENTS: Comment[] = [
   {
     id: 'sample-1',
-    episodeId: 1,
     userName: 'Anh Minh',
-    content: 'Tập đầu rất hay! Cảm động khi thấy Rintaro và Kaoruko gặp nhau lần đầu. Mong được xem tập tiếp theo.',
+    content: 'Anime rất hay! Cảm động khi thấy Rintaro và Kaoruko gặp nhau. Story line rất cuốn hút, mong được xem tiếp theo.',
     timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
     isApproved: true,
     userAgent: 'Sample User Agent',
@@ -17,9 +16,8 @@ const SAMPLE_COMMENTS: Comment[] = [
   },
   {
     id: 'sample-2',
-    episodeId: 1,
     userName: 'Chị Linh',
-    content: 'Animation rất đẹp, studio CloverWorks làm tốt lắm! Nhạc nền cũng phù hợp với không khí của truyện.',
+    content: 'Animation rất đẹp, studio CloverWorks làm tốt lắm! Nhạc nền cũng phù hợp với không khí của truyện. Character design dễ thương.',
     timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000), // 4 hours ago
     isApproved: true,
     userAgent: 'Sample User Agent',
@@ -27,9 +25,8 @@ const SAMPLE_COMMENTS: Comment[] = [
   },
   {
     id: 'sample-3',
-    episodeId: 1,
     userName: 'Bạn Nam',
-    content: 'Mình đã đọc manga rồi nhưng anime vẫn khiến mình cảm động. Diễn viên lồng tiếng Nhật rất hay!',
+    content: 'Mình đã đọc manga rồi nhưng anime vẫn khiến mình cảm động. Diễn viên lồng tiếng Nhật rất hay! Adaptation rất trung thành.',
     timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000), // 6 hours ago
     isApproved: true,
     userAgent: 'Sample User Agent',
@@ -37,9 +34,8 @@ const SAMPLE_COMMENTS: Comment[] = [
   },
   {
     id: 'sample-4',
-    episodeId: 2,
     userName: 'Thanh Hương',
-    content: 'Tập 2 phát triển nhân vật rất tốt. Kaoruko dễ thương quá! Hy vọng tình cảm của 2 bạn sẽ tiến triển.',
+    content: 'Bộ anime phát triển nhân vật rất tốt. Kaoruko dễ thương quá! Hy vọng tình cảm của 2 bạn sẽ tiến triển. Romance rất ngọt ngào.',
     timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000), // 1 hour ago
     isApproved: true,
     userAgent: 'Sample User Agent',
@@ -47,9 +43,8 @@ const SAMPLE_COMMENTS: Comment[] = [
   },
   {
     id: 'sample-5',
-    episodeId: 2,
     userName: 'Anh Tuấn',
-    content: 'Waiting cho tập 3! Drama giữa 2 trường học thật thú vị, không biết sẽ ra sao tiếp theo.',
+    content: 'Waiting cho season tiếp theo! Drama giữa 2 trường học thật thú vị. Cốt truyện rất hay và có chiều sâu.',
     timestamp: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
     isApproved: false, // Pending approval
     userAgent: 'Sample User Agent',

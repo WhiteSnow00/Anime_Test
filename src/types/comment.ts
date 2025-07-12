@@ -1,6 +1,5 @@
 export interface Comment {
   id: string;
-  episodeId: number;
   userName: string;
   content: string;
   timestamp: Date;
@@ -12,7 +11,6 @@ export interface Comment {
 export interface CommentFormData {
   userName: string;
   content: string;
-  episodeId: number;
 }
 
 export interface CommentStats {
@@ -20,5 +18,4 @@ export interface CommentStats {
   approvedComments: number;
   pendingComments: number;
   commentsToday: number;
-  commentsByEpisode: Record<number, number>;
 }

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { CommentService } from '@/lib/comment-service';
 import { Comment, CommentFormData } from '@/types/comment';
 
-export function useComments(episodeId?: number) {
+export function useComments() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -13,9 +13,7 @@ export function useComments(episodeId?: number) {
   const loadComments = () => {
     setIsLoading(true);
     try {
-      const allComments = episodeId 
-        ? CommentService.getCommentsForEpisode(episodeId)
-        : CommentService.getAllCommentsAdmin();
+      const allComments = CommentService.getApprovedComments();
       setComments(allComments);
     } catch (error) {
       console.error('Error loading comments:', error);
@@ -50,6 +48,38 @@ export function useComments(episodeId?: number) {
     }
   };
 
+  // Load comments on mount
+  useEffect(() => {
+    loadComments();
+  }, []);
+
+  return {
+    comments,
+    isLoading,
+    isSubmitting,
+    addComment,
+    refreshComments: loadComments,
+  };
+}
+
+// Separate hook for admin functions
+export function useAdminComments() {
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load all comments (including unapproved)
+  const loadComments = () => {
+    setIsLoading(true);
+    try {
+      const allComments = CommentService.getAllCommentsAdmin();
+      setComments(allComments);
+    } catch (error) {
+      console.error('Error loading comments:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Toggle approval (admin only)
   const toggleApproval = (commentId: string) => {
     const success = CommentService.toggleApproval(commentId);
@@ -71,13 +101,11 @@ export function useComments(episodeId?: number) {
   // Load comments on mount
   useEffect(() => {
     loadComments();
-  }, [episodeId]);
+  }, []);
 
   return {
     comments,
     isLoading,
-    isSubmitting,
-    addComment,
     toggleApproval,
     deleteComment,
     refreshComments: loadComments,
