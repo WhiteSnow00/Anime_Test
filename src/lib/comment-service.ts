@@ -2,136 +2,141 @@
 
 import { Comment, CommentFormData } from '@/types/comment';
 
-const STORAGE_KEY = 'anime-comments';
-const ADMIN_PASSWORD = '826264';
-
 export class CommentService {
-  // Get all comments from localStorage
-  static getComments(): Comment[] {
-    if (typeof window === 'undefined') return [];
-    
+  // Get all approved comments from API
+  static async getComments(): Promise<Comment[]> {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (!stored) return [];
+      const response = await fetch('/api/comments', {
+        method: 'GET',
+        cache: 'no-store'
+      });
       
-      const comments = JSON.parse(stored);
-      // Convert timestamp strings back to Date objects
-      return comments.map((comment: any) => ({
-        ...comment,
-        timestamp: new Date(comment.timestamp)
-      }));
+      const data = await response.json();
+      
+      if (data.success) {
+        // Convert timestamp strings back to Date objects
+        return data.comments.map((comment: any) => ({
+          ...comment,
+          timestamp: new Date(comment.timestamp)
+        }));
+      }
+      
+      return [];
     } catch (error) {
       console.error('Error loading comments:', error);
       return [];
     }
   }
 
-  // Save comments to localStorage
-  static saveComments(comments: Comment[]): void {
-    if (typeof window === 'undefined') return;
-    
+  // Add new comment via API
+  static async addComment(formData: CommentFormData): Promise<Comment | null> {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(comments));
+      const response = await fetch('/api/comments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userName: formData.userName.trim(),
+          content: this.processEmojis(formData.content.trim()),
+          episodeViewing: formData.episodeViewing
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        return {
+          ...data.comment,
+          timestamp: new Date(data.comment.timestamp)
+        };
+      }
+      
+      return null;
     } catch (error) {
-      console.error('Error saving comments:', error);
+      console.error('Error adding comment:', error);
+      return null;
     }
   }
 
-  // Generate unique ID
-  static generateId(): string {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2);
-  }
-
-  // Add new comment
-  static addComment(formData: CommentFormData): Comment {
-    const comments = this.getComments();
-    
-    const newComment: Comment = {
-      id: this.generateId(),
-      userName: formData.userName.trim(),
-      content: formData.content.trim(),
-      timestamp: new Date(),
-      isApproved: true, // Auto-approve for now, can be changed to false for moderation
-      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
-      ipAddress: 'localhost', // In real app, get from server
-      episodeViewing: formData.episodeViewing // Track episode user was watching
-    };
-
-    comments.unshift(newComment); // Add to beginning for newest first
-    this.saveComments(comments);
-    
-    return newComment;
-  }
-
-  // Get all approved comments for public display
-  static getApprovedComments(): Comment[] {
-    return this.getComments()
-      .filter(comment => comment.isApproved)
-      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-  }
-
   // Get all comments for admin (including unapproved)
-  static getAllCommentsAdmin(): Comment[] {
-    return this.getComments()
-      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-  }
+  static async getAllCommentsAdmin(password: string): Promise<{comments: Comment[], stats: any} | null> {
+    try {
+      const response = await fetch(`/api/comments/admin?password=${encodeURIComponent(password)}`, {
+        method: 'GET',
+        cache: 'no-store'
+      });
 
-  // Approve/Unapprove comment
-  static toggleApproval(commentId: string): boolean {
-    const comments = this.getComments();
-    const commentIndex = comments.findIndex(c => c.id === commentId);
-    
-    if (commentIndex === -1) return false;
-    
-    comments[commentIndex].isApproved = !comments[commentIndex].isApproved;
-    this.saveComments(comments);
-    
-    return true;
-  }
-
-  // Delete comment
-  static deleteComment(commentId: string): boolean {
-    const comments = this.getComments();
-    const filteredComments = comments.filter(c => c.id !== commentId);
-    
-    if (filteredComments.length === comments.length) return false;
-    
-    this.saveComments(filteredComments);
-    return true;
-  }
-
-  // Get comment statistics
-  static getStats() {
-    const comments = this.getComments();
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
-    let commentsToday = 0;
-    let approvedComments = 0;
-
-    comments.forEach(comment => {
-      // Count today's comments
-      if (comment.timestamp >= today) {
-        commentsToday++;
+      const data = await response.json();
+      
+      if (data.success) {
+        return {
+          comments: data.comments.map((comment: any) => ({
+            ...comment,
+            timestamp: new Date(comment.timestamp)
+          })),
+          stats: data.stats
+        };
       }
       
-      // Count approved comments
-      if (comment.isApproved) {
-        approvedComments++;
-      }
-    });
-
-    return {
-      totalComments: comments.length,
-      approvedComments,
-      pendingComments: comments.length - approvedComments,
-      commentsToday
-    };
+      return null;
+    } catch (error) {
+      console.error('Error loading admin comments:', error);
+      return null;
+    }
   }
 
-  // Validate admin password
+  // Toggle comment approval via API
+  static async toggleApproval(commentId: string, password: string): Promise<boolean> {
+    try {
+      const response = await fetch('/api/comments/admin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          password,
+          action: 'toggle-approval',
+          commentId
+        })
+      });
+
+      const data = await response.json();
+      return data.success;
+    } catch (error) {
+      console.error('Error toggling approval:', error);
+      return false;
+    }
+  }
+
+  // Delete comment via API
+  static async deleteComment(commentId: string, password: string): Promise<boolean> {
+    try {
+      const response = await fetch('/api/comments/admin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          password,
+          action: 'delete',
+          commentId
+        })
+      });
+
+      const data = await response.json();
+      return data.success;
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      return false;
+    }
+  }
+
+  // Validate admin password (server-side validation only)
   static validateAdminPassword(password: string): boolean {
-    return password === ADMIN_PASSWORD;
+    // Client-side validation removed for security
+    // Real validation happens server-side only
+    return password.length >= 6;
   }
 
   // Format relative time in Vietnamese

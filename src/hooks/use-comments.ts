@@ -9,11 +9,11 @@ export function useComments() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Load comments
-  const loadComments = () => {
+  // Load comments from API
+  const loadComments = async () => {
     setIsLoading(true);
     try {
-      const allComments = CommentService.getApprovedComments();
+      const allComments = await CommentService.getComments();
       setComments(allComments);
     } catch (error) {
       console.error('Error loading comments:', error);
@@ -22,7 +22,7 @@ export function useComments() {
     }
   };
 
-  // Add comment
+  // Add comment via API
   const addComment = async (formData: CommentFormData): Promise<{ success: boolean; errors?: string[] }> => {
     setIsSubmitting(true);
     
@@ -33,13 +33,16 @@ export function useComments() {
         return { success: false, errors };
       }
 
-      // Add comment
-      const newComment = CommentService.addComment(formData);
+      // Add comment via API
+      const newComment = await CommentService.addComment(formData);
       
-      // Reload comments to reflect changes
-      loadComments();
-      
-      return { success: true };
+      if (newComment) {
+        // Reload comments to reflect changes
+        await loadComments();
+        return { success: true };
+      } else {
+        return { success: false, errors: ['Có lỗi xảy ra khi gửi bình luận'] };
+      }
     } catch (error) {
       console.error('Error adding comment:', error);
       return { success: false, errors: ['Có lỗi xảy ra, vui lòng thử lại'] };
@@ -63,48 +66,64 @@ export function useComments() {
 }
 
 // Separate hook for admin functions
-export function useAdminComments() {
+export function useAdminComments(password: string) {
   const [comments, setComments] = useState<Comment[]>([]);
+  const [stats, setStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Load all comments (including unapproved)
-  const loadComments = () => {
+  const loadComments = async () => {
+    if (!password || password.trim() === '') {
+      setIsLoading(false);
+      return;
+    }
+    
     setIsLoading(true);
     try {
-      const allComments = CommentService.getAllCommentsAdmin();
-      setComments(allComments);
+      const result = await CommentService.getAllCommentsAdmin(password);
+      if (result) {
+        setComments(result.comments);
+        setStats(result.stats);
+      }
     } catch (error) {
-      console.error('Error loading comments:', error);
+      console.error('Error loading admin comments:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
   // Toggle approval (admin only)
-  const toggleApproval = (commentId: string) => {
-    const success = CommentService.toggleApproval(commentId);
+  const toggleApproval = async (commentId: string) => {
+    const success = await CommentService.toggleApproval(commentId, password);
     if (success) {
-      loadComments();
+      await loadComments();
     }
     return success;
   };
 
   // Delete comment (admin only)
-  const deleteComment = (commentId: string) => {
-    const success = CommentService.deleteComment(commentId);
+  const deleteComment = async (commentId: string) => {
+    const success = await CommentService.deleteComment(commentId, password);
     if (success) {
-      loadComments();
+      await loadComments();
     }
     return success;
   };
 
   // Load comments on mount
   useEffect(() => {
-    loadComments();
-  }, []);
+    if (password && password.trim() !== '') {
+      loadComments();
+    } else {
+      setIsLoading(false);
+      setStats(null);
+      setComments([]);
+    }
+  }, [password]);
 
   return {
     comments,
+    stats,
     isLoading,
     toggleApproval,
     deleteComment,

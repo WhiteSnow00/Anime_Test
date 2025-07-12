@@ -34,25 +34,36 @@ export default function CommentManagement() {
   const [filter, setFilter] = useState<'all' | 'approved' | 'pending'>('all');
   const [searchTerm, setSearchTerm] = useState('');
 
-  const { comments, toggleApproval, deleteComment, refreshComments } = useAdminComments();
+  // Only initialize admin hook when authenticated
+  const { comments, stats, isLoading, toggleApproval, deleteComment, refreshComments } = useAdminComments(
+    isAuthenticated && password ? password : ''
+  );
 
   useEffect(() => {
-    // Check if already authenticated in session
-    const authStatus = sessionStorage.getItem('comment-admin-auth');
-    if (authStatus === 'true') {
-      setIsAuthenticated(true);
-    }
+    // Clear any existing session on mount to force re-authentication
+    sessionStorage.removeItem('comment-admin-auth');
+    sessionStorage.removeItem('comment-admin-password');
   }, []);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAuthError('');
     
-    if (CommentService.validateAdminPassword(password)) {
-      setIsAuthenticated(true);
-      setAuthError('');
-      sessionStorage.setItem('comment-admin-auth', 'true');
-    } else {
-      setAuthError('Mật khẩu không đúng');
+    // Validate password by trying to fetch admin data
+    try {
+      const result = await CommentService.getAllCommentsAdmin(password);
+      
+      if (result) {
+        setIsAuthenticated(true);
+        setAuthError('');
+        sessionStorage.setItem('comment-admin-auth', 'true');
+        sessionStorage.setItem('comment-admin-password', password);
+      } else {
+        setAuthError('Mật khẩu không đúng. Vui lòng kiểm tra lại.');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      setAuthError('Có lỗi xảy ra, vui lòng thử lại');
     }
   };
 
@@ -60,6 +71,7 @@ export default function CommentManagement() {
     setIsAuthenticated(false);
     setPassword('');
     sessionStorage.removeItem('comment-admin-auth');
+    sessionStorage.removeItem('comment-admin-password');
   };
 
   // Get filtered comments
@@ -74,9 +86,6 @@ export default function CommentManagement() {
     
     return matchesFilter && matchesSearch;
   });
-
-  // Get statistics
-  const stats = CommentService.getStats();
 
   if (!isAuthenticated) {
     return (
@@ -138,15 +147,30 @@ export default function CommentManagement() {
         </div>
 
         {/* Statistics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <MessageCircle className="h-5 w-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Tổng bình luận</p>
-                <p className="text-2xl font-bold">{stats.totalComments}</p>
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Card key={i} className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gray-200 rounded-lg animate-pulse" />
+                  <div className="space-y-2">
+                    <div className="h-4 bg-gray-200 rounded animate-pulse w-20" />
+                    <div className="h-6 bg-gray-200 rounded animate-pulse w-12" />
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        ) : stats ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <MessageCircle className="h-5 w-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Tổng bình luận</p>
+                  <p className="text-2xl font-bold">{stats.totalComments}</p>
               </div>
             </div>
           </Card>
@@ -187,6 +211,21 @@ export default function CommentManagement() {
             </div>
           </Card>
         </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Card key={i} className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gray-100 rounded-lg animate-pulse" />
+                  <div>
+                    <div className="h-4 w-20 bg-gray-200 rounded animate-pulse mb-1" />
+                    <div className="h-6 w-12 bg-gray-200 rounded animate-pulse" />
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
 
         {/* Filters and Search */}
         <Card className="p-4">
@@ -197,21 +236,21 @@ export default function CommentManagement() {
                 size="sm"
                 onClick={() => setFilter('all')}
               >
-                Tất cả ({stats.totalComments})
+                Tất cả {stats ? `(${stats.totalComments})` : ''}
               </Button>
               <Button
                 variant={filter === 'approved' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setFilter('approved')}
               >
-                Đã duyệt ({stats.approvedComments})
+                Đã duyệt {stats ? `(${stats.approvedComments})` : ''}
               </Button>
               <Button
                 variant={filter === 'pending' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setFilter('pending')}
               >
-                Chờ duyệt ({stats.pendingComments})
+                Chờ duyệt {stats ? `(${stats.pendingComments})` : ''}
               </Button>
             </div>
 
@@ -339,22 +378,24 @@ export default function CommentManagement() {
         </Card>
 
         {/* Overall Statistics */}
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" />
-            Tổng quan
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-              <span className="font-medium">Tổng số bình luận</span>
-              <Badge variant="secondary">{stats.totalComments}</Badge>
+        {stats && (
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Tổng quan
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="font-medium">Tổng số bình luận</span>
+                <Badge variant="secondary">{stats.totalComments}</Badge>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="font-medium">Bình luận hôm nay</span>
+                <Badge variant="secondary">{stats.commentsToday}</Badge>
+              </div>
             </div>
-            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-              <span className="font-medium">Bình luận hôm nay</span>
-              <Badge variant="secondary">{stats.commentsToday}</Badge>
-            </div>
-          </div>
-        </Card>
+          </Card>
+        )}
       </div>
     </div>
   );

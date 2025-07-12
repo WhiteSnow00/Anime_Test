@@ -18,6 +18,10 @@ out/
 .env.test.local
 .env.production.local
 
+# Comment system data (keep private)
+data/
+comments.json
+
 # Cache files
 .cache/
 .parcel-cache/
