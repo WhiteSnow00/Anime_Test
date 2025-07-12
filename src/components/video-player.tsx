@@ -203,7 +203,7 @@ function VideoPlayerComponent({
     transitionStyles,
   ]);
 
-  // Enhanced loading overlay component with transition support
+  // Enhanced loading overlay component with mobile-optimized transition support
   const LoadingOverlay = memo(() => {
     const overlayProps = transitionStyles.getLoadingOverlayProps();
     
@@ -211,21 +211,40 @@ function VideoPlayerComponent({
       return null;
     }
 
+    // Check if mobile for optimized UI
+    const isMobileDevice = viewport.isMobile;
+
     return (
       <div 
-        className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm z-10"
+        className={cn(
+          "absolute inset-0 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm z-10",
+          // Mobile-specific optimizations
+          isMobileDevice && "backdrop-blur-none bg-background/90" // Less intensive backdrop blur on mobile
+        )}
         style={{
           opacity: overlayProps.opacity,
           transition: overlayProps.transition,
         }}
       >
-        <div className="flex flex-col items-center space-y-3">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <div className="text-sm text-muted-foreground">
-            Loading {episodeTitle}...
+        <div className={cn(
+          "flex flex-col items-center space-y-3",
+          isMobileDevice ? "space-y-2" : "space-y-3" // Tighter spacing on mobile
+        )}>
+          <Loader2 className={cn(
+            "animate-spin text-primary",
+            isMobileDevice ? "h-6 w-6" : "h-8 w-8" // Smaller spinner on mobile
+          )} />
+          <div className={cn(
+            "text-muted-foreground text-center px-2",
+            isMobileDevice ? "text-xs" : "text-sm" // Smaller text on mobile
+          )}>
+            Đang tải {episodeTitle}...
           </div>
           {transitionState.transitionPhase !== 'idle' && (
-            <div className="w-24 h-1 bg-muted rounded-full overflow-hidden">
+            <div className={cn(
+              "bg-muted rounded-full overflow-hidden",
+              isMobileDevice ? "w-16 h-0.5" : "w-24 h-1" // Smaller progress bar on mobile
+            )}>
               <div 
                 className="h-full bg-primary transition-all duration-300 ease-out"
                 style={{ width: `${transitionComputed.transitionProgress}%` }}
@@ -250,21 +269,30 @@ function VideoPlayerComponent({
         {/* Enhanced Loading Overlay */}
         <LoadingOverlay />
         
-        {/* Error State */}
+        {/* Error State - Mobile Optimized */}
         {loadError && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-destructive/10 z-20">
-            <AlertCircle className="h-12 w-12 text-destructive mb-2" />
-            <p className="text-sm text-destructive text-center px-4">
-              Failed to load video
+            <AlertCircle className={cn(
+              "text-destructive mb-2",
+              viewport.isMobile ? "h-8 w-8" : "h-12 w-12"
+            )} />
+            <p className={cn(
+              "text-destructive text-center px-4",
+              viewport.isMobile ? "text-xs" : "text-sm"
+            )}>
+              {viewport.isMobile ? "Lỗi tải video" : "Failed to load video"}
             </p>
             <button
               onClick={() => {
                 setLoadError(null);
                 transitionActions.resetTransition();
               }}
-              className="mt-2 px-3 py-1 bg-destructive text-destructive-foreground rounded text-xs hover:bg-destructive/90 transition-colors"
+              className={cn(
+                "mt-2 bg-destructive text-destructive-foreground rounded hover:bg-destructive/90 transition-colors",
+                viewport.isMobile ? "px-2 py-1 text-xs" : "px-3 py-1 text-xs"
+              )}
             >
-              Retry
+              {viewport.isMobile ? "Thử lại" : "Retry"}
             </button>
           </div>
         )}

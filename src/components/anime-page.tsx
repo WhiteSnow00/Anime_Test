@@ -172,7 +172,7 @@ function AnimePageComponent() {
           <VideoPlayer 
             videoId={getCurrentVideoId(navState.currentEpisode || episodes[0])} 
             server={currentServer}
-            episodeTitle={`Episode ${(navState.currentEpisode || episodes[0]).id}: ${(navState.currentEpisode || episodes[0]).title}`}
+            episodeTitle={`Tập ${(navState.currentEpisode || episodes[0]).id}`}
             autoPlay={true}
             onLoad={() => console.log(`Episode ${(navState.currentEpisode || episodes[0]).id} loaded successfully`)}
             onError={(error) => console.error(`Episode ${(navState.currentEpisode || episodes[0]).id} error:`, error)}

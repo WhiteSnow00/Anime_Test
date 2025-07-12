@@ -30,6 +30,14 @@ export function useVideoTransition(
     preloadNext = false,
   } = options;
 
+  // Mobile-optimized transition settings
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  const mobileOptimizedSettings = {
+    transitionDuration: isMobile ? Math.min(transitionDuration, 250) : transitionDuration,
+    loadingDelay: isMobile ? Math.min(loadingDelay, 80) : loadingDelay,
+    fadeInDuration: isMobile ? Math.min(fadeInDuration, 150) : fadeInDuration,
+  };
+
   const [state, setState] = useState<VideoTransitionState>({
     isTransitioning: false,
     isLoading: false,
@@ -68,45 +76,43 @@ export function useVideoTransition(
       nextVideoId: newVideoId,
       transitionPhase: 'fade-out',
       isVisible: false,
-    }));
-
-    // Phase 1: Fade out current video
-    timeoutRef.current = setTimeout(() => {
-      setState(prev => ({
-        ...prev,
-        transitionPhase: 'loading',
-        isLoading: true,
-        currentVideoId: newVideoId,
-        nextVideoId: null,
-      }));
-
-      // Phase 2: Load new video
+    }));      // Phase 1: Fade out current video
       timeoutRef.current = setTimeout(() => {
         setState(prev => ({
           ...prev,
-          transitionPhase: 'fade-in',
-          isVisible: true,
+          transitionPhase: 'loading',
+          isLoading: true,
+          currentVideoId: newVideoId,
+          nextVideoId: null,
         }));
 
-        // Phase 3: Fade in new video
+        // Phase 2: Load new video
         timeoutRef.current = setTimeout(() => {
           setState(prev => ({
             ...prev,
-            isTransitioning: false,
-            isLoading: false,
-            transitionPhase: 'complete',
+            transitionPhase: 'fade-in',
+            isVisible: true,
           }));
 
-          // Phase 4: Complete transition
+          // Phase 3: Fade in new video
           timeoutRef.current = setTimeout(() => {
             setState(prev => ({
               ...prev,
-              transitionPhase: 'idle',
+              isTransitioning: false,
+              isLoading: false,
+              transitionPhase: 'complete',
             }));
-          }, 50);
-        }, fadeInDuration);
-      }, loadingDelay);
-    }, transitionDuration);
+
+            // Phase 4: Complete transition
+            timeoutRef.current = setTimeout(() => {
+              setState(prev => ({
+                ...prev,
+                transitionPhase: 'idle',
+              }));
+            }, 50);
+          }, mobileOptimizedSettings.fadeInDuration);
+        }, mobileOptimizedSettings.loadingDelay);
+      }, mobileOptimizedSettings.transitionDuration);
   }, [state.isTransitioning, transitionDuration, loadingDelay, fadeInDuration]);
 
   // Force complete transition (useful for cleanup)
@@ -150,10 +156,13 @@ export function useVideoTransition(
     [startTransition]
   );
 
-  // Get transition styles for smooth animations
+  // Get transition styles for smooth animations (mobile-optimized)
   const getTransitionStyles = useCallback(() => {
+    const duration = mobileOptimizedSettings.transitionDuration;
     const baseStyle = {
-      transition: `opacity ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1), transform ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+      transition: `opacity ${duration}ms cubic-bezier(0.4, 0, 0.2, 1), transform ${duration}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+      // Add will-change for better mobile performance
+      willChange: 'opacity, transform',
     };
 
     switch (state.transitionPhase) {
@@ -161,13 +170,13 @@ export function useVideoTransition(
         return {
           ...baseStyle,
           opacity: 0,
-          transform: 'scale(0.98)',
+          transform: isMobile ? 'scale(0.99)' : 'scale(0.98)', // Less aggressive scaling on mobile
         };
       case 'loading':
         return {
           ...baseStyle,
           opacity: 0,
-          transform: 'scale(0.98)',
+          transform: isMobile ? 'scale(0.99)' : 'scale(0.98)',
         };
       case 'fade-in':
         return {
@@ -182,29 +191,29 @@ export function useVideoTransition(
           transform: 'scale(1)',
         };
     }
-  }, [state.transitionPhase, transitionDuration]);
+  }, [state.transitionPhase, mobileOptimizedSettings.transitionDuration, isMobile]);
 
-  // Get container classes for different transition phases
+  // Get container classes for different transition phases (mobile-optimized)
   const getContainerClasses = useCallback(() => {
     const baseClasses = 'relative overflow-hidden';
     
     switch (state.transitionPhase) {
       case 'loading':
-        return `${baseClasses} opacity-50`;
+        return `${baseClasses} ${isMobile ? 'opacity-60' : 'opacity-50'}`;
       case 'fade-out':
       case 'fade-in':
-        return `${baseClasses} transition-all duration-300`;
+        return `${baseClasses} transition-all ${isMobile ? 'duration-200' : 'duration-300'}`;
       default:
         return baseClasses;
     }
-  }, [state.transitionPhase]);
+  }, [state.transitionPhase, isMobile]);
 
-  // Loading overlay component props
+  // Loading overlay component props (mobile-optimized)
   const getLoadingOverlayProps = useCallback(() => ({
     isVisible: state.isLoading || state.transitionPhase === 'loading',
     opacity: state.transitionPhase === 'loading' ? 1 : 0,
-    transition: `opacity ${fadeInDuration}ms ease-in-out`,
-  }), [state.isLoading, state.transitionPhase, fadeInDuration]);
+    transition: `opacity ${mobileOptimizedSettings.fadeInDuration}ms ease-in-out`,
+  }), [state.isLoading, state.transitionPhase, mobileOptimizedSettings.fadeInDuration]);
 
   return {
     state,
