@@ -5,6 +5,7 @@ import { Toaster } from '@/components/ui/toaster';
 export const metadata: Metadata = {
   title: 'Xem Anime Online',
   description: 'Web coi anime thay gdrive!',
+  viewport: 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no',
   openGraph: {
     title: 'Xem Anime Online',
     description: 'Web coi anime thay gdrive!',

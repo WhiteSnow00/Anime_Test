@@ -70,59 +70,40 @@ export function CommentSection({ currentEpisodeId, className }: CommentSectionPr
   };
 
   return (
-    <Card className={cn("w-full p-6", className)}>
+    <Card className={cn("w-full p-4 sm:p-6 mb-20 lg:mb-0", className)}>
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
-        <MessageCircle className="h-6 w-6 text-primary" />
+        <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
         <div>
-          <h3 className="text-lg font-semibold">Bình luận</h3>
-          <p className="text-sm text-muted-foreground">Hoa Thơm Kiêu Hãnh</p>
+          <h3 className="text-base sm:text-lg font-semibold">Bình luận</h3>
+          <p className="text-xs sm:text-sm text-muted-foreground">Hoa Thơm Kiêu Hãnh</p>
         </div>
       </div>
 
       {/* Comment Form */}
-      <form onSubmit={handleSubmit} className="space-y-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label htmlFor="userName" className="text-sm font-medium">
-              Tên của bạn *
-            </label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="userName"
-                type="text"
-                placeholder="Nhập tên hiển thị..."
-                value={formData.userName}
-                onChange={(e) => handleInputChange('userName', e.target.value)}
-                className="pl-10"
-                maxLength={50}
-                disabled={isSubmitting}
-              />
-            </div>
+      <div className="comment-form-container">
+        <form onSubmit={handleSubmit} className="space-y-4 mb-6">
+        {/* Name Input - Full width on mobile */}
+        <div className="space-y-2">
+          <label htmlFor="userName" className="text-sm font-medium block">
+            Tên của bạn *
+          </label>
+          <div className="relative">
+            <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              id="userName"
+              type="text"
+              placeholder="Nhập tên hiển thị..."
+              value={formData.userName}
+              onChange={(e) => handleInputChange('userName', e.target.value)}
+              className="pl-10 h-11 text-base mobile-input"
+              maxLength={50}
+              disabled={isSubmitting}
+            />
           </div>
-          
-          <div className="flex items-end">
-            <Button
-              type="submit"
-              disabled={isSubmitting || !formData.userName.trim() || !formData.content.trim()}
-              className="w-full md:w-auto"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Đang gửi...
-                </>
-              ) : (
-                <>
-                  <Send className="h-4 w-4 mr-2" />
-                  Gửi bình luận
-                </>
-              )}
-            </Button>
-          </div>
-        </div>        <div className="space-y-2">
-          <label htmlFor="content" className="text-sm font-medium">
+        </div>        {/* Content Input */}
+        <div className="space-y-2">
+          <label htmlFor="content" className="text-sm font-medium block">
             Nội dung bình luận *
           </label>
           <div className="relative">
@@ -131,7 +112,7 @@ export function CommentSection({ currentEpisodeId, className }: CommentSectionPr
               placeholder="Comment cái gì đó(có vấn đề gì về dịch thuật thì góp ý luôn)"
               value={formData.content}
               onChange={(e) => handleInputChange('content', e.target.value)}
-              className="min-h-[100px] resize-none pr-12"
+              className="min-h-[100px] resize-none pr-12 text-base leading-relaxed mobile-input"
               maxLength={1000}
               disabled={isSubmitting}
             />
@@ -139,8 +120,9 @@ export function CommentSection({ currentEpisodeId, className }: CommentSectionPr
               type="button"
               variant="ghost"
               size="sm"
-              className="absolute top-2 right-2 h-8 w-8 p-0"
+              className="absolute top-2 right-2 h-9 w-9 p-0 touch-target-lg"
               onClick={() => setShowEmojiHelper(!showEmojiHelper)}
+              title="Thêm emoji"
             >
               <Smile className="h-4 w-4" />
             </Button>
@@ -149,8 +131,8 @@ export function CommentSection({ currentEpisodeId, className }: CommentSectionPr
           {/* Emoji Helper */}
           <Collapsible open={showEmojiHelper} onOpenChange={setShowEmojiHelper}>
             <CollapsibleContent className="mt-2">
-              <Card className="p-3 bg-muted/30">
-                <div className="text-xs font-medium mb-2 flex items-center gap-2">
+              <Card className="p-3 bg-muted/30 max-h-48 sm:max-h-60 overflow-y-auto emoji-helper-mobile">
+                <div className="text-xs font-medium mb-2 flex items-center gap-2 sticky top-0 bg-muted/30 pb-1">
                   <Smile className="h-3 w-3" />
                   Biểu tượng cảm xúc
                 </div>
@@ -165,11 +147,11 @@ export function CommentSection({ currentEpisodeId, className }: CommentSectionPr
                             type="button"
                             variant="outline"
                             size="sm"
-                            className="h-7 px-2 text-xs"
+                            className="h-9 px-2 text-xs min-w-0 touch-target-lg emoji-button-mobile"
                             onClick={() => insertEmoji(emoji.emoji)}
                             title={`${emoji.name} (${emoji.shortcut})`}
                           >
-                            {emoji.emoji} {emoji.shortcut}
+                            <span className="text-xs truncate">{emoji.emoji} {emoji.shortcut}</span>
                           </Button>
                         ))}
                       </div>
@@ -183,10 +165,32 @@ export function CommentSection({ currentEpisodeId, className }: CommentSectionPr
             </CollapsibleContent>
           </Collapsible>
           
-          <div className="flex justify-between text-xs text-muted-foreground">
+          <div className="flex flex-col sm:flex-row sm:justify-between text-xs text-muted-foreground gap-1">
             <span>Tối đa 1000 ký tự</span>
-            <span>{formData.content.length}/1000</span>
+            <span className="font-medium">{formData.content.length}/1000</span>
           </div>
+        </div>
+
+        {/* Submit Button - Full width on mobile */}
+        <div className="pt-2">
+          <Button
+            type="submit"
+            disabled={isSubmitting || !formData.userName.trim() || !formData.content.trim()}
+            className="w-full sm:w-auto min-h-[48px] text-base font-medium"
+            size="lg"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Đang gửi...
+              </>
+            ) : (
+              <>
+                <Send className="h-4 w-4 mr-2" />
+                Gửi bình luận
+              </>
+            )}
+          </Button>
         </div>
 
         {/* Errors */}
@@ -212,6 +216,7 @@ export function CommentSection({ currentEpisodeId, className }: CommentSectionPr
           </div>
         )}
       </form>
+      </div>
 
       <Separator className="my-6" />
 
@@ -235,30 +240,32 @@ export function CommentSection({ currentEpisodeId, className }: CommentSectionPr
             <p className="text-sm">Hãy là người đầu tiên bình luận!</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {comments.map((comment) => (
-              <Card key={comment.id} className="p-4 bg-muted/30 comment-item">
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
-                    <User className="h-4 w-4 text-primary" />
+              <Card key={comment.id} className="p-3 sm:p-4 bg-muted/30 comment-item">
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+                    <User className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
                   </div>
                   
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="font-medium text-sm comment-username">{comment.userName}</span>
-                      {comment.episodeViewing && (
-                        <Badge variant="outline" className="text-xs flex items-center gap-1">
-                          <Play className="h-3 w-3" />
-                          Tập {comment.episodeViewing}
-                        </Badge>
-                      )}
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3" />
-                        {CommentService.formatRelativeTime(comment.timestamp)}
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-2">
+                      <span className="font-medium text-sm comment-username vietnamese-text">{comment.userName}</span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {comment.episodeViewing && (
+                          <Badge variant="outline" className="text-xs flex items-center gap-1">
+                            <Play className="h-3 w-3" />
+                            Tập {comment.episodeViewing}
+                          </Badge>
+                        )}
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Clock className="h-3 w-3" />
+                          {CommentService.formatRelativeTime(comment.timestamp)}
+                        </div>
                       </div>
                     </div>
                     
-                    <p className="text-sm leading-relaxed comment-content">
+                    <p className="text-sm sm:text-base leading-relaxed comment-content vietnamese-text">
                       {comment.content}
                     </p>
                   </div>
