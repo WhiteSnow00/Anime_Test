@@ -10,7 +10,8 @@ import { MobileHeader } from './mobile-header';
 import { MobileBottomNav } from './mobile-bottom-nav';
 import { CommentSection } from './comment-section';
 import { NotificationHeader } from './notification-header';
-import { Heart } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Heart, Info } from 'lucide-react';
 
 // Import advanced hooks and utilities
 import { useAnimeNavigation } from '@/hooks/use-anime-navigation';
@@ -182,6 +183,16 @@ function AnimePageComponent() {
             onLoad={() => console.log(`Episode ${(navState.currentEpisode || episodes[0]).id} loaded successfully`)}
             onError={(error) => console.error(`Episode ${(navState.currentEpisode || episodes[0]).id} error:`, error)}
           />
+        </div>
+
+        {/* Ads Notice Section */}
+        <div className="mb-4">
+          <Alert className="mx-3 sm:mx-0 border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
+            <Info className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <AlertDescription className="text-xs sm:text-sm text-amber-800 dark:text-amber-200 vietnamese-text leading-relaxed ml-1">
+              Sẽ có quảng cáo khi xem anime tại web vì mình đang dùng host free chứ không phải mình đang kiếm tiền từ quảng cáo trên web, mong các bạn thông  cảm!
+            </AlertDescription>
+          </Alert>
         </div>
 
         {/* Server Selection */}

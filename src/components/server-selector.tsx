@@ -63,6 +63,28 @@ function ServerSelectorComponent({
     }
   }, [currentEpisode]);
 
+  const handleRawDownload = useCallback(() => {
+    if (!currentEpisode?.rawDownloadUrl) {
+      console.warn('No raw download URL available for current episode');
+      return;
+    }
+
+    if (!isValidDownloadUrl(currentEpisode.rawDownloadUrl)) {
+      console.error('Invalid raw download URL:', currentEpisode.rawDownloadUrl);
+      return;
+    }
+
+    const filename = `${currentEpisode.title || `Episode ${currentEpisode.id}`}_RAW.mp4`;
+    
+    // Check if it's a Google Drive link and handle accordingly
+    if (currentEpisode.rawDownloadUrl.includes('drive.google.com')) {
+      openGoogleDriveLink(currentEpisode.rawDownloadUrl, filename);
+    } else {
+      // For other types of links, try direct download
+      triggerDownload(currentEpisode.rawDownloadUrl, filename);
+    }
+  }, [currentEpisode]);
+
   return (
     <Card className={cn("w-full shadow-lg rounded-lg", className)}>
       <CardHeader>
@@ -87,8 +109,8 @@ function ServerSelectorComponent({
                   "flex items-center gap-2 font-medium transition-all duration-200",
                   "hover:scale-105 active:scale-95 touch-manipulation",
                   "focus:ring-2 focus:ring-primary focus:ring-offset-2",
-                  "text-xs sm:text-sm", // Responsive text size
-                  "px-3 py-2 sm:px-4 sm:py-2", // Responsive padding
+                  "text-xs sm:text-sm", 
+                  "px-3 py-2 sm:px-4 sm:py-2", 
                   isActive 
                     ? "bg-primary text-primary-foreground shadow-md scale-105" 
                     : "hover:bg-muted",
@@ -113,8 +135,8 @@ function ServerSelectorComponent({
                 "flex items-center gap-2 font-medium transition-all duration-200",
                 "hover:scale-105 active:scale-95 touch-manipulation",
                 "focus:ring-2 focus:ring-primary focus:ring-offset-2",
-                "text-xs sm:text-sm", // Responsive text size
-                "px-3 py-2 sm:px-4 sm:py-2", // Responsive padding
+                "text-xs sm:text-sm", 
+                "px-3 py-2 sm:px-4 sm:py-2", 
                 "bg-purple-500 text-white hover:bg-purple-600 border-purple-500",
               )}
               onClick={handleDownload}
@@ -124,6 +146,29 @@ function ServerSelectorComponent({
               <div className="flex flex-col items-start">
                 <span className="text-xs sm:text-sm font-semibold">Tải về</span>
                 <span className="text-xs opacity-75 hidden sm:block">Google Drive</span>
+              </div>
+            </Button>
+          )}
+
+          {/* Raw Download Button */}
+          {currentEpisode?.rawDownloadUrl && (
+            <Button
+              variant="outline"
+              className={cn(
+                "flex items-center gap-2 font-medium transition-all duration-200",
+                "hover:scale-105 active:scale-95 touch-manipulation",
+                "focus:ring-2 focus:ring-primary focus:ring-offset-2",
+                "text-xs sm:text-sm", 
+                "px-3 py-2 sm:px-4 sm:py-2", 
+                "bg-gray-500 text-white hover:bg-gray-600 border-gray-500",
+              )}
+              onClick={handleRawDownload}
+              aria-label="Tải phim raw (không phụ đề)"
+            >
+              <Download className="w-3 h-3 sm:w-4 sm:h-4" />
+              <div className="flex flex-col items-start">
+                <span className="text-xs sm:text-sm font-semibold">RAW</span>
+                <span className="text-xs opacity-75 hidden sm:block">Không Sub</span>
               </div>
             </Button>
           )}

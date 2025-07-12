@@ -7,6 +7,7 @@ export interface Episode {
     mxdrop: string;
   };
   downloadUrl?: string; 
+  rawDownloadUrl?: string; // For raw anime without subtitles
 }
 
 export interface Anime {
@@ -52,7 +53,8 @@ export const animeData: Anime = {
         hydax: 'kBo9MXg-C',
         mxdrop: 'eler0ndjt8nnzv'
       },
-      downloadUrl: 'https://drive.google.com/file/d/1-iRgvZnyAbOKf4470JSfNa5T9zwo5ehW/view?usp=sharing'
+      downloadUrl: 'https://drive.google.com/file/d/1-iRgvZnyAbOKf4470JSfNa5T9zwo5ehW/view?usp=sharing',
+      rawDownloadUrl: 'https://drive.google.com/file/d/1CHh6EMCr2Lg2q76NHnUSyYClA3si0SO2/view?usp=sharing'
     },
   ],
 };
