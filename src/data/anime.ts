@@ -54,15 +54,5 @@ export const animeData: Anime = {
       },
       downloadUrl: 'https://drive.google.com/file/d/1-iRgvZnyAbOKf4470JSfNa5T9zwo5ehW/view?usp=sharing'
     },
-    { 
-      id: 2, 
-      title: 'Episode 2', 
-      videoId: 'WVLKhnFOj',
-      servers: {
-        hydax: 'WVLKhnFOj',
-        mxdrop: 'eler0ndjt8nnzv'
-      },
-      downloadUrl: 'https://drive.google.com/file/d/1-iRgvZnyAbOKf4470JSfNa5T9zwo5ehW/view?usp=sharing'
-    },
   ],
 };
