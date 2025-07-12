@@ -9,6 +9,7 @@ import { AnimeInfo } from './anime-info';
 import { MobileHeader } from './mobile-header';
 import { MobileBottomNav } from './mobile-bottom-nav';
 import { CommentSection } from './comment-section';
+import { NotificationHeader } from './notification-header';
 import { Heart } from 'lucide-react';
 
 // Import advanced hooks and utilities
@@ -165,6 +166,9 @@ function AnimePageComponent() {
       {layoutConfig.showMobileHeader && (
         <MobileHeader title={animeDetails.title} />
       )}
+
+      {/* Notification Header */}
+      <NotificationHeader />
 
       {/* Main Content */}
       <div className={`w-full max-w-7xl mx-auto ${layoutConfig.spacing} ${layoutConfig.containerClass}`}>
