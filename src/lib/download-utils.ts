@@ -5,37 +5,44 @@
  */
 
 /**
- * Converts Google Drive share URL to direct download URL
- * @param shareUrl - Google Drive share URL
- * @returns Direct download URL
+ * Opens a Google Drive link in a new tab
+ * @param url - Google Drive share URL
+ * @param filename - Optional filename (for display purposes)
  */
-export function convertGoogleDriveUrl(shareUrl: string): string {
-  // Extract file ID from Google Drive URL
-  const match = shareUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-  if (!match || !match[1]) {
-    console.error('Invalid Google Drive URL:', shareUrl);
-    return shareUrl; // Return original URL if parsing fails
+export function openGoogleDriveLink(url: string, filename?: string): void {
+  try {
+    // Simply open the Google Drive link in a new tab
+    window.open(url, '_blank', 'noopener,noreferrer');
+    
+    console.log('Opened Google Drive link:', url);
+    if (filename) {
+      console.log('Suggested filename:', filename);
+    }
+  } catch (error) {
+    console.error('Failed to open Google Drive link:', error);
+    // Fallback: copy to clipboard
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url).then(() => {
+        alert('Không thể mở link. URL đã được sao chép vào clipboard.');
+      }).catch(() => {
+        alert('Không thể mở link. Vui lòng sao chép URL thủ công: ' + url);
+      });
+    } else {
+      alert('Không thể mở link. Vui lòng sao chép URL thủ công: ' + url);
+    }
   }
-  
-  const fileId = match[1];
-  return `https://drive.google.com/uc?export=download&id=${fileId}`;
 }
 
 /**
- * Triggers direct download of a file
- * @param url - Download URL
+ * Legacy download function for non-Google Drive links
+ * @param url - Download URL  
  * @param filename - Optional filename for the download
  */
 export function triggerDownload(url: string, filename?: string): void {
   try {
-    // Convert Google Drive URL if needed
-    const downloadUrl = url.includes('drive.google.com/file/d/') 
-      ? convertGoogleDriveUrl(url) 
-      : url;
-
     // Create a temporary anchor element
     const link = document.createElement('a');
-    link.href = downloadUrl;
+    link.href = url;
     link.style.display = 'none';
     
     // Set download attribute if filename is provided
@@ -48,11 +55,11 @@ export function triggerDownload(url: string, filename?: string): void {
     link.click();
     document.body.removeChild(link);
     
-    console.log('Download triggered for:', downloadUrl);
+    console.log('Download triggered for:', url);
   } catch (error) {
     console.error('Download failed:', error);
     // Fallback: open in new tab
-    window.open(url, '_blank');
+    window.open(url, '_blank', 'noopener,noreferrer');
   }
 }
 

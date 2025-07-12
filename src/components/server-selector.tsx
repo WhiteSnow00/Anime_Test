@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Server, Play, Download } from 'lucide-react';
 import { withPerformanceOptimization } from '@/lib/higher-order-components';
-import { triggerDownload, isValidDownloadUrl } from '@/lib/download-utils';
+import { triggerDownload, isValidDownloadUrl, openGoogleDriveLink } from '@/lib/download-utils';
 import type { Episode } from '@/data/anime';
 
 export type ServerType = 'hydax' | 'mxdrop';
@@ -53,7 +53,14 @@ function ServerSelectorComponent({
     }
 
     const filename = `${currentEpisode.title || `Episode ${currentEpisode.id}`}.mp4`;
-    triggerDownload(currentEpisode.downloadUrl, filename);
+    
+    // Check if it's a Google Drive link and handle accordingly
+    if (currentEpisode.downloadUrl.includes('drive.google.com')) {
+      openGoogleDriveLink(currentEpisode.downloadUrl, filename);
+    } else {
+      // For other types of links, try direct download
+      triggerDownload(currentEpisode.downloadUrl, filename);
+    }
   }, [currentEpisode]);
 
   return (
@@ -111,12 +118,12 @@ function ServerSelectorComponent({
                 "bg-purple-500 text-white hover:bg-purple-600 border-purple-500",
               )}
               onClick={handleDownload}
-              aria-label="Download episode"
+              aria-label="Mở link Google Drive để tải về"
             >
               <Download className="w-3 h-3 sm:w-4 sm:h-4" />
               <div className="flex flex-col items-start">
-                <span className="text-xs sm:text-sm font-semibold">Download</span>
-                <span className="text-xs opacity-75 hidden sm:block">HD File</span>
+                <span className="text-xs sm:text-sm font-semibold">Tải về</span>
+                <span className="text-xs opacity-75 hidden sm:block">Google Drive</span>
               </div>
             </Button>
           )}
