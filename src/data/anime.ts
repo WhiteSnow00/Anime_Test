@@ -53,7 +53,7 @@ export const animeData: Anime = {
         hydax: 'McHS0ZLgg',
         mxdrop: 'pjm8lxzob8q387'
       },
-      downloadUrl: 'https://drive.google.com/file/d/1-iRgvZnyAbOKf4470JSfNa5T9zwo5ehW/view?usp=sharing',
+      downloadUrl: 'https://drive.google.com/file/d/13GB9iPhIHBdL0HB-XT7mSUISZrLrkunZ/view?usp=sharing',
       rawDownloadUrl: 'https://drive.google.com/file/d/1CHh6EMCr2Lg2q76NHnUSyYClA3si0SO2/view?usp=sharing'
     },
   ],
