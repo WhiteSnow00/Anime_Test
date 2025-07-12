@@ -1,23 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { DatabaseService } from '@/lib/database-service';
 
-// Generate secure admin password from environment
-function getAdminPassword(): string {
-  // Use environment variable for admin password
-  const adminPassword = process.env.ADMIN_PASSWORD;
-  
-  if (!adminPassword) {
-    console.error('ADMIN_PASSWORD environment variable is not set');
-    // Return a default for development, but this should never be used in production
-    return 'NO_PASSWORD_SET';
-  }
-  
-  return adminPassword;
-}
-
-// Simple password validation - only one password accepted
-function validateAdminPassword(password: string): boolean {
-  return password === getAdminPassword();
+// Database-based admin authentication
+async function validateAdminPassword(password: string): Promise<boolean> {
+  // Try default username "admin" 
+  return await DatabaseService.verifyAdminPassword('admin', password);
 }
 
 // GET - Get all comments for admin (including unapproved)
@@ -26,7 +13,15 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const password = url.searchParams.get('password');
 
-    if (!password || !validateAdminPassword(password)) {
+    if (!password) {
+      return NextResponse.json(
+        { success: false, error: 'Password required' },
+        { status: 401 }
+      );
+    }
+
+    const isValid = await validateAdminPassword(password);
+    if (!isValid) {
       return NextResponse.json(
         { success: false, error: 'Invalid admin password' },
         { status: 401 }
@@ -59,7 +54,15 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { password, action, commentId } = body;
 
-    if (!password || !validateAdminPassword(password)) {
+    if (!password) {
+      return NextResponse.json(
+        { success: false, error: 'Password required' },
+        { status: 401 }
+      );
+    }
+
+    const isValid = await validateAdminPassword(password);
+    if (!isValid) {
       return NextResponse.json(
         { success: false, error: 'Invalid admin password' },
         { status: 401 }

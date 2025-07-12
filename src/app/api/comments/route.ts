@@ -4,6 +4,9 @@ import { DatabaseService } from '@/lib/database-service';
 // GET - Fetch all approved comments
 export async function GET() {
   try {
+    // Initialize database on first access
+    await DatabaseService.initDatabase();
+    
     const comments = await DatabaseService.getApprovedComments();
     return NextResponse.json({ success: true, comments });
   } catch (error) {
@@ -18,6 +21,9 @@ export async function GET() {
 // POST - Add new comment
 export async function POST(request: NextRequest) {
   try {
+    // Initialize database on first access
+    await DatabaseService.initDatabase();
+    
     const body = await request.json();
     const { userName, content, episodeViewing } = body;
 
@@ -59,8 +65,20 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error adding comment:', error);
+    
+    // More detailed error logging
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      hasDatabase: !!process.env.POSTGRES_URL
+    });
+    
     return NextResponse.json(
-      { success: false, error: 'Failed to add comment' },
+      { 
+        success: false, 
+        error: 'Failed to add comment',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

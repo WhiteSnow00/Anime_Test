@@ -53,6 +53,26 @@ export class DatabaseService {
       await sql`
         CREATE INDEX IF NOT EXISTS idx_comments_approved ON comments(is_approved)
       `;
+
+      // Create admin table for storing admin credentials
+      await sql`
+        CREATE TABLE IF NOT EXISTS admins (
+          id SERIAL PRIMARY KEY,
+          username VARCHAR(50) UNIQUE NOT NULL,
+          password_hash VARCHAR(255) NOT NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          last_login TIMESTAMP WITH TIME ZONE,
+          is_active BOOLEAN DEFAULT TRUE
+        )
+      `;
+
+      // Create index for admin username lookup
+      await sql`
+        CREATE INDEX IF NOT EXISTS idx_admins_username ON admins(username)
+      `;
+
+      // Initialize default admin if none exists
+      await this.initializeDefaultAdmin();
       
       console.log('Database initialized successfully');
     } catch (error) {
@@ -222,6 +242,118 @@ export class DatabaseService {
         pendingComments: 0,
         commentsToday: 0
       };
+    }
+  }
+
+  // Initialize default admin account
+  static async initializeDefaultAdmin() {
+    try {
+      // Check if any admin exists
+      const existingAdmins = await sql`SELECT COUNT(*) as count FROM admins`;
+      const adminCount = parseInt(existingAdmins.rows[0].count);
+
+      if (adminCount === 0) {
+        console.log('No admin found, creating default admin...');
+        
+        // Create default admin with password "826264"
+        const defaultPassword = '826264';
+        const passwordHash = await this.hashPassword(defaultPassword);
+        
+        await sql`
+          INSERT INTO admins (username, password_hash) 
+          VALUES ('admin', ${passwordHash})
+        `;
+        
+        console.log('✅ Default admin created: username="admin", password="826264"');
+      }
+    } catch (error) {
+      console.error('Error initializing default admin:', error);
+    }
+  }
+
+  // Simple password hashing (compatible with both browser and Node.js)
+  static async hashPassword(password: string): Promise<string> {
+    const salt = 'anime_comment_salt_2025';
+    const combined = salt + password + salt;
+    
+    // Use Web Crypto API if available (browser), otherwise use a simple hash
+    if (typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.subtle) {
+      try {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(combined);
+        const hashBuffer = await globalThis.crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      } catch (error) {
+        console.warn('Web Crypto API failed, falling back to simple hash');
+      }
+    }
+    
+    // Fallback: simple hash using string manipulation
+    let hash = 0;
+    for (let i = 0; i < combined.length; i++) {
+      const char = combined.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return Math.abs(hash).toString(16).padStart(8, '0') + combined.length.toString(16);
+  }
+
+  // Verify admin password
+  static async verifyAdminPassword(username: string, password: string): Promise<boolean> {
+    try {
+      const result = await sql`
+        SELECT password_hash, is_active FROM admins 
+        WHERE username = ${username} AND is_active = true
+      `;
+
+      if (result.rows.length === 0) {
+        return false;
+      }
+
+      const storedHash = result.rows[0].password_hash;
+      const inputHash = await this.hashPassword(password);
+      
+      const isValid = storedHash === inputHash;
+      
+      if (isValid) {
+        // Update last login time
+        await sql`
+          UPDATE admins 
+          SET last_login = NOW() 
+          WHERE username = ${username}
+        `;
+      }
+      
+      return isValid;
+    } catch (error) {
+      console.error('Error verifying admin password:', error);
+      return false;
+    }
+  }
+
+  // Change admin password
+  static async changeAdminPassword(username: string, currentPassword: string, newPassword: string): Promise<boolean> {
+    try {
+      // Verify current password first
+      const isCurrentValid = await this.verifyAdminPassword(username, currentPassword);
+      if (!isCurrentValid) {
+        return false;
+      }
+
+      // Hash new password and update
+      const newPasswordHash = await this.hashPassword(newPassword);
+      await sql`
+        UPDATE admins 
+        SET password_hash = ${newPasswordHash} 
+        WHERE username = ${username}
+      `;
+
+      console.log(`Admin password changed for: ${username}`);
+      return true;
+    } catch (error) {
+      console.error('Error changing admin password:', error);
+      return false;
     }
   }
 }

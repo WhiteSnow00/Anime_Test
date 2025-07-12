@@ -18,9 +18,14 @@ Your anime streaming web app now has a **shared comment system** powered by Neon
 ### **Environment Variables Set:**
 ```bash
 POSTGRES_URL="postgresql://neondb_owner:npg_2SnPZ9dWplyY@ep-round-pine-a7ky8dkr-pooler.ap-southeast-2.aws.neon.tech/neondb?sslmode=require"
-ADMIN_PASSWORD="826264"
 COMMENT_ENCRYPTION_KEY="anime-comment-secure-key-123456!!"
 ```
+
+### **🔐 Admin Authentication:**
+- **Method**: Database-stored credentials (no environment variables needed)
+- **Default Admin**: username: `admin`, password: `826264`
+- **Auto-created**: On first database initialization
+- **Works everywhere**: Same credentials on all deployments
 
 ---
 
@@ -54,21 +59,30 @@ COMMENT_ENCRYPTION_KEY="anime-comment-secure-key-123456!!"
 
 ```bash
 POSTGRES_URL=postgresql://neondb_owner:npg_2SnPZ9dWplyY@ep-round-pine-a7ky8dkr-pooler.ap-southeast-2.aws.neon.tech/neondb?sslmode=require
-ADMIN_PASSWORD=826264
 COMMENT_ENCRYPTION_KEY=anime-comment-secure-key-123456!!
 ```
+
+**Note:** `ADMIN_PASSWORD` is no longer needed - admin credentials are now stored in the database!
 
 #### **Deploy Code:**
 ```bash
 git add .
-git commit -m "✨ Add shared Neon PostgreSQL database for comments"
+git commit -m "🔧 Fix database initialization for Vercel deployment"  
 git push origin main
 ```
 
+**⚠️ IMPORTANT:** After adding environment variables, **redeploy** the project in Vercel to apply changes!
+
 #### **Test After Deployment:**
 - Health: `https://anime-kana.vercel.app/api/health`
+- Debug: `https://anime-kana.vercel.app/api/debug` (check database connection)
 - Comments: `https://anime-kana.vercel.app/api/comments`
 - Admin: `https://anime-kana.vercel.app/comment` (password: 826264)
+
+**🔍 Debug Steps:**
+1. Check `/api/debug` first to verify database connection
+2. If connection fails, verify environment variables are set
+3. If initialization fails, check Vercel function logs
 
 ---
 
@@ -79,10 +93,9 @@ git push origin main
 # Navigate to your project
 cd /path/to/your/anime/project
 
-# Add environment variables (same as Vercel)
+# Add environment variables (no ADMIN_PASSWORD needed anymore!)
 cat >> .env.local << 'EOF'
 POSTGRES_URL="postgresql://neondb_owner:npg_2SnPZ9dWplyY@ep-round-pine-a7ky8dkr-pooler.ap-southeast-2.aws.neon.tech/neondb?sslmode=require"
-ADMIN_PASSWORD="826264"
 COMMENT_ENCRYPTION_KEY="anime-comment-secure-key-123456!!"
 EOF
 ```
