@@ -205,9 +205,9 @@ export function CommentSection({ currentEpisodeId, className }: CommentSectionPr
 
         {/* Success Message */}
         {showSuccess && (
-          <div className="bg-green-50 border border-green-200 rounded-md p-3 success-message">
-            <p className="text-sm text-green-700">
-              ✅ Bình luận của bạn đã được gửi thành công!
+          <div className="bg-gradient-to-r from-pink-500/10 to-purple-500/10 border border-pink-500/50 rounded-md p-3 success-message backdrop-blur-sm">
+            <p className="text-sm text-pink-100">
+              ✨ Bình luận của bạn đã được gửi thành công!
             </p>
           </div>
         )}

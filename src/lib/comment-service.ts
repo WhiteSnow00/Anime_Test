@@ -176,10 +176,21 @@ export class CommentService {
 
     if (!formData.content.trim()) {
       errors.push('Vui lòng nhập nội dung bình luận');
-    } else if (formData.content.trim().length < 3) {
-      errors.push('Bình luận phải có ít nhất 3 ký tự');
-    } else if (formData.content.trim().length > 1000) {
-      errors.push('Bình luận không được quá 1000 ký tự');
+    } else {
+      const content = formData.content.trim();
+      
+      // Check if content contains only emojis or emoji shortcuts
+      const processedContent = this.processEmojis(content);
+      const emojiOnlyRegex = /^[\p{Emoji_Presentation}\p{Emoji}\s]+$/u;
+      const isEmojiOnly = emojiOnlyRegex.test(processedContent) || 
+                         this.containsOnlyEmojiShortcuts(content);
+      
+      // For emoji-only comments, skip minimum length validation
+      if (!isEmojiOnly && content.length < 3) {
+        errors.push('Bình luận phải có ít nhất 3 ký tự');
+      } else if (content.length > 1000) {
+        errors.push('Bình luận không được quá 1000 ký tự');
+      }
     }
 
     // Check for spam patterns
@@ -196,16 +207,45 @@ export class CommentService {
     return errors;
   }
 
+  // Check if content contains only emoji shortcuts
+  static containsOnlyEmojiShortcuts(text: string): boolean {
+    const emojiShortcuts = [
+      '<3', '</3', ':)', ':D', ':(', ':o', ';)', '<(")',
+      ':heart:', ':love:', ':happy:', ':smile:', ':laugh:', ':joy:',
+      ':sad:', ':cry:', ':surprised:', ':angry:', ':mad:', ':cool:',
+      ':wink:', ':kawaii:', ':cute:', ':anime:', ':manga:', ':otaku:',
+      ':thumbsup:', ':thumbsdown:', ':like:', ':dislike:', ':vietnam:',
+      ':vn:', ':fire:', ':star:', ':sparkle:', ':100:', ':clap:',
+      ':pray:', ':think:', ':wow:', ':penguin:', ':cat:', ':dog:',
+      ':bear:', ':panda:', ':tiger:', ':fox:', ':rabbit:', ':frog:',
+      ':pizza:', ':burger:', ':sushi:', ':ramen:', ':coffee:', ':tea:',
+      ':beer:', ':cake:', ':cookie:', ':game:', ':controller:',
+      ':computer:', ':phone:', ':tv:', ':headphones:', ':sun:',
+      ':moon:', ':cloud:', ':rain:', ':snow:', ':flower:', ':tree:',
+      ':rainbow:', ':party:', ':birthday:', ':gift:', ':balloon:',
+      ':trophy:', ':medal:', ':rocket:', ':magic:', ':diamond:',
+      ':crown:', ':money:', ':bomb:', ':ghost:', ':alien:', ':robot:'
+    ];
+    
+    // Remove all emoji shortcuts and whitespace, see if anything remains
+    let cleanText = text;
+    emojiShortcuts.forEach(shortcut => {
+      const regex = new RegExp(shortcut.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+      cleanText = cleanText.replace(regex, '');
+    });
+    
+    // If only whitespace remains, it was emoji shortcuts only
+    return cleanText.trim().length === 0;
+  }
+
   // Convert text shortcuts to emojis
   static processEmojis(text: string): string {
     const emojiMap: Record<string, string> = {
-      // Hearts and love
       '<3': '❤️',
       '</3': '💔',
       ':heart:': '❤️',
       ':love:': '💕',
       
-      // Happy emotions
       ':)': '😊',
       ':-)': '😊',
       ':D': '😃',
@@ -215,13 +255,11 @@ export class CommentService {
       ':laugh:': '😂',
       ':joy:': '😂',
       
-      // Sad emotions  
       ':(':  '😢',
       ':-(':  '😢',
       ':sad:': '😢',
       ':cry:': '😭',
-      
-      // Other emotions
+
       ':o': '😮',
       ':-o': '😮',
       ':surprised:': '😮',
@@ -232,24 +270,20 @@ export class CommentService {
       ';)': '😉',
       ';-)': '😉',
       
-      // Anime/manga specific
       ':kawaii:': '🥰',
       ':cute:': '🥰',
       ':anime:': '🎌',
       ':manga:': '📚',
       ':otaku:': '🤓',
       
-      // Thumbs
       ':thumbsup:': '👍',
       ':thumbsdown:': '👎',
       ':like:': '👍',
       ':dislike:': '👎',
-      
-      // Vietnamese specific
+
       ':vietnam:': '🇻🇳',
       ':vn:': '🇻🇳',
       
-      // Popular ones
       ':fire:': '🔥',
       ':star:': '⭐',
       ':sparkle:': '✨',
@@ -257,7 +291,18 @@ export class CommentService {
       ':clap:': '👏',
       ':pray:': '🙏',
       ':think:': '🤔',
-      ':wow:': '😱'
+      ':wow:': '😱',
+
+      '<(")': '🐧', 
+      ':penguin:': '🐧',
+      ':cat:': '🐱',
+      ':dog:': '🐶',
+      ':bear:': '🐻',
+      ':panda:': '🐼',
+      ':tiger:': '🐯',
+      ':fox:': '🦊',
+      ':rabbit:': '🐰',
+      ':frog:': '🐸',
     };
 
     let processedText = text;
@@ -306,12 +351,48 @@ export class CommentService {
         ]
       },
       {
+        category: 'Động vật',
+        emojis: [
+          { shortcut: '<(")', emoji: '🐧', name: 'Chim cánh cụt' },
+          { shortcut: ':penguin:', emoji: '🐧', name: 'Chim cánh cụt' },
+          { shortcut: ':cat:', emoji: '🐱', name: 'Mèo' },
+          { shortcut: ':dog:', emoji: '🐶', name: 'Chó' },
+          { shortcut: ':panda:', emoji: '🐼', name: 'Gấu trúc' },
+          { shortcut: ':fox:', emoji: '🦊', name: 'Cáo' },
+          { shortcut: ':rabbit:', emoji: '🐰', name: 'Thỏ' }
+        ]
+      },
+      {
+        category: 'Đồ ăn thức uống',
+        emojis: [
+          { shortcut: ':pizza:', emoji: '🍕', name: 'Pizza' },
+          { shortcut: ':sushi:', emoji: '🍣', name: 'Sushi' },
+          { shortcut: ':ramen:', emoji: '🍜', name: 'Ramen' },
+          { shortcut: ':coffee:', emoji: '☕', name: 'Cà phê' },
+          { shortcut: ':cake:', emoji: '🎂', name: 'Bánh kem' },
+          { shortcut: ':cookie:', emoji: '🍪', name: 'Bánh quy' }
+        ]
+      },
+      {
+        category: 'Gaming & Tech',
+        emojis: [
+          { shortcut: ':game:', emoji: '🎮', name: 'Game' },
+          { shortcut: ':computer:', emoji: '💻', name: 'Máy tính' },
+          { shortcut: ':phone:', emoji: '📱', name: 'Điện thoại' },
+          { shortcut: ':headphones:', emoji: '🎧', name: 'Tai nghe' },
+          { shortcut: ':tv:', emoji: '📺', name: 'TV' },
+          { shortcut: ':rocket:', emoji: '🚀', name: 'Tên lửa' }
+        ]
+      },
+      {
         category: 'Phản ứng',
         emojis: [
           { shortcut: ':thumbsup:', emoji: '👍', name: 'Thích' },
           { shortcut: ':wow:', emoji: '😱', name: 'Wow' },
           { shortcut: ':think:', emoji: '🤔', name: 'Suy nghĩ' },
-          { shortcut: ':pray:', emoji: '🙏', name: 'Cầu nguyện' }
+          { shortcut: ':pray:', emoji: '🙏', name: 'Cầu nguyện' },
+          { shortcut: ':party:', emoji: '🎉', name: 'Tiệc tung' },
+          { shortcut: ':trophy:', emoji: '🏆', name: 'Cúp vàng' }
         ]
       }
     ];
