@@ -1,11 +1,11 @@
-import type {Metadata} from 'next';
+import type {Metadata, Viewport} from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 
 export const metadata: Metadata = {
+  metadataBase: new URL('http://ayaya-kana.id.vn/'),
   title: 'Xem Anime Online',
   description: 'Web coi anime thay gdrive!',
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no',
   openGraph: {
     title: 'Xem Anime Online',
     description: 'Web coi anime thay gdrive!',
@@ -28,6 +28,13 @@ export const metadata: Metadata = {
     description: 'Web coi anime thay gdrive!',
     images: ['/images/thumb.jpg'],
   },
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({

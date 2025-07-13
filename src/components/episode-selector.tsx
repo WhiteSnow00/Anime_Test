@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { Episode } from '@/data/anime';
@@ -23,10 +23,26 @@ function EpisodeSelectorComponent({
   onSelectEpisode,
   className,
 }: EpisodeSelectorProps) {
+  // Track hydration to prevent SSR mismatch
+  const [isHydrated, setIsHydrated] = useState(false);
   const viewport = useViewport();
 
-  // Responsive grid calculation
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
+  // Use static grid for SSR, then responsive after hydration
   const gridConfig = useMemo(() => {
+    if (!isHydrated) {
+      // Static configuration for SSR to prevent hydration mismatch
+      return {
+        columns: 6,
+        className: "grid-cols-6 md:grid-cols-8",
+        buttonSize: "h-12 w-full text-sm",
+      };
+    }
+
+    // Dynamic configuration after hydration
     const { width, isMobile, isTablet } = viewport;
     
     if (isMobile) {
@@ -48,7 +64,7 @@ function EpisodeSelectorComponent({
         buttonSize: "h-12 w-full text-sm",
       };
     }
-  }, [viewport]);
+  }, [viewport, isHydrated]);
 
   // Enhanced episode selection with performance optimization
   const handleEpisodeSelect = useCallback(

@@ -23,8 +23,11 @@ interface NotificationHeaderProps {
 export function NotificationHeader({ className }: NotificationHeaderProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [isAnimated, setIsAnimated] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
+    setIsHydrated(true);
+    
     // Check if notification was dismissed in the last 24 hours
     const checkNotificationStatus = () => {
       try {
@@ -70,7 +73,7 @@ export function NotificationHeader({ className }: NotificationHeaderProps) {
     setTimeout(() => setIsVisible(false), 300);
   };
 
-  if (!isVisible) {
+  if (!isHydrated || !isVisible) {
     return null;
   }
 

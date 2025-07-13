@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,12 +39,12 @@ export function CommentSection({ currentEpisodeId, className }: CommentSectionPr
   const endIndex = startIndex + commentsPerPage;
   const currentComments = comments.slice(startIndex, endIndex);
   
-  // Reset to page 1 when comments change (new comment added)
-  useState(() => {
+  // Reset to page 1 when comments change and current page is invalid
+  useEffect(() => {
     if (currentPage > totalPages && totalPages > 0) {
       setCurrentPage(1);
     }
-  });
+  }, [comments.length, currentPage, totalPages]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
