@@ -56,5 +56,17 @@ export const animeData: Anime = {
       downloadUrl: 'https://drive.google.com/file/d/13GB9iPhIHBdL0HB-XT7mSUISZrLrkunZ/view?usp=sharing',
       rawDownloadUrl: 'https://drive.google.com/file/d/1CHh6EMCr2Lg2q76NHnUSyYClA3si0SO2/view?usp=sharing'
     },
+        { 
+      id: 2, 
+      title: 'Episode 2', 
+      videoId: 'aNA9Jfmyv',
+      servers: {
+        hydax: 'aNA9Jfmyv',
+        mxdrop: 'vkl908pqu64970'
+      },
+      downloadUrl: 'https://drive.google.com/file/d/1D0_cyOs9xgtAoKh07-miJ8gZolGkbSIk/view?usp=sharing',
+      rawDownloadUrl: 'https://drive.google.com/file/d/1fgCgQPckMHU1kDyUaS5DG_kVayL_dsth/view?usp=sharing'
+    },
+    
   ],
 };
