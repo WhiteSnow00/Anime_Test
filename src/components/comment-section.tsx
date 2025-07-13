@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useComments } from '@/hooks/use-comments';
 import { CommentService } from '@/lib/comment-service';
-import { MessageCircle, User, Clock, Send, Loader2, Smile, ChevronDown, Play } from 'lucide-react';
+import { MessageCircle, User, Clock, Send, Loader2, Smile, ChevronDown, Play, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface CommentSectionProps {
@@ -28,6 +28,23 @@ export function CommentSection({ currentEpisodeId, className }: CommentSectionPr
   const [errors, setErrors] = useState<string[]>([]);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showEmojiHelper, setShowEmojiHelper] = useState(false);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const commentsPerPage = 12;
+  
+  // Calculate pagination
+  const totalPages = Math.ceil(comments.length / commentsPerPage);
+  const startIndex = (currentPage - 1) * commentsPerPage;
+  const endIndex = startIndex + commentsPerPage;
+  const currentComments = comments.slice(startIndex, endIndex);
+  
+  // Reset to page 1 when comments change (new comment added)
+  useState(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1);
+    }
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -226,6 +243,11 @@ export function CommentSection({ currentEpisodeId, className }: CommentSectionPr
           <h4 className="font-medium">
             Bình luận ({comments.length})
           </h4>
+          {totalPages > 1 && (
+            <div className="text-xs text-muted-foreground">
+              Trang {currentPage} / {totalPages}
+            </div>
+          )}
         </div>
 
         {isLoading ? (
@@ -240,39 +262,95 @@ export function CommentSection({ currentEpisodeId, className }: CommentSectionPr
             <p className="text-sm">Hãy là người đầu tiên bình luận!</p>
           </div>
         ) : (
-          <div className="space-y-3 sm:space-y-4">
-            {comments.map((comment) => (
-              <Card key={comment.id} className="p-3 sm:p-4 bg-muted/30 comment-item">
-                <div className="flex items-start gap-2 sm:gap-3">
-                  <div className="w-7 h-7 sm:w-8 sm:h-8 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
-                    <User className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-                  </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-2">
-                      <span className="font-medium text-sm comment-username vietnamese-text">{comment.userName}</span>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {comment.episodeViewing && (
-                          <Badge variant="outline" className="text-xs flex items-center gap-1">
-                            <Play className="h-3 w-3" />
-                            Tập {comment.episodeViewing}
-                          </Badge>
-                        )}
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Clock className="h-3 w-3" />
-                          {CommentService.formatRelativeTime(comment.timestamp)}
-                        </div>
-                      </div>
+          <>
+            <div className="space-y-3 sm:space-y-4">
+              {currentComments.map((comment) => (
+                <Card key={comment.id} className="p-3 sm:p-4 bg-muted/30 comment-item">
+                  <div className="flex items-start gap-2 sm:gap-3">
+                    <div className="w-7 h-7 sm:w-8 sm:h-8 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+                      <User className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
                     </div>
                     
-                    <p className="text-sm sm:text-base leading-relaxed comment-content vietnamese-text">
-                      {comment.content}
-                    </p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-2">
+                        <span className="font-medium text-sm comment-username vietnamese-text">{comment.userName}</span>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {comment.episodeViewing && (
+                            <Badge variant="outline" className="text-xs flex items-center gap-1">
+                              <Play className="h-3 w-3" />
+                              Tập {comment.episodeViewing}
+                            </Badge>
+                          )}
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            {CommentService.formatRelativeTime(comment.timestamp)}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <p className="text-sm sm:text-base leading-relaxed comment-content vietnamese-text">
+                        {comment.content}
+                      </p>
+                    </div>
                   </div>
+                </Card>
+              ))}
+            </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 mt-6 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="h-9 px-3 text-xs sm:text-sm"
+                >
+                  <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                  Trước
+                </Button>
+
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={currentPage === pageNum ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(pageNum)}
+                        className="h-9 w-9 p-0 text-xs sm:text-sm"
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
                 </div>
-              </Card>
-            ))}
-          </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="h-9 px-3 text-xs sm:text-sm"
+                >
+                  Sau
+                  <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 ml-1" />
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </Card>
