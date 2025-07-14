@@ -8,7 +8,6 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAdminComments } from '@/hooks/use-comments';
-import { CommentService } from '@/lib/comment-service';
 import { 
   Shield, 
   MessageCircle, 
@@ -49,11 +48,12 @@ export default function CommentManagement() {
     e.preventDefault();
     setAuthError('');
     
-    // Validate password by trying to fetch admin data
+    // Validate password by calling the admin API
     try {
-      const result = await CommentService.getAllCommentsAdmin(password);
+      const response = await fetch(`/api/comments/admin?password=${encodeURIComponent(password)}`);
+      const result = await response.json();
       
-      if (result) {
+      if (result.success) {
         setIsAuthenticated(true);
         setAuthError('');
         sessionStorage.setItem('comment-admin-auth', 'true');

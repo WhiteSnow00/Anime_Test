@@ -80,10 +80,16 @@ export function useAdminComments(password: string) {
     
     setIsLoading(true);
     try {
-      const result = await CommentService.getAllCommentsAdmin(password);
-      if (result) {
+      const response = await fetch(`/api/comments/admin?password=${encodeURIComponent(password)}`);
+      const result = await response.json();
+      
+      if (result.success) {
         setComments(result.comments);
         setStats(result.stats);
+      } else {
+        console.error('Admin authentication failed:', result.error);
+        setComments([]);
+        setStats(null);
       }
     } catch (error) {
       console.error('Error loading admin comments:', error);
@@ -94,20 +100,56 @@ export function useAdminComments(password: string) {
 
   // Toggle approval (admin only)
   const toggleApproval = async (commentId: string) => {
-    const success = await CommentService.toggleApproval(commentId, password);
-    if (success) {
-      await loadComments();
+    try {
+      const response = await fetch('/api/comments/admin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          password,
+          action: 'toggle-approval',
+          commentId
+        })
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        await loadComments();
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error toggling approval:', error);
+      return false;
     }
-    return success;
   };
 
   // Delete comment (admin only)
   const deleteComment = async (commentId: string) => {
-    const success = await CommentService.deleteComment(commentId, password);
-    if (success) {
-      await loadComments();
+    try {
+      const response = await fetch('/api/comments/admin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          password,
+          action: 'delete',
+          commentId
+        })
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        await loadComments();
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      return false;
     }
-    return success;
   };
 
   // Load comments on mount

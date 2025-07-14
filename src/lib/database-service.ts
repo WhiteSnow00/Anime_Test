@@ -130,6 +130,49 @@ export class DatabaseService {
     }
   }
 
+  // Get all comments with admin authentication and stats
+  static async getAllCommentsAdmin(password: string): Promise<{comments: Comment[], stats: any} | null> {
+    try {
+      // Validate admin password (using simple password check for compatibility)
+      const validPassword = process.env.ADMIN_PASSWORD || '826264';
+      if (password !== validPassword) {
+        return null;
+      }
+
+      const result = await sql`
+        SELECT * FROM comments 
+        ORDER BY timestamp DESC
+      `;
+      
+      const comments = result.rows.map(row => ({
+        id: row.id,
+        userName: row.user_name,
+        content: row.content,
+        timestamp: new Date(row.timestamp),
+        isApproved: row.is_approved,
+        userAgent: row.user_agent,
+        ipAddress: row.ip_address,
+        episodeViewing: row.episode_viewing
+      }));
+
+      // Calculate stats
+      const totalComments = comments.length;
+      const approvedComments = comments.filter(c => c.isApproved).length;
+      const pendingComments = totalComments - approvedComments;
+      
+      const stats = {
+        total: totalComments,
+        approved: approvedComments,
+        pending: pendingComments
+      };
+      
+      return { comments, stats };
+    } catch (error) {
+      console.error('Error getting admin comments:', error);
+      return null;
+    }
+  }
+
   // Add new comment
   static async addComment(comment: Omit<Comment, 'timestamp'>): Promise<Comment | null> {
     try {

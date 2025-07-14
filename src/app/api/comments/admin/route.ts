@@ -1,11 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { DatabaseService } from '@/lib/database-service';
-
-// Database-based admin authentication
-async function validateAdminPassword(password: string): Promise<boolean> {
-  // Try default username "admin" 
-  return await DatabaseService.verifyAdminPassword('admin', password);
-}
+import { CommentService } from '@/lib/unified-comment-service';
 
 // GET - Get all comments for admin (including unapproved)
 export async function GET(request: NextRequest) {
@@ -20,24 +14,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const isValid = await validateAdminPassword(password);
-    if (!isValid) {
+    // Use unified comment service for admin authentication and data retrieval
+    const result = await CommentService.getAllCommentsAdmin(password);
+    
+    if (!result) {
       return NextResponse.json(
         { success: false, error: 'Invalid admin password' },
         { status: 401 }
       );
     }
 
-    // Initialize database
-    await DatabaseService.initDatabase();
-
-    const comments = await DatabaseService.getAllComments();
-    const stats = await DatabaseService.getStats();
-
     return NextResponse.json({ 
       success: true, 
-      comments, 
-      stats 
+      comments: result.comments, 
+      stats: result.stats 
     });
   } catch (error) {
     console.error('Error fetching admin comments:', error);
@@ -61,19 +51,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const isValid = await validateAdminPassword(password);
-    if (!isValid) {
+    // Validate admin first
+    const admin = await CommentService.validateAdmin('admin', password);
+    if (!admin) {
       return NextResponse.json(
         { success: false, error: 'Invalid admin password' },
         { status: 401 }
       );
     }
 
-    // Initialize database
-    await DatabaseService.initDatabase();
-    
     if (action === 'toggle-approval') {
-      const success = await DatabaseService.toggleApproval(commentId);
+      const success = await CommentService.toggleApproval(commentId, password);
       if (success) {
         return NextResponse.json({ 
           success: true, 
@@ -81,14 +69,14 @@ export async function POST(request: NextRequest) {
         });
       } else {
         return NextResponse.json(
-          { success: false, error: 'Comment not found' },
+          { success: false, error: 'Comment not found or permission denied' },
           { status: 404 }
         );
       }
     }
 
     if (action === 'delete') {
-      const success = await DatabaseService.deleteComment(commentId);
+      const success = await CommentService.deleteComment(commentId, password);
       if (success) {
         return NextResponse.json({ 
           success: true, 
@@ -96,7 +84,7 @@ export async function POST(request: NextRequest) {
         });
       } else {
         return NextResponse.json(
-          { success: false, error: 'Comment not found' },
+          { success: false, error: 'Comment not found or permission denied' },
           { status: 404 }
         );
       }

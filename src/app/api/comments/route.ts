@@ -1,18 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { DatabaseService } from '@/lib/database-service';
+import { CommentService } from '@/lib/unified-comment-service';
 
 // GET - Fetch all approved comments
 export async function GET() {
   try {
-    // Initialize database on first access
-    await DatabaseService.initDatabase();
+    // Automatically trigger migration on first API call in development
+    if (process.env.NODE_ENV === 'development') {
+      try {
+        const migrationUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:9002'}/api/auto-migrate`;
+        await fetch(migrationUrl);
+      } catch (migrationError) {
+        console.warn('Auto-migration check failed:', migrationError);
+      }
+    }
+
+    const comments = await CommentService.getComments();
+    const approvedComments = comments.filter(comment => comment.isApproved);
     
-    const comments = await DatabaseService.getApprovedComments();
-    return NextResponse.json({ success: true, comments });
+    console.log(`📊 Fetched ${approvedComments.length} approved comments from ${CommentService.getDatabaseType()}`);
+    
+    return NextResponse.json({
+      success: true,
+      comments: approvedComments,
+      count: approvedComments.length,
+      database: CommentService.getDatabaseType(),
+      timestamp: new Date().toISOString()
+    });
   } catch (error) {
-    console.error('Error fetching comments:', error);
+    console.error('Failed to get comments:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch comments' },
+      { 
+        success: false,
+        error: 'Failed to retrieve comments',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }
@@ -21,65 +42,51 @@ export async function GET() {
 // POST - Add new comment
 export async function POST(request: NextRequest) {
   try {
-    // Initialize database on first access
-    await DatabaseService.initDatabase();
-    
     const body = await request.json();
     const { userName, content, episodeViewing } = body;
-
-    // Validation
-    if (!userName || !content) {
-      return NextResponse.json(
-        { success: false, error: 'User name and content are required' },
-        { status: 400 }
-      );
-    }
-
-    if (content.length > 1000) {
-      return NextResponse.json(
-        { success: false, error: 'Comment is too long (max 1000 characters)' },
-        { status: 400 }
-      );
-    }
 
     // Get client info
     const userAgent = request.headers.get('user-agent') || '';
     const forwardedFor = request.headers.get('x-forwarded-for');
     const realIp = request.headers.get('x-real-ip');
-    const ipAddress = forwardedFor?.split(',')[0] || realIp || 'unknown';
+    const ipAddress = forwardedFor?.split(',')[0] || realIp || 'localhost';
 
-    const comment = await DatabaseService.addComment({
-      id: crypto.randomUUID(),
-      userName: userName.trim(),
-      content: content.trim(),
-      isApproved: true, // Auto-approve comments for public use
+    // Add comment using unified service
+    const savedComment = await CommentService.addComment({
+      userName,
+      content,
       userAgent,
       ipAddress,
-      episodeViewing: episodeViewing || null
+      episodeViewing
     });
 
-    return NextResponse.json({ 
-      success: true, 
-      comment,
-      message: 'Comment submitted and pending approval' 
+    console.log(`✅ New comment added to ${CommentService.getDatabaseType()}: ${savedComment.id}`);
+
+    return NextResponse.json({
+      success: true,
+      comment: savedComment,
+      database: CommentService.getDatabaseType(),
+      message: 'Comment submitted successfully and pending approval'
     });
   } catch (error) {
-    console.error('Error adding comment:', error);
+    console.error('Failed to add comment:', error);
     
-    // More detailed error logging
-    console.error('Error details:', {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
-      hasDatabase: !!process.env.POSTGRES_URL
-    });
+    // Check if it's a validation error
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const isValidationError = errorMessage.includes('không được để trống') || 
+                             errorMessage.includes('quá dài') || 
+                             errorMessage.includes('spam') ||
+                             errorMessage.includes('Missing required fields');
     
     return NextResponse.json(
       { 
-        success: false, 
+        success: false,
         error: 'Failed to add comment',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        message: errorMessage,
+        isValidation: isValidationError,
+        database: CommentService.getDatabaseType()
       },
-      { status: 500 }
+      { status: isValidationError ? 400 : 500 }
     );
   }
 }
