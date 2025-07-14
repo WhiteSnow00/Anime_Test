@@ -259,7 +259,7 @@ function VideoPlayerComponent({
   LoadingOverlay.displayName = 'LoadingOverlay';
 
   return (
-    <Card className={cn("w-full overflow-hidden shadow-lg rounded-lg transition-all duration-300 border-2 border-blue-500", className)}>
+    <Card className={cn("w-full overflow-hidden shadow-lg rounded-lg transition-all duration-300", className)}>
       <div 
         className={cn(
           "aspect-video bg-muted relative",
