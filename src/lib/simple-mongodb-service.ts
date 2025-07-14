@@ -347,10 +347,20 @@ export class SimpleMongoDBService {
       const approvedComments = comments.filter((c: any) => c.isApproved).length;
       const pendingComments = totalComments - approvedComments;
       
+      // Calculate comments from today
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const commentsToday = comments.filter((c: any) => {
+        const commentDate = new Date(c.timestamp);
+        commentDate.setHours(0, 0, 0, 0);
+        return commentDate.getTime() === today.getTime();
+      }).length;
+      
       const stats = {
-        total: totalComments,
-        approved: approvedComments,
-        pending: pendingComments
+        totalComments: totalComments,
+        approvedComments: approvedComments,
+        pendingComments: pendingComments,
+        commentsToday: commentsToday
       };
       
       return {
