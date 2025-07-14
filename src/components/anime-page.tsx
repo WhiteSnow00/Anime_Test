@@ -168,11 +168,11 @@ function AnimePageComponent() {
         <MobileHeader title={animeDetails.title} />
       )}
 
-      {/* Notification Header */}
-      <NotificationHeader />
-
       {/* Main Content */}
       <div className={`w-full max-w-7xl mx-auto ${layoutConfig.spacing} ${layoutConfig.containerClass}`}>
+        {/* Notification Header - moved inside main container */}
+        <NotificationHeader />
+
         {/* Video Section with Enhanced Transitions */}
         <div ref={refs.videoRef} id="video-section" data-section="video">
           <VideoPlayer 

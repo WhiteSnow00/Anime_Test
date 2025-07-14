@@ -1,9 +1,6 @@
-// Simplified MongoDB service that avoids client-side issues
+import { MongoClient, Db, Collection } from 'mongodb';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
-
-// Only run MongoDB code on the server side
-const isServer = typeof window === 'undefined';
 
 // MongoDB connection string
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://kazenosakura100:animelovefanam1@ayaya.jtefs5i.mongodb.net/';
@@ -32,63 +29,56 @@ export interface Admin {
   isActive: boolean;
 }
 
-// Mongoose Schemas - only define on server
-let CommentModel: any = null;
-let AdminModel: any = null;
+// Mongoose Schemas
+const commentSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  userName: { type: String, required: true, maxlength: 100 },
+  content: { type: String, required: true, maxlength: 1000 },
+  timestamp: { type: Date, default: Date.now },
+  isApproved: { type: Boolean, default: false },
+  userAgent: { type: String },
+  ipAddress: { type: String, maxlength: 45 },
+  episodeViewing: { type: Number }
+}, {
+  collection: 'comments'
+});
 
-if (isServer) {
-  const commentSchema = new mongoose.Schema({
-    id: { type: String, required: true, unique: true },
-    userName: { type: String, required: true, maxlength: 100 },
-    content: { type: String, required: true, maxlength: 1000 },
-    timestamp: { type: Date, default: Date.now },
-    isApproved: { type: Boolean, default: false },
-    userAgent: { type: String },
-    ipAddress: { type: String, maxlength: 45 },
-    episodeViewing: { type: Number }
-  }, {
-    collection: 'comments'
-  });
+const adminSchema = new mongoose.Schema({
+  username: { type: String, required: true, unique: true, maxlength: 50 },
+  passwordHash: { type: String, required: true },
+  role: { type: String, enum: ['admin', 'moderator'], default: 'moderator' },
+  createdAt: { type: Date, default: Date.now },
+  lastLogin: { type: Date },
+  isActive: { type: Boolean, default: true }
+}, {
+  collection: 'admins'
+});
 
-  const adminSchema = new mongoose.Schema({
-    username: { type: String, required: true, unique: true, maxlength: 50 },
-    passwordHash: { type: String, required: true },
-    role: { type: String, enum: ['admin', 'moderator'], default: 'moderator' },
-    createdAt: { type: Date, default: Date.now },
-    lastLogin: { type: Date },
-    isActive: { type: Boolean, default: true }
-  }, {
-    collection: 'admins'
-  });
+// Create indexes
+commentSchema.index({ timestamp: -1 });
+commentSchema.index({ isApproved: 1 });
+commentSchema.index({ episodeViewing: 1 });
+// Note: username index is automatically created by unique: true
 
-  // Create indexes
-  commentSchema.index({ timestamp: -1 });
-  commentSchema.index({ isApproved: 1 });
-  commentSchema.index({ episodeViewing: 1 });
-  // Note: username index is automatically created by unique: true
+// Models
+const CommentModel = mongoose.models.Comment || mongoose.model('Comment', commentSchema);
+const AdminModel = mongoose.models.Admin || mongoose.model('Admin', adminSchema);
 
-  // Models
-  CommentModel = mongoose.models.Comment || mongoose.model('Comment', commentSchema);
-  AdminModel = mongoose.models.Admin || mongoose.model('Admin', adminSchema);
-}
-
-export class SimpleMongoDBService {
+export class MongoDBService {
+  private static client: MongoClient | null = null;
+  private static db: Db | null = null;
   private static isConnected = false;
 
   // Test MongoDB connection
   static async testConnection(): Promise<boolean> {
-    if (!isServer) return false;
-    
     try {
       if (!this.isConnected) {
         await this.connect();
       }
       
-      // Simple ping test
-      if (mongoose.connection.readyState === 1) {
-        return true;
-      }
-      return false;
+      // Ping the database
+      await this.db?.admin().ping();
+      return true;
     } catch (error) {
       console.error('MongoDB connection test failed:', error);
       return false;
@@ -97,13 +87,12 @@ export class SimpleMongoDBService {
 
   // Connect to MongoDB
   static async connect(): Promise<void> {
-    if (!isServer) throw new Error('MongoDB operations are server-side only');
-    
     try {
-      if (this.isConnected && mongoose.connection.readyState === 1) {
+      if (this.isConnected && this.client) {
         return;
       }
 
+      // Connect with Mongoose for ODM features
       if (mongoose.connection.readyState === 0) {
         await mongoose.connect(MONGODB_URI + DATABASE_NAME, {
           maxPoolSize: 10,
@@ -111,7 +100,16 @@ export class SimpleMongoDBService {
         });
       }
 
+      // Also connect with native driver for admin operations
+      this.client = new MongoClient(MONGODB_URI, {
+        maxPoolSize: 10,
+        serverSelectionTimeoutMS: 5000,
+      });
+      
+      await this.client.connect();
+      this.db = this.client.db(DATABASE_NAME);
       this.isConnected = true;
+
       console.log('Connected to MongoDB successfully');
     } catch (error) {
       console.error('Failed to connect to MongoDB:', error);
@@ -121,17 +119,17 @@ export class SimpleMongoDBService {
 
   // Initialize database collections and indexes
   static async initDatabase(): Promise<void> {
-    if (!isServer) throw new Error('Database initialization is server-side only');
-    
     try {
       await this.connect();
 
+      // Ensure collections exist and create indexes
+      await this.db?.createCollection('comments').catch(() => {}); // Ignore if exists
+      await this.db?.createCollection('admins').catch(() => {}); // Ignore if exists
+
       // Create default admin if none exists
-      if (AdminModel) {
-        const adminCount = await AdminModel.countDocuments();
-        if (adminCount === 0) {
-          await this.createDefaultAdmins();
-        }
+      const adminCount = await AdminModel.countDocuments();
+      if (adminCount === 0) {
+        await this.createDefaultAdmins();
       }
 
       console.log('MongoDB database initialized successfully');
@@ -143,8 +141,6 @@ export class SimpleMongoDBService {
 
   // Create default admin accounts
   static async createDefaultAdmins(): Promise<void> {
-    if (!isServer || !AdminModel) return;
-    
     const defaultAdmins = [
       {
         username: 'admin',
@@ -174,8 +170,6 @@ export class SimpleMongoDBService {
 
   // Comment operations
   static async getComments(): Promise<Comment[]> {
-    if (!isServer || !CommentModel) return [];
-    
     try {
       await this.connect();
       const comments = await CommentModel.find()
@@ -200,8 +194,6 @@ export class SimpleMongoDBService {
   }
 
   static async addComment(comment: Omit<Comment, '_id'>): Promise<Comment> {
-    if (!isServer || !CommentModel) throw new Error('Server-side only operation');
-    
     try {
       await this.connect();
       const newComment = new CommentModel(comment);
@@ -225,8 +217,6 @@ export class SimpleMongoDBService {
   }
 
   static async approveComment(commentId: string): Promise<boolean> {
-    if (!isServer || !CommentModel) return false;
-    
     try {
       await this.connect();
       const result = await CommentModel.updateOne(
@@ -241,37 +231,7 @@ export class SimpleMongoDBService {
     }
   }
 
-  static async toggleApproval(commentId: string): Promise<boolean> {
-    if (!isServer || !CommentModel) return false;
-    
-    try {
-      await this.connect();
-      
-      // First get the current approval status
-      const comment = await CommentModel.findOne({ id: commentId });
-      if (!comment) {
-        console.error('Comment not found:', commentId);
-        return false;
-      }
-      
-      // Toggle the approval status
-      const newApprovalStatus = !comment.isApproved;
-      const result = await CommentModel.updateOne(
-        { id: commentId },
-        { isApproved: newApprovalStatus }
-      );
-      
-      console.log(`Comment ${commentId} approval toggled to: ${newApprovalStatus}`);
-      return result.modifiedCount > 0;
-    } catch (error) {
-      console.error('Failed to toggle comment approval:', error);
-      throw error;
-    }
-  }
-
   static async deleteComment(commentId: string): Promise<boolean> {
-    if (!isServer || !CommentModel) return false;
-    
     try {
       await this.connect();
       const result = await CommentModel.deleteOne({ id: commentId });
@@ -284,8 +244,6 @@ export class SimpleMongoDBService {
 
   // Admin operations
   static async validateAdmin(username: string, password: string): Promise<Admin | null> {
-    if (!isServer || !AdminModel) return null;
-    
     try {
       await this.connect();
       const admin = await AdminModel.findOne({ 
@@ -323,69 +281,43 @@ export class SimpleMongoDBService {
     }
   }
 
-  // Admin methods
-  static async getAllCommentsAdmin(password: string): Promise<{comments: Comment[], stats: any} | null> {
-    if (!isServer || !CommentModel) throw new Error('Server-side only operation');
-    
+  static async createAdmin(username: string, password: string, role: 'admin' | 'moderator' = 'moderator'): Promise<Admin> {
     try {
-      // Validate admin password first
-      const admin = await this.validateAdmin('admin', password);
-      if (!admin) {
-        return null;
-      }
-
       await this.connect();
       
-      // Get all comments (approved and unapproved)
-      const comments = await CommentModel.find({})
-        .sort({ timestamp: -1 })
-        .lean()
-        .exec();
-      
-      // Calculate stats
-      const totalComments = comments.length;
-      const approvedComments = comments.filter((c: any) => c.isApproved).length;
-      const pendingComments = totalComments - approvedComments;
-      
-      // Calculate comments from today
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const commentsToday = comments.filter((c: any) => {
-        const commentDate = new Date(c.timestamp);
-        commentDate.setHours(0, 0, 0, 0);
-        return commentDate.getTime() === today.getTime();
-      }).length;
-      
-      const stats = {
-        totalComments: totalComments,
-        approvedComments: approvedComments,
-        pendingComments: pendingComments,
-        commentsToday: commentsToday
-      };
+      // Check if admin already exists
+      const existingAdmin = await AdminModel.findOne({ username: username.toLowerCase() });
+      if (existingAdmin) {
+        throw new Error('Admin with this username already exists');
+      }
+
+      const passwordHash = await bcrypt.hash(password, 12);
+      const newAdmin = new AdminModel({
+        username: username.toLowerCase(),
+        passwordHash,
+        role,
+        isActive: true
+      });
+
+      const savedAdmin = await newAdmin.save();
       
       return {
-        comments: comments.map((comment: any) => ({
-          id: comment.id,
-          userName: comment.userName,
-          content: comment.content,
-          timestamp: comment.timestamp,
-          isApproved: comment.isApproved,
-          userAgent: comment.userAgent,
-          ipAddress: comment.ipAddress,
-          episodeViewing: comment.episodeViewing
-        })),
-        stats
+        _id: savedAdmin._id.toString(),
+        username: savedAdmin.username,
+        passwordHash: savedAdmin.passwordHash,
+        role: savedAdmin.role,
+        createdAt: savedAdmin.createdAt,
+        lastLogin: savedAdmin.lastLogin,
+        isActive: savedAdmin.isActive
       };
     } catch (error) {
-      console.error('Failed to get admin comments:', error);
+      console.error('Failed to create admin:', error);
       throw error;
     }
   }
 
-  // Migration helper
+  // Migration helper to copy data from PostgreSQL
   static async migrateFromPostgreSQL(postgresComments: any[]): Promise<void> {
-    if (!isServer || !CommentModel) throw new Error('Server-side only operation');
-    
     try {
       await this.connect();
       
@@ -422,13 +354,17 @@ export class SimpleMongoDBService {
 
   // Close connections
   static async disconnect(): Promise<void> {
-    if (!isServer) return;
-    
     try {
+      if (this.client) {
+        await this.client.close();
+        this.client = null;
+      }
+      
       if (mongoose.connection.readyState !== 0) {
         await mongoose.disconnect();
       }
       
+      this.db = null;
       this.isConnected = false;
       console.log('Disconnected from MongoDB');
     } catch (error) {
