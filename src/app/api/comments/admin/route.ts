@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { CommentService } from '@/lib/unified-comment-service';
+import { CommentService } from '@/lib/server-comment-service';
 
 // GET - Get all comments for admin (including unapproved)
 export async function GET(request: NextRequest) {

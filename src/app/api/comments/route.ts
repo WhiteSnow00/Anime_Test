@@ -1,28 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { CommentService } from '@/lib/unified-comment-service';
+import { CommentService } from '@/lib/server-comment-service';
 
 // GET - Fetch all approved comments
 export async function GET() {
   try {
-    // Automatically trigger migration on first API call in development
-    if (process.env.NODE_ENV === 'development') {
-      try {
-        const migrationUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:9002'}/api/auto-migrate`;
-        await fetch(migrationUrl);
-      } catch (migrationError) {
-        console.warn('Auto-migration check failed:', migrationError);
-      }
-    }
-
     const comments = await CommentService.getComments();
-    const approvedComments = comments.filter(comment => comment.isApproved);
     
-    console.log(`📊 Fetched ${approvedComments.length} approved comments from ${CommentService.getDatabaseType()}`);
+    console.log(`📊 Fetched ${comments.length} approved comments from ${CommentService.getDatabaseType()}`);
     
     return NextResponse.json({
       success: true,
-      comments: approvedComments,
-      count: approvedComments.length,
+      comments: comments,
+      count: comments.length,
       database: CommentService.getDatabaseType(),
       timestamp: new Date().toISOString()
     });
