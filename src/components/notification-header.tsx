@@ -83,8 +83,8 @@ export function NotificationHeader({ className }: NotificationHeaderProps) {
         "transition-all duration-500 ease-out",
         isAnimated ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4"
       )}>
-        {/* Debug: matches video player exactly - no additional margins */}
-        <Card className="bg-gradient-to-r from-pink-50 via-purple-50 to-pink-50 dark:from-pink-950/20 dark:via-purple-950/20 dark:to-pink-950/20 border-pink-200/50 dark:border-pink-800/50 shadow-lg backdrop-blur-sm overflow-hidden relative border-2 border-red-500">
+        {/* Matches video player exactly - no additional margins */}
+        <Card className="bg-gradient-to-r from-pink-50 via-purple-50 to-pink-50 dark:from-pink-950/20 dark:via-purple-950/20 dark:to-pink-950/20 border-pink-200/50 dark:border-pink-800/50 shadow-lg backdrop-blur-sm overflow-hidden relative">
           {/* Animated background elements */}
           <div className="absolute inset-0 bg-gradient-to-r from-pink-100/30 via-transparent to-purple-100/30 dark:from-pink-900/10 dark:via-transparent dark:to-purple-900/10" />
           <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-pink-400 via-purple-400 to-pink-400" />

@@ -108,7 +108,7 @@ function AnimePageComponent() {
     scrollActions.scrollToSection(section);
   }, [navActions.navigateToSection, scrollActions.scrollToSection]);
 
-  // Enhanced episode navigation with validation
+  // Enhanced episode navigation with validation and scroll-to-video for mobile
   const handlePreviousEpisode = useCallback(() => {
     const currentEpisode = navState.currentEpisode;
     if (!currentEpisode || !computed.canGoPrevious) return;
@@ -116,8 +116,10 @@ function AnimePageComponent() {
     const previousEpisode = episodeOps.getCircularPrevious(currentEpisode.id);
     if (previousEpisode && utils.validation.isValidEpisode(previousEpisode)) {
       handleSelectEpisode(previousEpisode);
+      // Scroll to video section for mobile navigation
+      setTimeout(() => scrollActions.scrollToSection('video'), 100);
     }
-  }, [navState.currentEpisode, computed.canGoPrevious, episodeOps, handleSelectEpisode]);
+  }, [navState.currentEpisode, computed.canGoPrevious, episodeOps, handleSelectEpisode, scrollActions]);
 
   const handleNextEpisode = useCallback(() => {
     const currentEpisode = navState.currentEpisode;
@@ -126,8 +128,10 @@ function AnimePageComponent() {
     const nextEpisode = episodeOps.getCircularNext(currentEpisode.id);
     if (nextEpisode && utils.validation.isValidEpisode(nextEpisode)) {
       handleSelectEpisode(nextEpisode);
+      // Scroll to video section for mobile navigation
+      setTimeout(() => scrollActions.scrollToSection('video'), 100);
     }
-  }, [navState.currentEpisode, computed.canGoNext, episodeOps, handleSelectEpisode]);
+  }, [navState.currentEpisode, computed.canGoNext, episodeOps, handleSelectEpisode, scrollActions]);
 
   // Memoized data extraction
   const { episodes, ...animeDetails } = useMemo(() => animeData, []);
