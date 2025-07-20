@@ -56,7 +56,7 @@ export const animeData: Anime = {
       downloadUrl: 'https://drive.google.com/file/d/1OODRq70CsWpMVid6hejrNzIRb0l7RXEA/view?usp=sharing',
       rawDownloadUrl: 'https://drive.google.com/file/d/1CHh6EMCr2Lg2q76NHnUSyYClA3si0SO2/view?usp=sharing'
     },
-        { 
+    { 
       id: 2, 
       title: 'Episode 2', 
       videoId: 'wST53nPPw',
@@ -67,6 +67,16 @@ export const animeData: Anime = {
       downloadUrl: 'https://drive.google.com/file/d/1Eh9nQD7MSk0VpAnwR-4zTVof6V6kr5b9/view?usp=sharing',
       rawDownloadUrl: 'https://drive.google.com/file/d/1fgCgQPckMHU1kDyUaS5DG_kVayL_dsth/view?usp=sharing'
     },
-    
+        { 
+      id: 3, 
+      title: 'Episode 3', 
+      videoId: 'bkVUb62bM',
+      servers: {
+        hydax: 'bkVUb62bM',
+        mxdrop: '03rpqdlwflqdzw'
+      },
+      downloadUrl: 'https://drive.google.com/file/d/10g2xcGNZf3xfE4k4LFB4Iz88GWYZx0l_/view?usp=sharing',
+      rawDownloadUrl: 'https://drive.google.com/file/d/1JoWzKRWLnpvwhokC_uWGjflTu9KONrfL/view?usp=sharing'
+    },
   ],
 };
