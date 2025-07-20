@@ -193,13 +193,7 @@ export const performanceUtils = {
     label?: string
   ) => {
     return (...args: T): R => {
-      const start = globalThis.performance?.now() || Date.now();
       const result = fn(...args);
-      const end = globalThis.performance?.now() || Date.now();
-      
-      if (label) {
-        console.log(`${label}: ${end - start}ms`);
-      }
       
       return result;
     };

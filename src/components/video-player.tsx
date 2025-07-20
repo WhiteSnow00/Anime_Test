@@ -90,7 +90,6 @@ function VideoPlayerComponent({
       if (iframeRef.current) {
         setLoadError(null);
         onLoad?.();
-        console.log(`Video player loaded: ${transitionComputed.currentVideoId}`);
         // Complete transition when iframe loads
         if (transitionState.isTransitioning) {
           setTimeout(() => transitionActions.completeTransition(), 100);
@@ -139,10 +138,8 @@ function VideoPlayerComponent({
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
             // Player is visible, can perform optimizations
-            console.log('Video player is visible');
           } else {
             // Player is not visible, can pause or reduce quality
-            console.log('Video player is not visible');
           }
         });
       },
@@ -165,10 +162,6 @@ function VideoPlayerComponent({
     
     return () => {
       performanceProfiler.end(start);
-      if (process.env.NODE_ENV === 'development') {
-        console.log('VideoPlayer performance stats:', performanceProfiler.getStats());
-        console.log('Transition state:', transitionState.transitionPhase);
-      }
     };
   }, [performanceProfiler, videoId, transitionState.transitionPhase]);
 

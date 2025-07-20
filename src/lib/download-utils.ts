@@ -14,10 +14,6 @@ export function openGoogleDriveLink(url: string, filename?: string): void {
     // Simply open the Google Drive link in a new tab
     window.open(url, '_blank', 'noopener,noreferrer');
     
-    console.log('Opened Google Drive link:', url);
-    if (filename) {
-      console.log('Suggested filename:', filename);
-    }
   } catch (error) {
     console.error('Failed to open Google Drive link:', error);
     // Fallback: copy to clipboard
@@ -55,7 +51,6 @@ export function triggerDownload(url: string, filename?: string): void {
     link.click();
     document.body.removeChild(link);
     
-    console.log('Download triggered for:', url);
   } catch (error) {
     console.error('Download failed:', error);
     // Fallback: open in new tab

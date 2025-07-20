@@ -4,8 +4,6 @@ import { SimpleMongoDBService } from '@/lib/simple-mongodb-service';
 // GET - Fetch all approved comments
 export async function GET() {
   try {
-    console.log('[COMMENTS-GET] Starting to fetch comments...');
-    
     const comments = await SimpleMongoDBService.getComments();
     
     console.log(`[COMMENTS-GET] ✅ Fetched ${comments.length} approved comments from MongoDB`);
@@ -45,8 +43,6 @@ export async function GET() {
 // POST - Add new comment
 export async function POST(request: NextRequest) {
   try {
-    console.log('[COMMENTS-POST] Starting comment submission...');
-    
     const body = await request.json();
     const { userName, content, episodeViewing } = body;
 
@@ -57,8 +53,6 @@ export async function POST(request: NextRequest) {
     const forwardedFor = request.headers.get('x-forwarded-for');
     const realIp = request.headers.get('x-real-ip');
     const ipAddress = forwardedFor?.split(',')[0] || realIp || 'localhost';
-
-    console.log('[COMMENTS-POST] Attempting to save comment to database...');
 
     // Add comment using unified service (auto-approve new comments)
     const savedComment = await SimpleMongoDBService.addComment({

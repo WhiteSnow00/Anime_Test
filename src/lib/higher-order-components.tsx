@@ -186,7 +186,7 @@ export function withAnalytics<T extends Record<string, any>>(
 
     const track = useCallback((event: string, data?: any) => {
       // Replace with your analytics implementation
-      console.log(`[Analytics] ${event}:`, data);
+      // Analytics tracking would go here in production
     }, []);
 
     React.useEffect(() => {

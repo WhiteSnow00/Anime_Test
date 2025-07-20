@@ -47,12 +47,10 @@ function AnimePageComponent() {
   // Advanced navigation with callbacks
   const navigationCallbacks = useMemo(() => ({
     onEpisodeChange: fp.debounce((episode: Episode, previousEpisode: Episode) => {
-      console.log(`Episode changed from ${previousEpisode.title} to ${episode.title}`);
       actions.setEpisode(episode);
     }, 150),
     
     onSectionChange: fp.throttle((section: string, previousSection: string) => {
-      console.log(`Section changed from ${previousSection} to ${section}`);
       actions.setSection(section);
     }, 100),
   }), [actions]);
@@ -94,7 +92,6 @@ function AnimePageComponent() {
         scrollActions.scrollToTop();
         
         // Optional: Add analytics or user feedback
-        console.log(`Switching to episode ${episode.id}: ${episode.title}`);
         
         return episode;
       }
@@ -184,8 +181,6 @@ function AnimePageComponent() {
             server={currentServer}
             episodeTitle={`Tập ${(navState.currentEpisode || episodes[0]).id}`}
             autoPlay={true}
-            onLoad={() => console.log(`Episode ${(navState.currentEpisode || episodes[0]).id} loaded successfully`)}
-            onError={(error) => console.error(`Episode ${(navState.currentEpisode || episodes[0]).id} error:`, error)}
           />
         </div>
 

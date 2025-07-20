@@ -406,8 +406,6 @@ export class SimpleMongoDBService {
         role: admin.role,
         isActive: true
       });
-      
-      console.log(`Created default ${admin.role}: ${admin.username}`);
     }
   }
 
@@ -631,8 +629,6 @@ export class SimpleMongoDBService {
     try {
       await this.connect();
       
-      console.log(`Starting migration of ${postgresComments.length} comments from PostgreSQL to MongoDB`);
-      
       for (const pgComment of postgresComments) {
         const mongoComment = {
           id: pgComment.id,
@@ -649,13 +645,9 @@ export class SimpleMongoDBService {
         const existingComment = await CommentModel.findOne({ id: mongoComment.id });
         if (!existingComment) {
           await CommentModel.create(mongoComment);
-          console.log(`Migrated comment: ${mongoComment.id}`);
-        } else {
-          console.log(`Comment already exists: ${mongoComment.id}`);
         }
       }
       
-      console.log('Migration completed successfully');
     } catch (error) {
       console.error('Migration failed:', error);
       throw error;
