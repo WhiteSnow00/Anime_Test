@@ -60,22 +60,60 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Failed to add comment:', error);
     
-    // Check if it's a validation error
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const isValidationError = errorMessage.includes('không được để trống') || 
-                             errorMessage.includes('quá dài') || 
-                             errorMessage.includes('spam') ||
-                             errorMessage.includes('Missing required fields');
+    // Enhanced error handling with Vietnamese messages
+    let errorMessage = 'Có lỗi xảy ra khi gửi bình luận';
+    let isValidation = false;
+    let statusCode = 500;
+    
+    if (error instanceof Error) {
+      const errorMsg = error.message;
+      
+      // Check for validation errors
+      if (errorMsg.includes('không được để trống') || 
+          errorMsg.includes('quá dài') || 
+          errorMsg.includes('spam') ||
+          errorMsg.includes('Missing required fields')) {
+        isValidation = true;
+        errorMessage = errorMsg;
+        statusCode = 400;
+      }
+      // Check for database connection errors
+      else if (errorMsg.includes('connection') || 
+               errorMsg.includes('timeout') || 
+               errorMsg.includes('network') ||
+               errorMsg.includes('MongoDB')) {
+        errorMessage = 'Đang có sự cố kết nối cơ sở dữ liệu. Vui lòng thử lại sau.';
+        statusCode = 503;
+      }
+      // Check for rate limiting or overload
+      else if (errorMsg.includes('too many') || 
+               errorMsg.includes('rate limit') ||
+               errorMsg.includes('overload')) {
+        errorMessage = 'Hệ thống đang quá tải. Vui lòng thử lại sau ít phút.';
+        statusCode = 429;
+      }
+      // Check for duplicate errors
+      else if (errorMsg.includes('duplicate') || errorMsg.includes('E11000')) {
+        errorMessage = 'Bình luận này đã tồn tại. Vui lòng thử lại.';
+        statusCode = 409;
+      }
+      else {
+        errorMessage = `Lỗi hệ thống: ${errorMsg}`;
+      }
+    }
     
     return NextResponse.json(
       { 
         success: false,
         error: 'Failed to add comment',
         message: errorMessage,
-        isValidation: isValidationError,
-        database: CommentService.getDatabaseType()
+        isValidation: isValidation,
+        database: CommentService.getDatabaseType(),
+        timestamp: new Date().toISOString(),
+        // Include retry suggestion for connection errors
+        canRetry: statusCode === 503 || statusCode === 429
       },
-      { status: isValidationError ? 400 : 500 }
+      { status: statusCode }
     );
   }
 }

@@ -5,9 +5,20 @@ import bcrypt from 'bcryptjs';
 // Only run MongoDB code on the server side
 const isServer = typeof window === 'undefined';
 
-// MongoDB connection string
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://kazenosakura100:animelovefanam1@ayaya.jtefs5i.mongodb.net/';
+// MongoDB connection configuration - using environment variables for security
+const MONGODB_URI = process.env.MONGODB_URI;
 const DATABASE_NAME = process.env.MONGODB_DB_NAME || 'anime_streaming';
+const MAX_POOL_SIZE = parseInt(process.env.MONGODB_MAX_POOL_SIZE || '25');
+const SERVER_SELECTION_TIMEOUT = parseInt(process.env.MONGODB_SERVER_SELECTION_TIMEOUT || '15000');
+const MAX_IDLE_TIME = parseInt(process.env.MONGODB_MAX_IDLE_TIME || '1800000');
+
+// Validate required environment variables
+if (!MONGODB_URI) {
+  throw new Error(
+    'MONGODB_URI environment variable is required. Please check your .env.local file. ' +
+    'Expected format: mongodb+srv://username:password@cluster.mongodb.net/'
+  );
+}
 
 // Interfaces
 export interface Comment {
@@ -74,8 +85,130 @@ if (isServer) {
 
 export class SimpleMongoDBService {
   private static isConnected = false;
+  private static connectionAttempts = 0;
+  private static readonly MAX_RECONNECT_ATTEMPTS = parseInt(process.env.MAX_RECONNECT_ATTEMPTS || '5');
+  private static readonly RECONNECT_DELAY_BASE = parseInt(process.env.RECONNECT_DELAY_BASE || '1000');
+  private static lastConnectionError: Error | null = null;
+  private static connectionHealth = {
+    status: 'disconnected' as 'connected' | 'connecting' | 'disconnected' | 'error',
+    lastCheck: new Date(),
+    errorCount: 0,
+    successfulConnections: 0,
+  };
 
-  // Test MongoDB connection
+  // Enhanced connection monitoring
+  private static logConnectionStatus(message: string, isError = false) {
+    if (process.env.ENABLE_DB_LOGGING === 'true') {
+      const timestamp = new Date().toISOString();
+      const logMessage = `[${timestamp}] MongoDB: ${message}`;
+      
+      if (isError) {
+        console.error(logMessage);
+      } else {
+        console.log(logMessage);
+      }
+    }
+  }
+
+  // Helper method for retrying database operations
+  private static async retryOperation<T>(
+    operation: () => Promise<T>,
+    operationName: string,
+    maxRetries = 3
+  ): Promise<T> {
+    let lastError: Error | null = null;
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        // Ensure connection is healthy before operation
+        if (!this.isConnected || mongoose.connection.readyState !== 1) {
+          this.logConnectionStatus(`Reconnecting before ${operationName} (attempt ${attempt + 1})`);
+          await this.connect();
+        }
+        
+        const result = await operation();
+        
+        if (attempt > 0) {
+          this.logConnectionStatus(`${operationName} succeeded after ${attempt + 1} attempts`);
+        }
+        
+        return result;
+        
+      } catch (error) {
+        lastError = error as Error;
+        this.logConnectionStatus(
+          `${operationName} attempt ${attempt + 1} failed: ${lastError.message}`,
+          true
+        );
+        
+        // Check if this is a connection-related error that we should retry
+        const isRetryableError = this.isRetryableError(lastError);
+        
+        if (!isRetryableError || attempt === maxRetries - 1) {
+          // Don't retry non-retryable errors or on last attempt
+          break;
+        }
+        
+        // Wait before retrying with exponential backoff
+        const delay = this.calculateBackoffDelay(attempt);
+        this.logConnectionStatus(`Retrying ${operationName} in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        
+        // Mark connection as potentially broken
+        this.isConnected = false;
+      }
+    }
+    
+    throw new Error(
+      `${operationName} failed after ${maxRetries} attempts. Last error: ${lastError?.message}`
+    );
+  }
+
+  // Check if error is retryable
+  private static isRetryableError(error: Error): boolean {
+    const retryableErrors = [
+      'MongoServerSelectionError',
+      'MongoTimeoutError',
+      'MongoNetworkError',
+      'MongoWriteConcernError',
+      'ECONNRESET',
+      'ETIMEDOUT',
+      'ENOTFOUND',
+      'MongoError'
+    ];
+    
+    return retryableErrors.some(errorType => 
+      error.name.includes(errorType) || 
+      error.message.includes(errorType) ||
+      error.message.includes('connection') ||
+      error.message.includes('timeout') ||
+      error.message.includes('network')
+    );
+  }
+
+  // Calculate exponential backoff delay
+  private static calculateBackoffDelay(attempt: number): number {
+    return Math.min(this.RECONNECT_DELAY_BASE * Math.pow(2, attempt), 30000);
+  }
+
+  // Get connection health status
+  static getConnectionHealth() {
+    return {
+      ...this.connectionHealth,
+      isConnected: this.isConnected,
+      mongooseState: mongoose.connection.readyState,
+      mongooseStates: {
+        0: 'disconnected',
+        1: 'connected', 
+        2: 'connecting',
+        3: 'disconnecting'
+      },
+      lastError: this.lastConnectionError?.message,
+      connectionAttempts: this.connectionAttempts,
+    };
+  }
+
+  // Test MongoDB connection with retry logic
   static async testConnection(): Promise<boolean> {
     if (!isServer) return false;
     
@@ -84,38 +217,140 @@ export class SimpleMongoDBService {
         await this.connect();
       }
       
-      // Simple ping test
-      if (mongoose.connection.readyState === 1) {
-        return true;
+      // Simple ping test with timeout
+      const pingPromise = new Promise<boolean>((resolve) => {
+        if (mongoose.connection.readyState === 1) {
+          this.connectionHealth.status = 'connected';
+          this.connectionHealth.lastCheck = new Date();
+          resolve(true);
+        } else {
+          resolve(false);
+        }
+      });
+
+      const timeoutPromise = new Promise<boolean>((resolve) => {
+        setTimeout(() => resolve(false), 5000);
+      });
+
+      const result = await Promise.race([pingPromise, timeoutPromise]);
+      
+      if (result) {
+        this.connectionHealth.errorCount = 0;
+        this.connectionHealth.successfulConnections++;
+        this.logConnectionStatus('Connection test successful');
+      } else {
+        this.connectionHealth.errorCount++;
+        this.logConnectionStatus('Connection test failed', true);
       }
-      return false;
+      
+      return result;
     } catch (error) {
-      console.error('MongoDB connection test failed:', error);
+      this.connectionHealth.status = 'error';
+      this.connectionHealth.errorCount++;
+      this.lastConnectionError = error as Error;
+      this.logConnectionStatus(`Connection test failed: ${(error as Error).message}`, true);
       return false;
     }
   }
 
-  // Connect to MongoDB
+  // Connect to MongoDB with retry logic and enhanced monitoring
   static async connect(): Promise<void> {
     if (!isServer) throw new Error('MongoDB operations are server-side only');
     
-    try {
-      if (this.isConnected && mongoose.connection.readyState === 1) {
+    // Check if already connected
+    if (this.isConnected && mongoose.connection.readyState === 1) {
+      this.logConnectionStatus('Already connected to MongoDB');
+      return;
+    }
+
+    this.connectionHealth.status = 'connecting';
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt < this.MAX_RECONNECT_ATTEMPTS; attempt++) {
+      try {
+        this.connectionAttempts++;
+        this.logConnectionStatus(`Connection attempt ${attempt + 1}/${this.MAX_RECONNECT_ATTEMPTS}`);
+
+        if (mongoose.connection.readyState === 0) {
+          await mongoose.connect(MONGODB_URI + DATABASE_NAME, {
+            maxPoolSize: MAX_POOL_SIZE,
+            serverSelectionTimeoutMS: SERVER_SELECTION_TIMEOUT,
+            maxIdleTimeMS: MAX_IDLE_TIME,
+            // Additional optimizations for MongoDB Atlas free tier
+            retryWrites: true,
+            w: 'majority',
+            readPreference: 'primary',
+            compressors: ['zlib'],
+            // Connection monitoring
+            heartbeatFrequencyMS: 10000,
+          });
+        }
+
+        this.isConnected = true;
+        this.connectionHealth.status = 'connected';
+        this.connectionHealth.successfulConnections++;
+        this.connectionHealth.errorCount = 0;
+        this.logConnectionStatus(`Connected to MongoDB successfully (attempt ${attempt + 1})`);
+        
+        // Set up connection event listeners
+        this.setupConnectionEventListeners();
         return;
-      }
+        
+      } catch (error) {
+        lastError = error as Error;
+        this.lastConnectionError = lastError;
+        this.connectionHealth.errorCount++;
+        this.logConnectionStatus(
+          `Connection attempt ${attempt + 1} failed: ${lastError.message}`, 
+          true
+        );
 
-      if (mongoose.connection.readyState === 0) {
-        await mongoose.connect(MONGODB_URI + DATABASE_NAME, {
-          maxPoolSize: 10,
-          serverSelectionTimeoutMS: 5000,
-        });
+        // If this isn't the last attempt, wait before retrying
+        if (attempt < this.MAX_RECONNECT_ATTEMPTS - 1) {
+          const delay = this.calculateBackoffDelay(attempt);
+          this.logConnectionStatus(`Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
       }
+    }
 
-      this.isConnected = true;
-      console.log('Connected to MongoDB successfully');
-    } catch (error) {
-      console.error('Failed to connect to MongoDB:', error);
-      throw error;
+    // All attempts failed
+    this.connectionHealth.status = 'error';
+    this.isConnected = false;
+    throw new Error(
+      `Failed to connect to MongoDB after ${this.MAX_RECONNECT_ATTEMPTS} attempts. ` +
+      `Last error: ${lastError?.message}. ` +
+      `Please check your connection string and network connectivity.`
+    );
+  }
+
+  // Set up connection event listeners for monitoring
+  private static setupConnectionEventListeners(): void {
+    if (mongoose.connection.listeners('error').length === 0) {
+      mongoose.connection.on('error', (error) => {
+        this.isConnected = false;
+        this.connectionHealth.status = 'error';
+        this.connectionHealth.errorCount++;
+        this.lastConnectionError = error;
+        this.logConnectionStatus(`MongoDB connection error: ${error.message}`, true);
+      });
+    }
+
+    if (mongoose.connection.listeners('disconnected').length === 0) {
+      mongoose.connection.on('disconnected', () => {
+        this.isConnected = false;
+        this.connectionHealth.status = 'disconnected';
+        this.logConnectionStatus('MongoDB disconnected', true);
+      });
+    }
+
+    if (mongoose.connection.listeners('reconnected').length === 0) {
+      mongoose.connection.on('reconnected', () => {
+        this.isConnected = true;
+        this.connectionHealth.status = 'connected';
+        this.connectionHealth.successfulConnections++;
+        this.logConnectionStatus('MongoDB reconnected');
+      });
     }
   }
 
@@ -176,52 +411,54 @@ export class SimpleMongoDBService {
   static async getComments(): Promise<Comment[]> {
     if (!isServer || !CommentModel) return [];
     
-    try {
-      await this.connect();
-      const comments = await CommentModel.find()
-        .sort({ timestamp: -1 })
-        .lean();
-      
-      return comments.map((comment: any) => ({
-        _id: comment._id?.toString(),
-        id: comment.id,
-        userName: comment.userName,
-        content: comment.content,
-        timestamp: comment.timestamp,
-        isApproved: comment.isApproved,
-        userAgent: comment.userAgent,
-        ipAddress: comment.ipAddress,
-        episodeViewing: comment.episodeViewing
-      }));
-    } catch (error) {
-      console.error('Failed to get comments:', error);
-      throw error;
-    }
+    return this.retryOperation(
+      async () => {
+        const comments = await CommentModel.find()
+          .sort({ timestamp: -1 })
+          .lean();
+        
+        this.logConnectionStatus(`Retrieved ${comments.length} comments successfully`);
+        
+        return comments.map((comment: any) => ({
+          _id: comment._id?.toString(),
+          id: comment.id,
+          userName: comment.userName,
+          content: comment.content,
+          timestamp: comment.timestamp,
+          isApproved: comment.isApproved,
+          userAgent: comment.userAgent,
+          ipAddress: comment.ipAddress,
+          episodeViewing: comment.episodeViewing
+        }));
+      },
+      'getComments'
+    );
   }
 
   static async addComment(comment: Omit<Comment, '_id'>): Promise<Comment> {
     if (!isServer || !CommentModel) throw new Error('Server-side only operation');
     
-    try {
-      await this.connect();
-      const newComment = new CommentModel(comment);
-      const savedComment = await newComment.save();
-      
-      return {
-        _id: savedComment._id.toString(),
-        id: savedComment.id,
-        userName: savedComment.userName,
-        content: savedComment.content,
-        timestamp: savedComment.timestamp,
-        isApproved: savedComment.isApproved,
-        userAgent: savedComment.userAgent,
-        ipAddress: savedComment.ipAddress,
-        episodeViewing: savedComment.episodeViewing
-      };
-    } catch (error) {
-      console.error('Failed to add comment:', error);
-      throw error;
-    }
+    return this.retryOperation(
+      async () => {
+        const newComment = new CommentModel(comment);
+        const savedComment = await newComment.save();
+        
+        this.logConnectionStatus(`Comment added successfully: ${savedComment.id}`);
+        
+        return {
+          _id: savedComment._id.toString(),
+          id: savedComment.id,
+          userName: savedComment.userName,
+          content: savedComment.content,
+          timestamp: savedComment.timestamp,
+          isApproved: savedComment.isApproved,
+          userAgent: savedComment.userAgent,
+          ipAddress: savedComment.ipAddress,
+          episodeViewing: savedComment.episodeViewing
+        };
+      },
+      'addComment'
+    );
   }
 
   static async approveComment(commentId: string): Promise<boolean> {
