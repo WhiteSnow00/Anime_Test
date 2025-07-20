@@ -223,12 +223,12 @@ export function NotificationHeader({ className }: NotificationHeaderProps) {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => window.open('https://play.google.com/store/apps/details?id=com.microsoft.emmx&hl=vi', '_blank')}
+                      onClick={() => window.open('https://telegra.ph/Cách-Cài-Trình-Chặn-Quảng-Cáo-Trên-Android-07-20', '_blank')}
                       className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800 hover:from-green-100 hover:to-emerald-100 dark:hover:from-green-900/30 dark:hover:to-emerald-900/30 text-green-700 dark:text-green-400 shadow-sm relative group animate-pulse hover:animate-none w-fit"
-                      title="Tải Microsoft Edge cho Android - Hỗ trợ uBlock Origin"
+                      title="Hướng dẫn cài đặt trình chặn quảng cáo trên Android"
                     >
                       <Shield className="h-4 w-4 md:mr-1.5" />
-                      <span className="hidden md:inline text-xs font-medium">Tải Edge</span>
+                      <span className="hidden md:inline text-xs font-medium">Hướng Dẫn Android</span>
                       <span className="md:hidden text-xs font-medium">Ad</span>
                     </Button>
                   ) : (
