@@ -37,18 +37,33 @@ export function NotificationHeader({ className }: NotificationHeaderProps) {
       const userAgent = navigator.userAgent.toLowerCase();
       const isSmallScreen = window.innerWidth <= 768;
       
-      // Check for iOS devices
-      if (/iphone|ipad|ipod/.test(userAgent) || (userAgent.includes('safari') && userAgent.includes('mobile'))) {
+      // Check for Android devices first (more specific check)
+      if (/android/.test(userAgent)) {
+        setDeviceType('android');
+      }
+      // Check for iOS devices (specific iOS identifiers only)
+      else if (/iphone|ipad|ipod/.test(userAgent) || 
+               (userAgent.includes('safari') && userAgent.includes('mobile') && !userAgent.includes('android') && !userAgent.includes('chrome'))) {
         setDeviceType('ios');
       }
-      // Check for Android devices
-      else if (/android/.test(userAgent) || (isSmallScreen && /chrome|firefox|opera|samsung/.test(userAgent))) {
+      // Additional Android check for small screens with common Android browsers
+      else if (isSmallScreen && /chrome|firefox|opera|samsung/.test(userAgent) && !userAgent.includes('safari')) {
         setDeviceType('android');
       }
       // Default to desktop
       else {
         setDeviceType('desktop');
       }
+      
+      // Debug log to help with testing (remove in production)
+      console.log('Device detection:', {
+        userAgent: userAgent,
+        deviceType: /android/.test(userAgent) ? 'android' : 
+                   /iphone|ipad|ipod/.test(userAgent) ? 'ios' : 'desktop',
+        isSmallScreen,
+        hasAndroid: /android/.test(userAgent),
+        hasIOS: /iphone|ipad|ipod/.test(userAgent)
+      });
     };
 
     checkDeviceType();
@@ -242,7 +257,7 @@ export function NotificationHeader({ className }: NotificationHeaderProps) {
                             </div>
                             <div>
                               <p className="text-xs text-muted-foreground mb-3">
-                                Cài đặt uBlock Origin để xem anime không bị quảng cáo làm phiền:
+                                Cài đặt trình chặn quảng cáo để xem anime không bị quảng cáo làm phiền:
                               </p>
                               <div className="space-y-2">
                                 <a href="https://chromewebstore.google.com/detail/ublock-origin/cjpalhdlnbpafiamejdnhcphjbkeiagm?hl=vi" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">
