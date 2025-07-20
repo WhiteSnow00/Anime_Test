@@ -1,5 +1,6 @@
 export interface Comment {
-  id: string;
+  _id?: string; // MongoDB ObjectId as string
+  id?: string; // Optional custom ID
   userName: string;
   content: string;
   timestamp: Date;

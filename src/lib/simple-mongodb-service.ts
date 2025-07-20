@@ -51,7 +51,6 @@ let AdminModel: any = null;
 
 if (isServer) {
   const commentSchema = new mongoose.Schema({
-    id: { type: String, required: true, unique: true },
     userName: { type: String, required: true, maxlength: 100 },
     content: { type: String, required: true, maxlength: 1000 },
     timestamp: { type: Date, default: Date.now },
@@ -60,7 +59,7 @@ if (isServer) {
     ipAddress: { type: String, maxlength: 45 },
     episodeViewing: { type: Number }
   }, {
-    collection: 'comments'
+    collection: 'comments' // Use original collection
   });
 
   const adminSchema = new mongoose.Schema({
@@ -426,7 +425,7 @@ export class SimpleMongoDBService {
         
         return comments.map((comment: any) => ({
           _id: comment._id?.toString(),
-          id: comment.id,
+          id: comment._id?.toString(), // Use _id as id for consistency
           userName: comment.userName,
           content: comment.content,
           timestamp: comment.timestamp,
@@ -448,11 +447,11 @@ export class SimpleMongoDBService {
         const newComment = new CommentModel(comment);
         const savedComment = await newComment.save();
         
-        this.logConnectionStatus(`Comment added successfully: ${savedComment.id}`);
+        this.logConnectionStatus(`Comment added successfully: ${savedComment._id}`);
         
         return {
           _id: savedComment._id.toString(),
-          id: savedComment.id,
+          id: savedComment._id.toString(), // Use _id as id for consistency
           userName: savedComment.userName,
           content: savedComment.content,
           timestamp: savedComment.timestamp,
@@ -472,7 +471,7 @@ export class SimpleMongoDBService {
     try {
       await this.connect();
       const result = await CommentModel.updateOne(
-        { id: commentId },
+        { _id: commentId },
         { isApproved: true }
       );
       
@@ -490,7 +489,7 @@ export class SimpleMongoDBService {
       await this.connect();
       
       // First get the current approval status
-      const comment = await CommentModel.findOne({ id: commentId });
+      const comment = await CommentModel.findOne({ _id: commentId });
       if (!comment) {
         console.error('Comment not found:', commentId);
         return false;
@@ -499,7 +498,7 @@ export class SimpleMongoDBService {
       // Toggle the approval status
       const newApprovalStatus = !comment.isApproved;
       const result = await CommentModel.updateOne(
-        { id: commentId },
+        { _id: commentId },
         { isApproved: newApprovalStatus }
       );
       
@@ -516,7 +515,7 @@ export class SimpleMongoDBService {
     
     try {
       await this.connect();
-      const result = await CommentModel.deleteOne({ id: commentId });
+      const result = await CommentModel.deleteOne({ _id: commentId });
       return result.deletedCount > 0;
     } catch (error) {
       console.error('Failed to delete comment:', error);
@@ -607,7 +606,8 @@ export class SimpleMongoDBService {
       
       return {
         comments: comments.map((comment: any) => ({
-          id: comment.id,
+          _id: comment._id?.toString(),
+          id: comment._id?.toString(), // Use _id as id
           userName: comment.userName,
           content: comment.content,
           timestamp: comment.timestamp,
