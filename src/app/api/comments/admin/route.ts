@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { CommentService } from '@/lib/server-comment-service';
+import { SimpleMongoDBService } from '@/lib/simple-mongodb-service';
 
 // GET - Get all comments for admin (including unapproved)
 export async function GET(request: NextRequest) {
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Use unified comment service for admin authentication and data retrieval
-    const result = await CommentService.getAllCommentsAdmin(password);
+    const result = await SimpleMongoDBService.getAllCommentsAdmin(password);
     
     if (!result) {
       return NextResponse.json(
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate admin first
-    const admin = await CommentService.validateAdmin('admin', password);
+    const admin = await SimpleMongoDBService.validateAdmin('admin', password);
     if (!admin) {
       return NextResponse.json(
         { success: false, error: 'Invalid admin password' },
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'toggle-approval') {
-      const success = await CommentService.toggleApproval(commentId, password);
+      const success = await SimpleMongoDBService.toggleApproval(commentId);
       if (success) {
         return NextResponse.json({ 
           success: true, 
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'delete') {
-      const success = await CommentService.deleteComment(commentId, password);
+      const success = await SimpleMongoDBService.deleteComment(commentId);
       if (success) {
         return NextResponse.json({ 
           success: true, 

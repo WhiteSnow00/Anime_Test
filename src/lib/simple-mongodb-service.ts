@@ -678,3 +678,6 @@ export class SimpleMongoDBService {
     }
   }
 }
+
+// Export singleton instance
+export const mongoDbService = new SimpleMongoDBService();
