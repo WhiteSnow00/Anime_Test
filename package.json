@@ -17,7 +17,8 @@
     "test": "echo \"No tests specified\" && exit 0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "setup-db": "node scripts/setup-database.js"
+    "setup-db": "node scripts/setup-database.js",
+    "vercel-setup": "node scripts/vercel-setup.js"
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.13.0",

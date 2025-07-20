@@ -12,12 +12,14 @@ const MAX_POOL_SIZE = parseInt(process.env.MONGODB_MAX_POOL_SIZE || '25');
 const SERVER_SELECTION_TIMEOUT = parseInt(process.env.MONGODB_SERVER_SELECTION_TIMEOUT || '15000');
 const MAX_IDLE_TIME = parseInt(process.env.MONGODB_MAX_IDLE_TIME || '1800000');
 
-// Validate required environment variables
-if (!MONGODB_URI) {
-  throw new Error(
-    'MONGODB_URI environment variable is required. Please check your .env.local file. ' +
-    'Expected format: mongodb+srv://username:password@cluster.mongodb.net/'
-  );
+// Validate required environment variables at runtime, not build time
+function validateEnvironment() {
+  if (!MONGODB_URI) {
+    throw new Error(
+      'MONGODB_URI environment variable is required. Please check your .env.local file. ' +
+      'Expected format: mongodb+srv://username:password@cluster.mongodb.net/'
+    );
+  }
 }
 
 // Interfaces
@@ -256,6 +258,9 @@ export class SimpleMongoDBService {
   // Connect to MongoDB with retry logic and enhanced monitoring
   static async connect(): Promise<void> {
     if (!isServer) throw new Error('MongoDB operations are server-side only');
+    
+    // Validate environment variables at runtime
+    validateEnvironment();
     
     // Check if already connected
     if (this.isConnected && mongoose.connection.readyState === 1) {
