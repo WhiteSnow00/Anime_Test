@@ -25,32 +25,52 @@ export async function GET(request: NextRequest) {
       environment: {
         nodeEnv: process.env.NODE_ENV,
         hasMongoUri: !!process.env.MONGODB_URI,
+        mongoUriLength: process.env.MONGODB_URI ? process.env.MONGODB_URI.length : 0,
         databaseName: process.env.MONGODB_DB_NAME || 'anime_streaming',
         maxPoolSize: process.env.MONGODB_MAX_POOL_SIZE || '25',
         serverTimeout: process.env.MONGODB_SERVER_SELECTION_TIMEOUT || '15000',
+        // Show first 20 chars of URI for debugging (safe to expose)
+        mongoUriPreview: process.env.MONGODB_URI ? 
+          process.env.MONGODB_URI.substring(0, 20) + '...' : 'NOT_SET',
+      },
+      vercel: {
+        region: process.env.VERCEL_REGION || 'unknown',
+        runtime: process.env.AWS_LAMBDA_FUNCTION_NAME ? 'lambda' : 'local',
+        memory: process.env.AWS_LAMBDA_FUNCTION_MEMORY_SIZE || 'unknown',
       }
     };
 
     const statusCode = isConnected ? 200 : 503;
     
-    if (process.env.ENABLE_DB_LOGGING === 'true') {
-      console.log(`Health check completed: ${response.status} (${connectionTime}ms)`);
-    }
+    // Always log health checks in production for debugging
+    console.log(`[HEALTH] ${response.status} (${connectionTime}ms) - URI: ${response.environment.mongoUriPreview}`);
     
     return NextResponse.json(response, { status: statusCode });
     
   } catch (error) {
-    console.error('Health check failed:', error);
+    console.error('[HEALTH] Health check failed:', error);
     
-    return NextResponse.json({
+    const errorResponse = {
       status: 'unhealthy',
       timestamp: new Date().toISOString(),
       error: error instanceof Error ? error.message : 'Unknown error',
       database: {
         type: 'MongoDB',
         connected: false,
+      },
+      environment: {
+        hasMongoUri: !!process.env.MONGODB_URI,
+        mongoUriLength: process.env.MONGODB_URI ? process.env.MONGODB_URI.length : 0,
+        mongoUriPreview: process.env.MONGODB_URI ? 
+          process.env.MONGODB_URI.substring(0, 20) + '...' : 'NOT_SET',
+      },
+      debug: {
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+        errorStack: error instanceof Error ? error.stack?.split('\n')[0] : 'No stack',
       }
-    }, { status: 503 });
+    };
+    
+    return NextResponse.json(errorResponse, { status: 503 });
   }
 }
 

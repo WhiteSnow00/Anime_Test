@@ -4,9 +4,11 @@ import { CommentService } from '@/lib/server-comment-service';
 // GET - Fetch all approved comments
 export async function GET() {
   try {
+    console.log('[COMMENTS-GET] Starting to fetch comments...');
+    
     const comments = await CommentService.getComments();
     
-    console.log(`📊 Fetched ${comments.length} approved comments from ${CommentService.getDatabaseType()}`);
+    console.log(`[COMMENTS-GET] ✅ Fetched ${comments.length} approved comments from ${CommentService.getDatabaseType()}`);
     
     return NextResponse.json({
       success: true,
@@ -16,12 +18,24 @@ export async function GET() {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('Failed to get comments:', error);
+    console.error('[COMMENTS-GET] ❌ Failed to get comments:', error);
+    
+    const errorInfo = {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      name: error instanceof Error ? error.name : 'UnknownError',
+      hasMongoUri: !!process.env.MONGODB_URI,
+      mongoUriPreview: process.env.MONGODB_URI ? 
+        process.env.MONGODB_URI.substring(0, 20) + '...' : 'NOT_SET'
+    };
+    
+    console.error('[COMMENTS-GET] Error details:', errorInfo);
+    
     return NextResponse.json(
       { 
         success: false,
         error: 'Failed to retrieve comments',
-        message: error instanceof Error ? error.message : 'Unknown error'
+        message: error instanceof Error ? error.message : 'Unknown error',
+        debug: errorInfo
       },
       { status: 500 }
     );
@@ -31,14 +45,20 @@ export async function GET() {
 // POST - Add new comment
 export async function POST(request: NextRequest) {
   try {
+    console.log('[COMMENTS-POST] Starting comment submission...');
+    
     const body = await request.json();
     const { userName, content, episodeViewing } = body;
+
+    console.log(`[COMMENTS-POST] Data received: user=${userName}, content length=${content?.length}, episode=${episodeViewing}`);
 
     // Get client info
     const userAgent = request.headers.get('user-agent') || '';
     const forwardedFor = request.headers.get('x-forwarded-for');
     const realIp = request.headers.get('x-real-ip');
     const ipAddress = forwardedFor?.split(',')[0] || realIp || 'localhost';
+
+    console.log('[COMMENTS-POST] Attempting to save comment to database...');
 
     // Add comment using unified service
     const savedComment = await CommentService.addComment({
@@ -49,7 +69,7 @@ export async function POST(request: NextRequest) {
       episodeViewing
     });
 
-    console.log(`✅ New comment added to ${CommentService.getDatabaseType()}: ${savedComment.id}`);
+    console.log(`[COMMENTS-POST] ✅ New comment added to ${CommentService.getDatabaseType()}: ${savedComment.id}`);
 
     return NextResponse.json({
       success: true,
@@ -58,7 +78,7 @@ export async function POST(request: NextRequest) {
       message: 'Comment submitted successfully and pending approval'
     });
   } catch (error) {
-    console.error('Failed to add comment:', error);
+    console.error('[COMMENTS-POST] ❌ Failed to add comment:', error);
     
     // Enhanced error handling with Vietnamese messages
     let errorMessage = 'Có lỗi xảy ra khi gửi bình luận';
@@ -67,6 +87,7 @@ export async function POST(request: NextRequest) {
     
     if (error instanceof Error) {
       const errorMsg = error.message;
+      console.error(`[COMMENTS-POST] Error details: ${errorMsg}`);
       
       // Check for validation errors
       if (errorMsg.includes('không được để trống') || 
@@ -81,9 +102,11 @@ export async function POST(request: NextRequest) {
       else if (errorMsg.includes('connection') || 
                errorMsg.includes('timeout') || 
                errorMsg.includes('network') ||
-               errorMsg.includes('MongoDB')) {
+               errorMsg.includes('MongoDB') ||
+               errorMsg.includes('MONGODB_URI')) {
         errorMessage = 'Đang có sự cố kết nối cơ sở dữ liệu. Vui lòng thử lại sau.';
         statusCode = 503;
+        console.error('[COMMENTS-POST] Database connection error detected');
       }
       // Check for rate limiting or overload
       else if (errorMsg.includes('too many') || 
@@ -99,6 +122,7 @@ export async function POST(request: NextRequest) {
       }
       else {
         errorMessage = `Lỗi hệ thống: ${errorMsg}`;
+        console.error(`[COMMENTS-POST] Unhandled error type: ${errorMsg}`);
       }
     }
     
@@ -111,7 +135,12 @@ export async function POST(request: NextRequest) {
         database: CommentService.getDatabaseType(),
         timestamp: new Date().toISOString(),
         // Include retry suggestion for connection errors
-        canRetry: statusCode === 503 || statusCode === 429
+        canRetry: statusCode === 503 || statusCode === 429,
+        debug: {
+          hasMongoUri: !!process.env.MONGODB_URI,
+          mongoUriLength: process.env.MONGODB_URI?.length || 0,
+          errorType: error instanceof Error ? error.name : 'Unknown'
+        }
       },
       { status: statusCode }
     );
