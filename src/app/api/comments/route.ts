@@ -60,12 +60,12 @@ export async function POST(request: NextRequest) {
 
     console.log('[COMMENTS-POST] Attempting to save comment to database...');
 
-    // Add comment using unified service (let MongoDB generate the ID)
+    // Add comment using unified service (auto-approve new comments)
     const savedComment = await SimpleMongoDBService.addComment({
       userName,
       content,
       timestamp: new Date(),
-      isApproved: false,
+      isApproved: true, // Auto-approve new comments so they show immediately
       userAgent,
       ipAddress,
       episodeViewing

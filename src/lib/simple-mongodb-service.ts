@@ -25,7 +25,7 @@ function validateEnvironment() {
 // Interfaces
 export interface Comment {
   _id?: string;
-  id: string;
+  id?: string; // Optional since it's generated from _id
   userName: string;
   content: string;
   timestamp: Date;
@@ -54,7 +54,7 @@ if (isServer) {
     userName: { type: String, required: true, maxlength: 100 },
     content: { type: String, required: true, maxlength: 1000 },
     timestamp: { type: Date, default: Date.now },
-    isApproved: { type: Boolean, default: false },
+    isApproved: { type: Boolean, default: true }, // Auto-approve new comments
     userAgent: { type: String },
     ipAddress: { type: String, maxlength: 45 },
     episodeViewing: { type: Number }
@@ -417,7 +417,7 @@ export class SimpleMongoDBService {
     
     return this.retryOperation(
       async () => {
-        const comments = await CommentModel.find()
+        const comments = await CommentModel.find() // Show all comments (approved and pending)
           .sort({ timestamp: -1 })
           .lean();
         
