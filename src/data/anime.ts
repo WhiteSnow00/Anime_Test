@@ -59,12 +59,12 @@ export const animeData: Anime = {
     { 
       id: 2, 
       title: 'Episode 2', 
-      videoId: 'wST53nPPw',
+      videoId: 'ubMg6Vlex',
       servers: {
-        hydax: 'wST53nPPw',
-        mxdrop: 'r6dker9padgzwd'
+        hydax: 'ubMg6Vlex',
+        mxdrop: 'q166dv6rux7pr1m'
       },
-      downloadUrl: 'https://drive.google.com/file/d/1Eh9nQD7MSk0VpAnwR-4zTVof6V6kr5b9/view?usp=sharing',
+      downloadUrl: 'https://drive.google.com/file/d/1DdFaT7f-BXdC8S7P3vNZx_j0CC6gzWSA/view?usp=sharing',
       rawDownloadUrl: 'https://drive.google.com/file/d/1fgCgQPckMHU1kDyUaS5DG_kVayL_dsth/view?usp=sharing'
     },
         { 
