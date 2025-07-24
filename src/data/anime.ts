@@ -28,7 +28,7 @@ export interface Anime {
   episodes: Episode[];
 }
 
-export const h264EpisodeIds: number[] = [1, 2, 3]; 
+export const h264EpisodeIds: number[] = [1, 2]; 
 
 export const isH265Episode = (episodeId: number): boolean => {
   return !h264EpisodeIds.includes(episodeId);
@@ -76,12 +76,12 @@ export const animeData: Anime = {
     { 
       id: 3, 
       title: 'Episode 3', 
-      videoId: 'bkVUb62bM',
+      videoId: 'dibBTjuqH',
       servers: {
-        hydax: 'bkVUb62bM',
+        hydax: 'dibBTjuqH',
         mxdrop: '03rpqdlwflqdzw'
       },
-      downloadUrl: 'https://drive.google.com/file/d/10g2xcGNZf3xfE4k4LFB4Iz88GWYZx0l_/view?usp=sharing',
+      downloadUrl: 'https://drive.google.com/file/d/1tTj9xwr8Rs2KDFPMhgrBn6qj1qcY3mw_/view?usp=sharing',
       rawDownloadUrl: 'https://drive.google.com/file/d/1JoWzKRWLnpvwhokC_uWGjflTu9KONrfL/view?usp=sharing'
     },
   ],
