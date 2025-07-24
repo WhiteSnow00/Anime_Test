@@ -12,9 +12,9 @@ import { CommentSection } from './comment-section';
 import { NotificationHeader } from './notification-header';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Heart, Info } from 'lucide-react';
+import { clearEpisodePosition } from '@/lib/download-utils';
 
 // Import advanced hooks and utilities
-import { useAnimeNavigation } from '@/hooks/use-anime-navigation';
 import { useScrollNavigation } from '@/hooks/use-scroll-navigation';
 import { useViewport } from '@/hooks/use-viewport';
 import { useAnimeState } from '@/hooks/use-anime-state';
@@ -27,6 +27,14 @@ function AnimePageComponent() {
   
   useEffect(() => {
     setIsHydrated(true);
+    
+    // Clear the download position flag after user returns to the page
+    // This ensures the download position only affects the initial load
+    const timeoutId = setTimeout(() => {
+      clearEpisodePosition();
+    }, 1000);
+    
+    return () => clearTimeout(timeoutId);
   }, []);
 
   // Server state management
@@ -43,25 +51,10 @@ function AnimePageComponent() {
   }, [currentServer]);
   // Initialize advanced state management
   const { state, actions, computed } = useAnimeState(animeData);
-  
-  // Advanced navigation with callbacks
-  const navigationCallbacks = useMemo(() => ({
-    onEpisodeChange: fp.debounce((episode: Episode, previousEpisode: Episode) => {
-      actions.setEpisode(episode);
-    }, 150),
-    
-    onSectionChange: fp.throttle((section: string, previousSection: string) => {
-      actions.setSection(section);
-    }, 100),
-  }), [actions]);
 
-  // Use advanced navigation hook
-  const { state: navState, actions: navActions } = useAnimeNavigation({
-    episodes: animeData.episodes,
-    initialEpisode: animeData.episodes[0],
-    initialSection: 'video',
-    ...navigationCallbacks,
-  });
+  // Use the current episode from useAnimeState directly
+  const currentEpisode = state.currentEpisode || animeData.episodes[0];
+  const currentSection = state.currentSection;
 
   // Use scroll navigation hook
   const { refs, actions: scrollActions } = useScrollNavigation({
@@ -88,7 +81,7 @@ function AnimePageComponent() {
       utils.performance.measure,
       (episode: Episode) => {
         // Only update episode state, video player will handle transition automatically
-        navActions.selectEpisode(episode);
+        actions.setEpisode(episode);
         scrollActions.scrollToTop();
         
         // Optional: Add analytics or user feedback
@@ -96,18 +89,18 @@ function AnimePageComponent() {
         return episode;
       }
     ),
-    [navActions.selectEpisode, scrollActions.scrollToTop]
+    [actions.setEpisode, scrollActions.scrollToTop]
   );
 
   // Advanced navigation handler
   const handleNavigate = useCallback((section: string) => {
-    navActions.navigateToSection(section);
+    actions.setSection(section);
     scrollActions.scrollToSection(section);
-  }, [navActions.navigateToSection, scrollActions.scrollToSection]);
+  }, [actions.setSection, scrollActions.scrollToSection]);
 
   // Enhanced episode navigation with validation and scroll-to-video for mobile
   const handlePreviousEpisode = useCallback(() => {
-    const currentEpisode = navState.currentEpisode;
+    const currentEpisode = state.currentEpisode;
     if (!currentEpisode || !computed.canGoPrevious) return;
 
     const previousEpisode = episodeOps.getCircularPrevious(currentEpisode.id);
@@ -116,10 +109,10 @@ function AnimePageComponent() {
       // Scroll to video section for mobile navigation
       setTimeout(() => scrollActions.scrollToSection('video'), 100);
     }
-  }, [navState.currentEpisode, computed.canGoPrevious, episodeOps, handleSelectEpisode, scrollActions]);
+  }, [state.currentEpisode, computed.canGoPrevious, episodeOps, handleSelectEpisode, scrollActions]);
 
   const handleNextEpisode = useCallback(() => {
-    const currentEpisode = navState.currentEpisode;
+    const currentEpisode = state.currentEpisode;
     if (!currentEpisode || !computed.canGoNext) return;
 
     const nextEpisode = episodeOps.getCircularNext(currentEpisode.id);
@@ -128,7 +121,7 @@ function AnimePageComponent() {
       // Scroll to video section for mobile navigation
       setTimeout(() => scrollActions.scrollToSection('video'), 100);
     }
-  }, [navState.currentEpisode, computed.canGoNext, episodeOps, handleSelectEpisode, scrollActions]);
+  }, [state.currentEpisode, computed.canGoNext, episodeOps, handleSelectEpisode, scrollActions]);
 
   // Memoized data extraction
   const { episodes, ...animeDetails } = useMemo(() => animeData, []);
@@ -177,9 +170,9 @@ function AnimePageComponent() {
         {/* Video Section with Enhanced Transitions */}
         <div ref={refs.videoRef} id="video-section" data-section="video">
           <VideoPlayer 
-            videoId={getCurrentVideoId(navState.currentEpisode || episodes[0])} 
+            videoId={getCurrentVideoId(currentEpisode)} 
             server={currentServer}
-            episodeTitle={`Tập ${(navState.currentEpisode || episodes[0]).id}`}
+            episodeTitle={`Tập ${currentEpisode.id}`}
             autoPlay={true}
           />
         </div>
@@ -199,7 +192,7 @@ function AnimePageComponent() {
           <ServerSelector
             currentServer={currentServer}
             onServerChange={handleServerChange}
-            currentEpisode={navState.currentEpisode || episodes[0]}
+            currentEpisode={currentEpisode}
           />
         </div>
 
@@ -207,7 +200,7 @@ function AnimePageComponent() {
         <div ref={refs.episodesRef} id="episodes-section" data-section="episodes">
           <EpisodeSelector
             episodes={episodes}
-            currentEpisode={navState.currentEpisode || episodes[0]}
+            currentEpisode={currentEpisode}
             onSelectEpisode={handleSelectEpisode}
           />
         </div>
@@ -219,7 +212,7 @@ function AnimePageComponent() {
 
         {/* Comment Section */}
         <div ref={refs.commentRef} id="comment-section" data-section="comment" className="mt-6 comment-section-mobile">
-          <CommentSection currentEpisodeId={(navState.currentEpisode || episodes[0]).id} />
+          <CommentSection currentEpisodeId={currentEpisode.id} />
         </div>
       </div>
 
@@ -234,7 +227,7 @@ function AnimePageComponent() {
 
       {/* Mobile Bottom Navigation */}
       <MobileBottomNav
-        currentSection={navState.currentSection}
+        currentSection={currentSection}
         onNavigate={handleNavigate}
         onPreviousEpisode={handlePreviousEpisode}
         onNextEpisode={handleNextEpisode}

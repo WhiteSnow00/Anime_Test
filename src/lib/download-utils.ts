@@ -5,6 +5,52 @@
  */
 
 /**
+ * Saves the current episode position to localStorage for restoration when user returns
+ * @param episodeId - Current episode ID to save
+ */
+export function saveEpisodePosition(episodeId: number): void {
+  try {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('last-episode-download', episodeId.toString());
+    }
+  } catch (error) {
+    console.warn('Failed to save episode position:', error);
+  }
+}
+
+/**
+ * Gets the saved episode position from localStorage
+ * @returns Episode ID if found, null otherwise
+ */
+export function getSavedEpisodePosition(): number | null {
+  try {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('last-episode-download');
+      if (saved) {
+        const episodeId = parseInt(saved, 10);
+        return isNaN(episodeId) ? null : episodeId;
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to get saved episode position:', error);
+  }
+  return null;
+}
+
+/**
+ * Clears the saved episode position from localStorage
+ */
+export function clearEpisodePosition(): void {
+  try {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('last-episode-download');
+    }
+  } catch (error) {
+    console.warn('Failed to clear episode position:', error);
+  }
+}
+
+/**
  * Opens a Google Drive link through the redirect page with H.265 guide
  * @param url - Google Drive share URL
  * @param filename - Optional filename (for display purposes)
@@ -13,6 +59,11 @@
  */
 export function openGoogleDriveLink(url: string, filename?: string, isRaw?: boolean, episodeId?: number): void {
   try {
+    // Save the episode position when user clicks download
+    if (episodeId) {
+      saveEpisodePosition(episodeId);
+    }
+    
     const params = new URLSearchParams({
       url: url,
       filename: filename || 'Tập',

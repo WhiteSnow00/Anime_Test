@@ -176,7 +176,7 @@ export function useAnimeState(initialAnime?: Anime) {
   const [state, dispatch] = useReducer(animeReducer, {
     ...initialState,
     anime: initialAnime || null,
-    currentEpisode: initialAnime?.episodes[0] || null,
+    currentEpisode: initialAnime?.episodes[0] || null, // Always start with first episode for SSR
   });
 
   // Computed values
@@ -299,13 +299,43 @@ export function useAnimeState(initialAnime?: Anime) {
       if (savedPreferences) {
         try {
           const parsed = JSON.parse(savedPreferences);
-          actions.updatePreferences(parsed);
+          dispatch({ type: 'SET_PREFERENCES', payload: parsed });
         } catch (error) {
           console.warn('Failed to load saved preferences:', error);
         }
       }
     }
   }, []); 
+
+  // Restore saved episode position after hydration to avoid SSR mismatch
+  useEffect(() => {
+    if (typeof window !== 'undefined' && state.anime) {
+      try {
+        // First check for download position (most recent user action)
+        const downloadPosition = localStorage.getItem('last-episode-download');
+        if (downloadPosition) {
+          const episodeId = parseInt(downloadPosition, 10);
+          const episodeExists = state.anime.episodes.find(ep => ep.id === episodeId);
+          if (episodeExists) {
+            dispatch({ type: 'SET_EPISODE', payload: episodeExists });
+            return;
+          }
+        }
+        
+        // Fallback to general last episode
+        const savedEpisode = localStorage.getItem('last-episode');
+        if (savedEpisode) {
+          const parsedEpisode = JSON.parse(savedEpisode);
+          const episodeExists = state.anime.episodes.find(ep => ep.id === parsedEpisode.id);
+          if (episodeExists) {
+            dispatch({ type: 'SET_EPISODE', payload: episodeExists });
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to restore saved episode position:', error);
+      }
+    }
+  }, [state.anime]); // Run when anime data is available 
   
   return {
     state,
