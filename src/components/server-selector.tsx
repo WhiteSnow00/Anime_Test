@@ -52,11 +52,11 @@ function ServerSelectorComponent({
       return;
     }
 
-    const filename = `${currentEpisode.title || `Episode ${currentEpisode.id}`}.mp4`;
+    const filename = `Tập ${currentEpisode.id}`;
     
     // Check if it's a Google Drive link and handle accordingly
     if (currentEpisode.downloadUrl.includes('drive.google.com')) {
-      openGoogleDriveLink(currentEpisode.downloadUrl, filename);
+      openGoogleDriveLink(currentEpisode.downloadUrl, filename, false, currentEpisode.id);
     } else {
       // For other types of links, try direct download
       triggerDownload(currentEpisode.downloadUrl, filename);
@@ -74,11 +74,11 @@ function ServerSelectorComponent({
       return;
     }
 
-    const filename = `${currentEpisode.title || `Episode ${currentEpisode.id}`}_RAW.mp4`;
+    const filename = `Tập ${currentEpisode.id} RAW`;
     
     // Check if it's a Google Drive link and handle accordingly
     if (currentEpisode.rawDownloadUrl.includes('drive.google.com')) {
-      openGoogleDriveLink(currentEpisode.rawDownloadUrl, filename);
+      openGoogleDriveLink(currentEpisode.rawDownloadUrl, filename, true, currentEpisode.id);
     } else {
       // For other types of links, try direct download
       triggerDownload(currentEpisode.rawDownloadUrl, filename);
@@ -100,6 +100,11 @@ function ServerSelectorComponent({
           {(Object.keys(serverConfig) as ServerType[]).map((server) => {
             const config = serverConfig[server];
             const isActive = currentServer === server;
+            
+            // Hide mxdrop server if the current episode doesn't have mxdrop server data
+            if (server === 'mxdrop' && currentEpisode && !currentEpisode.servers.mxdrop) {
+              return null;
+            }
             
             return (
               <Button

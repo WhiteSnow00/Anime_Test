@@ -28,6 +28,12 @@ export interface Anime {
   episodes: Episode[];
 }
 
+export const h264EpisodeIds: number[] = [1, 2, 3]; 
+
+export const isH265Episode = (episodeId: number): boolean => {
+  return !h264EpisodeIds.includes(episodeId);
+};
+
 export const animeData: Anime = {
   title: 'Hoa Thơm Kiêu Hãnh',
   alternativeTitles: {
@@ -67,7 +73,7 @@ export const animeData: Anime = {
       downloadUrl: 'https://drive.google.com/file/d/1DdFaT7f-BXdC8S7P3vNZx_j0CC6gzWSA/view?usp=sharing',
       rawDownloadUrl: 'https://drive.google.com/file/d/1fgCgQPckMHU1kDyUaS5DG_kVayL_dsth/view?usp=sharing'
     },
-        { 
+    { 
       id: 3, 
       title: 'Episode 3', 
       videoId: 'bkVUb62bM',

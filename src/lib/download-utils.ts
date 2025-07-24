@@ -5,27 +5,28 @@
  */
 
 /**
- * Opens a Google Drive link in a new tab
+ * Opens a Google Drive link through the redirect page with H.265 guide
  * @param url - Google Drive share URL
  * @param filename - Optional filename (for display purposes)
+ * @param isRaw - Whether this is a raw download (no subtitles)
+ * @param episodeId - Episode ID to check H.265 encoding status
  */
-export function openGoogleDriveLink(url: string, filename?: string): void {
+export function openGoogleDriveLink(url: string, filename?: string, isRaw?: boolean, episodeId?: number): void {
   try {
-    // Simply open the Google Drive link in a new tab
-    window.open(url, '_blank', 'noopener,noreferrer');
+    const params = new URLSearchParams({
+      url: url,
+      filename: filename || 'Tập',
+      type: isRaw ? 'raw' : 'download',
+      episodeId: episodeId?.toString() || '0'
+    });
+    
+    // Navigate to the redirect page instead of directly opening Google Drive
+    window.location.href = `/download-redirect?${params.toString()}`;
     
   } catch (error) {
-    console.error('Failed to open Google Drive link:', error);
-    // Fallback: copy to clipboard
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(url).then(() => {
-        alert('Không thể mở link. URL đã được sao chép vào clipboard.');
-      }).catch(() => {
-        alert('Không thể mở link. Vui lòng sao chép URL thủ công: ' + url);
-      });
-    } else {
-      alert('Không thể mở link. Vui lòng sao chép URL thủ công: ' + url);
-    }
+    console.error('Failed to navigate to redirect page:', error);
+    // Fallback: open Google Drive directly
+    window.open(url, '_blank', 'noopener,noreferrer');
   }
 }
 
