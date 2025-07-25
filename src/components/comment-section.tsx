@@ -265,7 +265,7 @@ export function CommentSection({ currentEpisodeId, className }: CommentSectionPr
           <>
             <div className="space-y-3 sm:space-y-4">
               {currentComments.map((comment) => (
-                <Card key={comment.id} className="p-3 sm:p-4 bg-muted/30 comment-item">
+                <Card key={comment._id || `comment-${comment.userName}-${comment.timestamp}`} className="p-3 sm:p-4 bg-muted/30 comment-item">
                   <div className="flex items-start gap-2 sm:gap-3">
                     <div className="w-7 h-7 sm:w-8 sm:h-8 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
                       <User className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />

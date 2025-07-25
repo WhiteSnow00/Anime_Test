@@ -20,6 +20,7 @@ import { useViewport } from '@/hooks/use-viewport';
 import { useAnimeState } from '@/hooks/use-anime-state';
 import { utils, fp } from '@/lib/advanced-utils';
 import { withPerformanceOptimization, withErrorBoundary } from '@/lib/higher-order-components';
+import { FloatingSupportWidget } from './floating-support-widget';
 
 function AnimePageComponent() {
   // Track hydration to avoid hydration mismatch
@@ -157,6 +158,9 @@ function AnimePageComponent() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Floating Support Widget - Only for PC */}
+      <FloatingSupportWidget />
+
       {/* Mobile Header - Conditionally rendered */}
       {layoutConfig.showMobileHeader && (
         <MobileHeader title={animeDetails.title} />

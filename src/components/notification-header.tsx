@@ -55,15 +55,6 @@ export function NotificationHeader({ className }: NotificationHeaderProps) {
         setDeviceType('desktop');
       }
       
-      // Debug log to help with testing (remove in production)
-      console.log('Device detection:', {
-        userAgent: userAgent,
-        deviceType: /android/.test(userAgent) ? 'android' : 
-                   /iphone|ipad|ipod/.test(userAgent) ? 'ios' : 'desktop',
-        isSmallScreen,
-        hasAndroid: /android/.test(userAgent),
-        hasIOS: /iphone|ipad|ipod/.test(userAgent)
-      });
     };
 
     checkDeviceType();

@@ -285,7 +285,7 @@ export default function CommentManagement() {
               </div>
             ) : (
               filteredComments.map((comment) => (
-                <div key={comment.id} className="border rounded-lg p-3 sm:p-4 space-y-3 admin-comment-card">
+                <div key={comment._id || `admin-comment-${comment.userName}-${comment.timestamp}`} className="border rounded-lg p-3 sm:p-4 space-y-3 admin-comment-card">
                   {/* Comment Header - Mobile optimized */}
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                     <div className="flex items-start gap-2 sm:gap-3 flex-1 min-w-0">
@@ -329,7 +329,7 @@ export default function CommentManagement() {
                       <Button
                         size="sm"
                         variant={comment.isApproved ? "outline" : "default"}
-                        onClick={() => toggleApproval(comment.id)}
+                        onClick={() => toggleApproval(comment._id!)}
                         className="text-xs sm:text-sm px-2 sm:px-3"
                       >
                         {comment.isApproved ? (
@@ -349,7 +349,7 @@ export default function CommentManagement() {
                         variant="destructive"
                         onClick={() => {
                           if (confirm('Bạn có chắc muốn xóa bình luận này?')) {
-                            deleteComment(comment.id);
+                            deleteComment(comment._id!);
                           }
                         }}
                         className="px-2 sm:px-3"
@@ -376,7 +376,7 @@ export default function CommentManagement() {
                         <div className="mt-2 space-y-1 text-xs">
                           <p className="break-all">User Agent: {comment.userAgent}</p>
                           <p>IP: {comment.ipAddress}</p>
-                          <p>ID: {comment.id}</p>
+                          <p>ID: {comment._id}</p>
                         </div>
                       </details>
                     </div>
