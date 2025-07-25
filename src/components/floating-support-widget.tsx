@@ -14,7 +14,6 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
   const [isHovered, setIsHovered] = useState(false);
   const [scrollTop, setScrollTop] = useState(0);
   const [isClient, setIsClient] = useState(false);
-  const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
     // Set client flag to true after hydration
@@ -154,29 +153,15 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
           {/* QR Code Container */}
           <div className="relative bg-white rounded-xl p-4 shadow-inner border border-gray-100">
             <div className="relative w-full aspect-square max-w-[200px] mx-auto">
-              {!imageError ? (
-                <Image
-                  src="/images/qr.png"
-                  alt="QR Code ủng hộ nhóm dịch"
-                  width={200}
-                  height={200}
-                  className="object-contain rounded-lg w-full h-full"
-                  priority
-                  unoptimized // Disable Next.js optimization for deployment compatibility
-                  onError={() => {
-                    console.warn('QR image failed to load, showing fallback');
-                    setImageError(true);
-                  }}
-                />
-              ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center text-gray-500 border-2 border-dashed border-gray-300 rounded-lg min-h-[200px]">
-                  <div className="text-4xl mb-2">📱</div>
-                  <p className="text-sm text-center vietnamese-text">
-                    QR Code không thể tải<br />
-                    Vui lòng liên hệ admin để ủng hộ
-                  </p>
-                </div>
-              )}
+              <Image
+                src="/images/qr.png"
+                alt="QR Code ủng hộ nhóm dịch"
+                width={200}
+                height={200}
+                className="object-contain rounded-lg"
+                priority={true}
+                unoptimized={true}
+              />
             </div>
           </div>
 
