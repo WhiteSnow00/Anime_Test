@@ -23,6 +23,11 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
+    // Ensure local images are properly handled
+    unoptimized: false,
+    dangerouslyAllowSVG: true,
+    contentDispositionType: 'attachment',
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
 };
 

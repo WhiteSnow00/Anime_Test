@@ -14,6 +14,7 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
   const [isHovered, setIsHovered] = useState(false);
   const [scrollTop, setScrollTop] = useState(0);
   const [isClient, setIsClient] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
     // Set client flag to true after hydration
@@ -146,29 +147,44 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
               <Gift className="w-5 h-5 text-pink-600" />
             </div>
             <p className="text-sm text-gray-600 vietnamese-text leading-relaxed">
-              Quét mã QR để ủng hộ nhóm dịch phụ đề
+              Quét mã QR để ủng hộ KanaFansub
             </p>
           </div>
 
           {/* QR Code Container */}
           <div className="relative bg-white rounded-xl p-4 shadow-inner border border-gray-100">
             <div className="relative w-full aspect-square max-w-[200px] mx-auto">
-              <Image
-                src="/images/qr.png"
-                alt="QR Code ủng hộ nhóm dịch"
-                fill
-                className="object-contain rounded-lg"
-                sizes="200px"
-                priority
-              />
+              {!imageError ? (
+                <Image
+                  src="/images/qr.png"
+                  alt="QR Code ủng hộ nhóm dịch"
+                  width={200}
+                  height={200}
+                  className="object-contain rounded-lg w-full h-full"
+                  priority
+                  unoptimized // Disable Next.js optimization for deployment compatibility
+                  onError={() => {
+                    console.warn('QR image failed to load, showing fallback');
+                    setImageError(true);
+                  }}
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center text-gray-500 border-2 border-dashed border-gray-300 rounded-lg min-h-[200px]">
+                  <div className="text-4xl mb-2">📱</div>
+                  <p className="text-sm text-center vietnamese-text">
+                    QR Code không thể tải<br />
+                    Vui lòng liên hệ admin để ủng hộ
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Instructions */}
           <div className="mt-4 text-center">
             <p className="text-xs text-gray-500 vietnamese-text leading-relaxed">
-              Cảm ơn bạn đã ủng hộ nhóm dịch!<br />
-              Mọi đóng góp đều giúp cải thiện chất lượng phụ đề
+              Cảm ơn bạn đã ủng hộ nhóm!<br />
+              Mọi đóng góp đều giúp cải thiện chất lượng bản dịch
             </p>
           </div>
 
