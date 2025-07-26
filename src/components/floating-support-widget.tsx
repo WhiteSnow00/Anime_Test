@@ -160,7 +160,6 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
                 height={200}
                 className="object-contain rounded-lg"
                 priority
-                unoptimized
               />
             </div>
           </div>
