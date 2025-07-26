@@ -1,7 +1,15 @@
-import CommentManagement from './page';
-
-export default function CommentPage() {
-  return <CommentManagement />;
+export default function CommentLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto py-8">
+        {children}
+      </div>
+    </div>
+  );
 }
 
 export const metadata = {
