@@ -27,27 +27,16 @@ export function AnimeInfo({ anime }: AnimeInfoProps) {
       <div className="grid md:grid-cols-12 gap-0 md:gap-6 bg-card">
         <div className="md:col-span-4 lg:col-span-3">
           <div className="relative aspect-[2/3] w-full max-w-sm mx-auto md:max-w-none">
-            {anime.posterUrl.endsWith('.avif') ? (
-              <img
-                src={anime.posterUrl}
-                alt={`Poster for ${anime.title}`}
-                className="object-cover w-full h-full rounded-lg"
-                style={{ width: '100%', height: '100%' }}
-                loading="eager"
-                data-ai-hint="anime girl"
-              />
-            ) : (
-              <Image
-                src={anime.posterUrl}
-                alt={`Poster for ${anime.title}`}
-                fill
-                className="object-cover"
-                sizes="(max-width: 768px) 90vw, (max-width: 1024px) 50vw, 40vw"
-                priority
-                quality={95}
-                data-ai-hint="anime girl"
-              />
-            )}
+            <img
+              src={anime.posterUrl}
+              alt={`Poster for ${anime.title}`}
+              className="object-cover w-full h-full rounded-lg"
+              style={{ width: '100%', height: '100%' }}
+              loading="eager"
+              onLoad={() => console.log('Image loaded successfully:', anime.posterUrl)}
+              onError={(e) => console.error('Image failed to load:', anime.posterUrl, e)}
+              data-ai-hint="anime girl"
+            />
           </div>
         </div>
         <div className="md:col-span-8 lg:col-span-9 p-4 md:p-6">
