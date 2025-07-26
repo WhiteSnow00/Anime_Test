@@ -18,19 +18,6 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
     // Set client flag to true after hydration
     setIsClient(true);
     
-    // Preload QR image for faster loading
-    const preloadImage = () => {
-      const link = document.createElement('link');
-      link.rel = 'preload';
-      link.as = 'image';
-      link.href = 'https://i.ibb.co/v4MMFJcN/qr.png';
-      link.crossOrigin = 'anonymous';
-      document.head.appendChild(link);
-    };
-    
-    // Preload image after a short delay to not block initial render
-    const preloadTimeout = setTimeout(preloadImage, 100);
-    
     let timeoutId: NodeJS.Timeout;
     
     const handleScroll = () => {
@@ -51,7 +38,6 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
     return () => {
       window.removeEventListener('scroll', handleScroll);
       clearTimeout(timeoutId);
-      clearTimeout(preloadTimeout);
     };
   }, []);
 
@@ -164,30 +150,15 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
           </div>
 
           {/* QR Code Container */}
-          <div 
-            className="relative bg-white rounded-xl p-4 shadow-inner border border-gray-100 select-none"
-            onContextMenu={(e) => e.preventDefault()}
-            style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
-          >
+          <div className="relative bg-white rounded-xl p-4 shadow-inner border border-gray-100">
             <div className="relative w-full aspect-square max-w-[200px] mx-auto">
               <img
                 src="https://i.ibb.co/v4MMFJcN/qr.png"
                 alt="QR Code ủng hộ nhóm dịch"
                 width={200}
                 height={200}
-                className="object-contain rounded-lg w-full h-full select-none"
-                style={{ 
-                  maxWidth: '200px', 
-                  maxHeight: '200px',
-                  userSelect: 'none',
-                  WebkitUserSelect: 'none',
-                  pointerEvents: 'none'
-                }}
-                onContextMenu={(e) => e.preventDefault()}
-                onDragStart={(e) => e.preventDefault()}
-                loading="eager"
-                fetchPriority="high"
-                decoding="sync"
+                className="object-contain rounded-lg w-full h-full"
+                style={{ maxWidth: '200px', maxHeight: '200px' }}
               />
             </div>
           </div>
