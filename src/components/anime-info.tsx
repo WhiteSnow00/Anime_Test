@@ -35,6 +35,7 @@ export function AnimeInfo({ anime }: AnimeInfoProps) {
               sizes="(max-width: 768px) 90vw, (max-width: 1024px) 50vw, 40vw"
               priority
               quality={95}
+              unoptimized={anime.posterUrl.endsWith('.avif')}
               data-ai-hint="anime girl"
             />
           </div>

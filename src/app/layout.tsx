@@ -48,7 +48,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700;800&display=swap&subset=latin,vietnamese" rel="stylesheet" />
-        <link rel="preload" href="/images/thumbnail.avif" as="image" type="image/jpeg" />
+        <link rel="preload" href="/images/thumbnail.avif" as="image" type="image/avif" />
       </head>
       <body className="font-body antialiased" suppressHydrationWarning>
         {children}
