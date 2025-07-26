@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import Image from 'next/image';
 import { Star, Gift, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -153,13 +152,13 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
           {/* QR Code Container */}
           <div className="relative bg-white rounded-xl p-4 shadow-inner border border-gray-100">
             <div className="relative w-full aspect-square max-w-[200px] mx-auto">
-              <Image
+              <img
                 src="/images/qr.png"
                 alt="QR Code ủng hộ nhóm dịch"
                 width={200}
                 height={200}
-                className="object-contain rounded-lg"
-                priority
+                className="object-contain rounded-lg w-full h-full"
+                style={{ maxWidth: '200px', maxHeight: '200px' }}
               />
             </div>
           </div>
