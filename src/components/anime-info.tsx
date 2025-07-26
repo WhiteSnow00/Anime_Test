@@ -27,12 +27,14 @@ export function AnimeInfo({ anime }: AnimeInfoProps) {
       <div className="grid md:grid-cols-12 gap-0 md:gap-6 bg-card">
         <div className="md:col-span-4 lg:col-span-3">
           <div className="relative aspect-[2/3] w-full max-w-sm mx-auto md:max-w-none">
-            <Image
+            <img
               src={anime.posterUrl}
               alt={`Poster for ${anime.title}`}
-              fill
-              className="object-cover"
-              sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+              className="object-cover w-full h-full rounded-lg"
+              style={{ width: '100%', height: '100%' }}
+              loading="eager"
+              onLoad={() => console.log('Image loaded successfully:', anime.posterUrl)}
+              onError={(e) => console.error('Image failed to load:', anime.posterUrl, e)}
               data-ai-hint="anime girl"
             />
           </div>

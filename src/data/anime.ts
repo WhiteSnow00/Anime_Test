@@ -40,7 +40,7 @@ export const animeData: Anime = {
     japanese: '薫る花は凛と咲く',
     english: 'Kaoru Hana wa Rin to Saku',
   },
-  posterUrl: '/images/kaoruhana.jpg',
+  posterUrl: '/images/thumbnail.avif',
   summary:
     "Tsugumi Rintaro, một nam sinh to lớn, trầm tính và có hơi “hung dữ” do vẻ ngoài của mình. Cậu tới từ trường cấp 3 Chidori, ngôi trường nam sinh cấp thấp hội tụ đủ những thành phần “bất hảo”. Bên cạnh trường của cậu là trường nữ sinh Kikyo, một trường cấp 3 vô cùng danh giá. Cậu thường xuyên bắt gặp Waguri Kaoruko, một khách hàng tại cửa hàng bánh nhà mình. Rintaro cảm thấy thoải mái khi dành thời gian bên Kaoruko. Tuy nhiên, học sinh của trường Kikyo lại cực kỳ căm ghét trường Chidori khiến mối quan hệ giữa cả hai trở nên khó xử. Đây là câu chuyện về 2 con người ở rất gần nhưng lại rất xa.",
   genres: ['Slice of Life', 'Romance', 'Drama', 'School Life'],
