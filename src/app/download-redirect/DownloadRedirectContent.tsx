@@ -21,6 +21,15 @@ export default function DownloadRedirectContent() {
   // Check if this episode is H.265 encoded
   const isH265 = isH265Episode(episodeId);
 
+  // Debug logging
+  console.log('DownloadRedirect Debug:', {
+    episodeId,
+    episodeIdRaw: searchParams.get('episodeId'),
+    type,
+    isH265,
+    shouldShowWarning: isH265Episode(episodeId) && type !== 'raw'
+  });
+
   const redirectToUrl = (targetUrl: string) => {
     setIsRedirecting(true);
     // Redirect directly to Google Drive instead of opening new tab
@@ -85,7 +94,6 @@ export default function DownloadRedirectContent() {
               {type === 'raw' ? 'Phim RAW (Không phụ đề)' : 'Phim có phụ đề'}: {filename}
             </p>
           </div>
-
           {/* Warning message - only show for H.265 episodes AND non-RAW downloads */}
           {isH265Episode(episodeId) && type !== 'raw' && (
             <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
