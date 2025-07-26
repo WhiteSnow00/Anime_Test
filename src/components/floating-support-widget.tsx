@@ -153,14 +153,16 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
           {/* QR Code Container */}
           <div className="relative bg-white rounded-xl p-4 shadow-inner border border-gray-100">
             <div className="relative w-full aspect-square max-w-[200px] mx-auto">
-              <Image
-                src="/images/qr.png"
+              <img
+                src="/qr.png"
                 alt="QR Code ủng hộ nhóm dịch"
-                width={200}
-                height={200}
-                className="object-contain rounded-lg"
-                priority={true}
-                unoptimized={true}
+                className="object-contain rounded-lg w-full h-full"
+                style={{ width: '200px', height: '200px' }}
+                onError={(e) => {
+                  console.error('Image failed to load:', e);
+                  // Try fallback approach
+                  e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NzM4NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkxpw6puIGjhu4cgYWRtaW4gxJHhu4MgxaluZyBo4buZPC90ZXh0Pjwvc3ZnPg==';
+                }}
               />
             </div>
           </div>
