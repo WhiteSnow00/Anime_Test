@@ -153,7 +153,7 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
           <div className="relative bg-white rounded-xl p-4 shadow-inner border border-gray-100">
             <div className="relative w-full aspect-square max-w-[200px] mx-auto">
               <img
-                src="/qr.bmp"
+                src="https://i.ibb.co/v4MMFJcN/qr.png"
                 alt="QR Code ủng hộ nhóm dịch"
                 width={200}
                 height={200}
