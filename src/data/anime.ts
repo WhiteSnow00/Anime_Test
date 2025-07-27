@@ -79,7 +79,7 @@ export const animeData: Anime = {
       videoId: 'dibBTjuqH',
       servers: {
         hydax: 'dibBTjuqH',
-        mxdrop: '03rpqdlwflqdzw'
+        mxdrop: '1n6oqgzkblw8g'
       },
       downloadUrl: 'https://drive.google.com/file/d/1tTj9xwr8Rs2KDFPMhgrBn6qj1qcY3mw_/view?usp=sharing',
       rawDownloadUrl: 'https://drive.google.com/file/d/1JoWzKRWLnpvwhokC_uWGjflTu9KONrfL/view?usp=sharing'
