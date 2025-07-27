@@ -84,5 +84,16 @@ export const animeData: Anime = {
       downloadUrl: 'https://drive.google.com/file/d/1tTj9xwr8Rs2KDFPMhgrBn6qj1qcY3mw_/view?usp=sharing',
       rawDownloadUrl: 'https://drive.google.com/file/d/1JoWzKRWLnpvwhokC_uWGjflTu9KONrfL/view?usp=sharing'
     },
+    { 
+      id: 4, 
+      title: 'Episode 4', 
+      videoId: 'RNYvmmSXh',
+      servers: {
+        hydax: 'RNYvmmSXh',
+        mxdrop: ''
+      },
+      downloadUrl: '',
+      rawDownloadUrl: 'https://drive.google.com/file/d/1n5j15eQR2umkpIW48yYz0Y5Wkm0uWNqw/view?usp=sharing'
+    },
   ],
 };
