@@ -90,9 +90,9 @@ export const animeData: Anime = {
       videoId: 'RNYvmmSXh',
       servers: {
         hydax: 'RNYvmmSXh',
-        mxdrop: ''
+        mxdrop: 'k01exgz4ijqeod'
       },
-      downloadUrl: '',
+      downloadUrl: 'https://drive.google.com/file/d/11SdllkZheEmHJ2IoWAd_kUsZWxpm37rw/view?usp=sharing',
       rawDownloadUrl: 'https://drive.google.com/file/d/1n5j15eQR2umkpIW48yYz0Y5Wkm0uWNqw/view?usp=sharing'
     },
   ],
