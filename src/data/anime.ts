@@ -3,8 +3,9 @@ export interface Episode {
   title: string;
   videoId: string;
   servers: {
+    hls?: string; // m3u8 filename for HLS streaming
+    helvid: string;
     hydax: string;
-    mxdrop: string;
   };
   downloadUrl?: string; 
   rawDownloadUrl?: string; // For raw anime without subtitles
@@ -54,10 +55,11 @@ export const animeData: Anime = {
     { 
       id: 1, 
       title: 'Episode 1', 
-      videoId: 'AkqMUVl6B',
+      videoId: '01',
       servers: {
-        hydax: 'AkqMUVl6B',
-        mxdrop: '9wok3vg4u9lx3x'
+        hls: 'kanasub-01.m3u8',
+        helvid: '8c8edb8924a8',
+        hydax: 'AkqMUVl6B'
       },
       downloadUrl: 'https://drive.google.com/file/d/1OODRq70CsWpMVid6hejrNzIRb0l7RXEA/view?usp=sharing',
       rawDownloadUrl: 'https://drive.google.com/file/d/1CHh6EMCr2Lg2q76NHnUSyYClA3si0SO2/view?usp=sharing'
@@ -65,10 +67,11 @@ export const animeData: Anime = {
     { 
       id: 2, 
       title: 'Episode 2', 
-      videoId: 'ubMg6Vlex',
+      videoId: '02',
       servers: {
-        hydax: 'ubMg6Vlex',
-        mxdrop: 'q166dv6rux7pr1m'
+        hls: 'kanasub-02.m3u8',
+        helvid: '34ebbd8b7a07',
+        hydax: 'ubMg6Vlex'
       },
       downloadUrl: 'https://drive.google.com/file/d/1DdFaT7f-BXdC8S7P3vNZx_j0CC6gzWSA/view?usp=sharing',
       rawDownloadUrl: 'https://drive.google.com/file/d/1fgCgQPckMHU1kDyUaS5DG_kVayL_dsth/view?usp=sharing'
@@ -76,10 +79,11 @@ export const animeData: Anime = {
     { 
       id: 3, 
       title: 'Episode 3', 
-      videoId: 'dibBTjuqH',
+      videoId: '03',
       servers: {
-        hydax: 'dibBTjuqH',
-        mxdrop: '1n6oqgzkblw8g'
+        hls: 'kanasub-03.m3u8',
+        helvid: '50909806cf25',
+        hydax: 'dibBTjuqH'
       },
       downloadUrl: 'https://drive.google.com/file/d/1tTj9xwr8Rs2KDFPMhgrBn6qj1qcY3mw_/view?usp=sharing',
       rawDownloadUrl: 'https://drive.google.com/file/d/1JoWzKRWLnpvwhokC_uWGjflTu9KONrfL/view?usp=sharing'
@@ -87,10 +91,11 @@ export const animeData: Anime = {
     { 
       id: 4, 
       title: 'Episode 4', 
-      videoId: 'p_BMmjguS',
+      videoId: '04',
       servers: {
-        hydax: 'p_BMmjguS',
-        mxdrop: 'k01exgz4ijqeod'
+        hls: 'kanasub-04.m3u8',
+        helvid: '28b0a006506a',
+        hydax: 'p_BMmjguS'
       },
       downloadUrl: 'https://drive.google.com/file/d/1EnWQNbCZvtDkB8vdvBwSsclJ4jgsjzj5/view?usp=sharing',
       rawDownloadUrl: 'https://drive.google.com/file/d/1n5j15eQR2umkpIW48yYz0Y5Wkm0uWNqw/view?usp=sharing'

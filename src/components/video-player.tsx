@@ -8,8 +8,9 @@ import { withPerformanceOptimization, withErrorBoundary } from '@/lib/higher-ord
 import { fp, performanceUtils } from '@/lib/advanced-utils';
 import { Loader2, Play, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { JWPlayerComponent } from './jwplayer';
 
-export type ServerType = 'hydax' | 'mxdrop';
+export type ServerType = 'hls' | 'helvid' | 'hydax';
 
 interface VideoPlayerProps {
   videoId: string;
@@ -25,7 +26,7 @@ interface VideoPlayerProps {
 
 function VideoPlayerComponent({ 
   videoId,
-  server = 'hydax',
+  server = 'helvid',
   autoPlay = false,
   muted = false,
   controls = true,
@@ -57,17 +58,33 @@ function VideoPlayerComponent({
     setIsHydrated(true);
   }, []);
 
-  // Memoized iframe URL with advanced parameters
+  // Memoized iframe URL with advanced parameters (for non-HLS servers)
   const iframeUrl = useMemo(() => {
+    if (server === 'hls') return ''; // HLS uses JWPlayer component, not iframe
+    
     const currentVideoId = transitionComputed.currentVideoId || videoId;
     
-    if (server === 'mxdrop') {
-      // MxDrop server URL
-      return `//mxdrop.to/e/${currentVideoId}`;
+    if (server === 'helvid') {
+      // Helvid server URL - using sample video IDs for now
+      const helvidSampleIds = {
+        '01': '8c8edb8924a8',
+        '02': '8c8edb8924a9', 
+        '03': '8c8edb8924aa',
+        '04': '8c8edb8924ab'
+      };
+      const helvidId = helvidSampleIds[currentVideoId as keyof typeof helvidSampleIds] || helvidSampleIds['01'];
+      return `https://helvid.net/play/index/${helvidId}`;
     }
     
-    // Hydax server URL (default)
-    const baseUrl = `https://short.icu/${currentVideoId}`;
+    // Hydax server URL (3rd server)
+    const hydaxSampleIds = {
+      '01': 'sample01',
+      '02': 'sample02',
+      '03': 'sample03', 
+      '04': 'sample04'
+    };
+    const hydaxId = hydaxSampleIds[currentVideoId as keyof typeof hydaxSampleIds] || hydaxSampleIds['01'];
+    const baseUrl = `https://player.hidatv.live/player/?id=${hydaxId}`;
     
     let quality = 'hd1080'; 
     if (isHydrated && viewport.width > 0) {
@@ -165,28 +182,33 @@ function VideoPlayerComponent({
     };
   }, [performanceProfiler, videoId, transitionState.transitionPhase]);
 
-  // Memoized iframe props for performance with transition support
-  const iframeProps = useMemo(() => ({
-    ref: iframeRef,
-    width: iframeDimensions.width,
-    height: iframeDimensions.height,
-    src: iframeUrl,
-    frameBorder: "0",
-    scrolling: "no" as const,
-    allowFullScreen: true,
-    allow: "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share",
-    onLoad: handleIframeLoad,
-    onError: () => handleIframeError(`Failed to load video: ${videoId}`),
-    className: "w-full h-full touch-manipulation",
-    style: {
-      border: 'none',
-      outline: 'none',
-      ...transitionStyles.getTransitionStyles(),
-    },
-    // Enhanced accessibility
-    title: `Video player for ${episodeTitle}`,
-    'aria-label': `Video content for ${episodeTitle}`,
-  }), [
+  // Memoized iframe props for performance with transition support (only for non-HLS servers)
+  const iframeProps = useMemo(() => {
+    if (server === 'hls') return {}; // HLS doesn't use iframe
+    
+    return {
+      ref: iframeRef,
+      width: iframeDimensions.width,
+      height: iframeDimensions.height,
+      src: iframeUrl,
+      frameBorder: "0",
+      scrolling: "no" as const,
+      allowFullScreen: true,
+      allow: "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share",
+      onLoad: handleIframeLoad,
+      onError: () => handleIframeError(`Failed to load video: ${videoId}`),
+      className: "w-full h-full touch-manipulation",
+      style: {
+        border: 'none',
+        outline: 'none',
+        ...transitionStyles.getTransitionStyles(),
+      },
+      // Enhanced accessibility
+      title: `Video player for ${episodeTitle}`,
+      'aria-label': `Video content for ${episodeTitle}`,
+    };
+  }, [
+    server,
     videoId,
     episodeTitle,
     iframeDimensions,
@@ -290,12 +312,26 @@ function VideoPlayerComponent({
           </div>
         )}
         
-        {/* Video iframe with smooth transitions */}
-        <iframe 
-          key={`${server}-${transitionComputed.currentVideoId}`} 
-          {...iframeProps} 
-          suppressHydrationWarning={true}
-        />
+        {/* Video player - JWPlayer for HLS, iframe for others */}
+        {server === 'hls' ? (
+          <JWPlayerComponent
+            key={`${server}-${transitionComputed.currentVideoId}`}
+            videoId={transitionComputed.currentVideoId || videoId}
+            server={server}
+            autoPlay={autoPlay}
+            muted={muted}
+            controls={controls}
+            onLoad={handleIframeLoad}
+            onError={handleIframeError}
+            className="w-full h-full"
+          />
+        ) : (
+          <iframe 
+            key={`${server}-${transitionComputed.currentVideoId}`} 
+            {...iframeProps} 
+            suppressHydrationWarning={true}
+          />
+        )}
       </div>
     </Card>
   );

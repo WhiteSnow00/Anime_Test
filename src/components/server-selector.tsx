@@ -9,7 +9,7 @@ import { withPerformanceOptimization } from '@/lib/higher-order-components';
 import { triggerDownload, isValidDownloadUrl, openGoogleDriveLink } from '@/lib/download-utils';
 import type { Episode } from '@/data/anime';
 
-export type ServerType = 'hydax' | 'mxdrop';
+export type ServerType = 'hls' | 'helvid' | 'hydax';
 
 interface ServerSelectorProps {
   currentServer: ServerType;
@@ -19,13 +19,18 @@ interface ServerSelectorProps {
 }
 
 const serverConfig = {
-  hydax: {
-    name: 'Hydax',
+  hls: {
+    name: 'HLS Stream',
+    label: 'HD Local',
+    color: 'bg-purple-500 hover:bg-purple-600',
+  },
+  helvid: {
+    name: 'Helvid',
     label: 'HD Fast',
     color: 'bg-blue-500 hover:bg-blue-600',
   },
-  mxdrop: {
-    name: 'MxDrop',
+  hydax: {
+    name: 'Hydax',
     label: 'HD Backup',
     color: 'bg-green-500 hover:bg-green-600',
   },
@@ -101,8 +106,13 @@ function ServerSelectorComponent({
             const config = serverConfig[server];
             const isActive = currentServer === server;
             
-            // Hide mxdrop server if the current episode doesn't have mxdrop server data
-            if (server === 'mxdrop' && currentEpisode && !currentEpisode.servers.mxdrop) {
+            // Hide helvid server if the current episode doesn't have helvid server data
+            if (server === 'helvid' && currentEpisode && !currentEpisode.servers.helvid) {
+              return null;
+            }
+            
+            // Hide hydax server if the current episode doesn't have hydax server data
+            if (server === 'hydax' && currentEpisode && !currentEpisode.servers.hydax) {
               return null;
             }
             

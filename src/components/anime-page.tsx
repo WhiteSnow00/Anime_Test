@@ -39,7 +39,7 @@ function AnimePageComponent() {
   }, []);
 
   // Server state management
-  const [currentServer, setCurrentServer] = useState<ServerType>('hydax');
+  const [currentServer, setCurrentServer] = useState<ServerType>('hls');
 
   // Handle server change
   const handleServerChange = useCallback((server: ServerType) => {
@@ -178,6 +178,7 @@ function AnimePageComponent() {
             server={currentServer}
             episodeTitle={`Tập ${currentEpisode.id}`}
             autoPlay={true}
+            muted={false}
           />
         </div>
 
