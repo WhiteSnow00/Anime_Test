@@ -65,26 +65,12 @@ function VideoPlayerComponent({
     const currentVideoId = transitionComputed.currentVideoId || videoId;
     
     if (server === 'helvid') {
-      // Helvid server URL - using sample video IDs for now
-      const helvidSampleIds = {
-        '01': '8c8edb8924a8',
-        '02': '8c8edb8924a9', 
-        '03': '8c8edb8924aa',
-        '04': '8c8edb8924ab'
-      };
-      const helvidId = helvidSampleIds[currentVideoId as keyof typeof helvidSampleIds] || helvidSampleIds['01'];
-      return `https://helvid.net/play/index/${helvidId}`;
+      // Helvid server URL - use the actual video ID from episode data
+      return `https://helvid.net/play/index/${currentVideoId}`;
     }
     
-    // Hydax server URL (3rd server)
-    const hydaxSampleIds = {
-      '01': 'sample01',
-      '02': 'sample02',
-      '03': 'sample03', 
-      '04': 'sample04'
-    };
-    const hydaxId = hydaxSampleIds[currentVideoId as keyof typeof hydaxSampleIds] || hydaxSampleIds['01'];
-    const baseUrl = `https://player.hidatv.live/player/?id=${hydaxId}`;
+    // Hydax server URL (3rd server) - use the actual video ID from episode data
+    const baseUrl = `https://player.hidatv.live/player/`;
     
     let quality = 'hd1080'; 
     if (isHydrated && viewport.width > 0) {
@@ -92,6 +78,7 @@ function VideoPlayerComponent({
     }
     
     const params = new URLSearchParams({
+      id: currentVideoId,
       autoplay: autoPlay ? '1' : '0',
       muted: muted ? '1' : '0',
       controls: controls ? '1' : '0',

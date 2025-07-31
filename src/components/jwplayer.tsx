@@ -37,25 +37,11 @@ export function JWPlayerComponent({
       // Use our HLS API route
       return `/api/hls?file=${videoId}`;
     } else if (server === 'helvid') {
-      // Helvid server URL - using sample video IDs for now
-      const helvidsampleIds = {
-        '01': '8c8edb8924a8',
-        '02': '8c8edb8924a9', 
-        '03': '8c8edb8924aa',
-        '04': '8c8edb8924ab'
-      };
-      const helvid = helvidsampleIds[videoId as keyof typeof helvidsampleIds] || helvidsampleIds['01'];
-      return `https://helvid.net/play/index/${helvid}`;
+      // Helvid server URL - use the actual videoId passed from episode data
+      return `https://helvid.net/play/index/${videoId}`;
     } else if (server === 'hydax') {
-      // Hydax server URL - using sample video IDs for now
-      const hydaxSampleIds = {
-        '01': 'sample01',
-        '02': 'sample02',
-        '03': 'sample03', 
-        '04': 'sample04'
-      };
-      const hydaxId = hydaxSampleIds[videoId as keyof typeof hydaxSampleIds] || hydaxSampleIds['01'];
-      return `https://player.hidatv.live/player/?id=${hydaxId}`;
+      // Hydax server URL - use the actual videoId passed from episode data
+      return `https://player.hidatv.live/player/?id=${videoId}`;
     }
     return '';
   }, [videoId, server]);
