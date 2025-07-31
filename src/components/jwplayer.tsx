@@ -167,6 +167,15 @@ export function JWPlayerComponent({
 
     console.error = (...args: any[]) => {
       const message = args.join(' ');
+      
+      // Filter out JWPlayer core-shim errors and other common errors
+      if (message.includes('core-shim') || 
+          message.includes('[helpers/jwplayer/api/core-shim]') ||
+          message.includes('jwplayer.core.controls.js')) {
+        // Suppress these errors as they are typically non-critical JWPlayer internal errors
+        return;
+      }
+      
       // Allow HLS errors for debugging but filter sensitive content
       if (message.includes('m3u8') || message.includes('stream') || message.includes('segment')) {
         const filteredArgs = args.map(arg => 
@@ -536,6 +545,19 @@ export function JWPlayerComponent({
       return;
     }
 
+    // Check if we're in the middle of a fullscreen transition
+    const isFullscreen = document.fullscreenElement !== null;
+    if (isFullscreen && playerInstanceRef.current) {
+      console.log('Skipping player initialization due to fullscreen state');
+      return;
+    }
+
+    // Check if player exists and is in fullscreen mode
+    if (playerInstanceRef.current && playerInstanceRef.current._isFullscreen) {
+      console.log('Skipping player initialization due to player fullscreen flag');
+      return;
+    }
+
     try {
       const jwplayer = (window as any).jwplayer;
       const videoUrl = getVideoUrl();
@@ -543,7 +565,18 @@ export function JWPlayerComponent({
       // Remove existing player instance
       if (playerInstanceRef.current) {
         try {
+          // Save current playback position before removing
+          const currentPosition = playerInstanceRef.current.getPosition();
+          const wasPlaying = playerInstanceRef.current.getState() === 'playing';
+          
           playerInstanceRef.current.remove();
+          
+          // If we had a position, we'll restore it after recreation
+          if (currentPosition > 0) {
+            console.log('Saving playback position:', currentPosition);
+            playerInstanceRef.current._savedPosition = currentPosition;
+            playerInstanceRef.current._wasPlaying = wasPlaying;
+          }
         } catch (e) {
           console.warn('Error removing previous player:', e);
         }
@@ -727,6 +760,24 @@ export function JWPlayerComponent({
         setPlayerLoaded(true);
         setIsLoading(false);
         setError(null);
+        
+        // Restore saved position if available (from fullscreen or other reinitialization)
+        if (playerInstanceRef.current && playerInstanceRef.current._savedPosition) {
+          const savedPosition = playerInstanceRef.current._savedPosition;
+          const wasPlaying = playerInstanceRef.current._wasPlaying;
+          
+          console.log('Restoring playback position:', savedPosition);
+          
+          setTimeout(() => {
+            player.seek(savedPosition);
+            if (wasPlaying) {
+              player.play();
+            }
+            // Clear saved position
+            playerInstanceRef.current._savedPosition = null;
+            playerInstanceRef.current._wasPlaying = false;
+          }, 1000); // Wait a bit for player to be fully ready
+        }
         
         // Additional UI customizations and protection after player is ready
         setTimeout(() => {
@@ -934,20 +985,43 @@ export function JWPlayerComponent({
 
       player.on('error', (e: any) => {
         console.error('JWPlayer error:', e);
+        
+        // Handle different types of errors with retry logic
         let errorMessage = `Lỗi phát video: ${e.message || 'Không thể tải video'}`;
+        let shouldRetry = false;
         
         // Provide more specific error messages for common issues
         if (e.message && e.message.includes('network')) {
-          errorMessage = 'Lỗi mạng: Không thể tải video từ server';
+          errorMessage = 'Lỗi mạng: Đang thử kết nối lại...';
+          shouldRetry = true;
         } else if (e.message && e.message.includes('CORS')) {
           errorMessage = 'Lỗi CORS: Video bị chặn bởi chính sách bảo mật';
         } else if (e.message && e.message.includes('404')) {
           errorMessage = 'Lỗi 404: Không tìm thấy file video';
-        } else if (e.code === 'hlsError') {
-          errorMessage = 'Lỗi HLS: Không thể phát định dạng video này';
+        } else if (e.code === 'hlsError' || e.type === 'hlsError') {
+          errorMessage = 'Lỗi HLS: Đang thử kết nối lại...';
+          shouldRetry = true;
+        } else if (e.message && e.message.includes('core-shim')) {
+          errorMessage = 'Lỗi tạm thời: Đang thử kết nối lại...';
+          shouldRetry = true;
         }
         
         setError(errorMessage);
+        
+        // Auto-retry for network/HLS errors after a short delay
+        if (shouldRetry) {
+          setTimeout(() => {
+            console.log('Attempting to retry video load...');
+            try {
+              // Try to reload the player
+              player.load();
+              setError(null);
+            } catch (retryError) {
+              console.error('Retry failed:', retryError);
+              setError('Không thể kết nối lại. Vui lòng thử lại sau.');
+            }
+          }, 2000);
+        }
         setIsLoading(false);
         onError?.(errorMessage);
       });
@@ -1065,7 +1139,23 @@ export function JWPlayerComponent({
 
       player.on('fullscreen', (e: any) => {
         console.log('Fullscreen toggled:', e.fullscreen);
-        // Could handle fullscreen-specific UI changes
+        
+        // Prevent player reinitialization during fullscreen changes
+        if (e.fullscreen) {
+          console.log('Entering fullscreen mode - preventing player reload');
+          // Add a flag to prevent reinitialization
+          playerInstanceRef.current._isFullscreen = true;
+        } else {
+          console.log('Exiting fullscreen mode - preventing player reload');
+          // Track when we exit fullscreen to prevent immediate reinitialization
+          playerInstanceRef.current._lastFullscreenExit = Date.now();
+          // Remove the flag after a short delay to prevent immediate reinitialization
+          setTimeout(() => {
+            if (playerInstanceRef.current) {
+              playerInstanceRef.current._isFullscreen = false;
+            }
+          }, 1000);
+        }
       });
 
       player.on('resize', (e: any) => {
@@ -1134,15 +1224,29 @@ export function JWPlayerComponent({
         }
       }
     };
-  }, [videoId, server, initializePlayer]);
+  }, [videoId, server]); // Remove initializePlayer from dependencies to prevent constant reinitializations
 
-  // Handle server/video changes
+  // Handle server/video changes separately to prevent fullscreen issues
   useEffect(() => {
-    if (playerLoaded) {
+    if (playerLoaded && playerInstanceRef.current) {
+      // Don't reinitialize if only fullscreen state changed
+      const isFullscreen = document.fullscreenElement !== null;
+      if (isFullscreen || (playerInstanceRef.current && playerInstanceRef.current._isFullscreen)) {
+        console.log('Skipping player reinitialization due to fullscreen state');
+        return;
+      }
+      
+      // Also check if we just exited fullscreen recently
+      const now = Date.now();
+      if (playerInstanceRef.current._lastFullscreenExit && (now - playerInstanceRef.current._lastFullscreenExit) < 2000) {
+        console.log('Skipping player reinitialization - recently exited fullscreen');
+        return;
+      }
+      
       setIsLoading(true);
       initializePlayer();
     }
-  }, [videoId, server, playerLoaded, initializePlayer]);
+  }, [videoId, server, playerLoaded]);
 
   if (server !== 'hls') {
     // For external servers (Helvid, Hydax), use iframe embed

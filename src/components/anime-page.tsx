@@ -46,16 +46,64 @@ function AnimePageComponent() {
     setCurrentServer(server);
   }, []);
 
-  // Get current video ID based on selected server
+  // Get current video ID based on selected server with fallback logic
   const getCurrentVideoId = useCallback((episode: Episode) => {
-    return episode.servers[currentServer];
+    // Check if current server has video ID for this episode
+    const currentVideoId = episode.servers[currentServer];
+    if (currentVideoId) {
+      return currentVideoId;
+    }
+    
+    // If current server doesn't have video ID, fallback to HLS
+    return episode.servers.hls || '';
   }, [currentServer]);
+
   // Initialize advanced state management
   const { state, actions, computed } = useAnimeState(animeData);
 
   // Use the current episode from useAnimeState directly
   const currentEpisode = state.currentEpisode || animeData.episodes[0];
   const currentSection = state.currentSection;
+
+  // Auto-reset server to HLS when episode changes (HLS as primary server)
+  useEffect(() => {
+    if (currentEpisode) {
+      // Always reset to HLS when episode changes, making HLS the primary server
+      // User can manually select other servers if needed for that specific episode
+      if (currentServer !== 'hls') {
+        console.log(`Episode changed to ${currentEpisode.id}, resetting to HLS server (primary)`);
+        setCurrentServer('hls');
+      }
+    }
+  }, [currentEpisode.id]); // Only depend on episode ID
+
+  // Handle server errors and auto-fallback
+  const handleServerError = useCallback((error: string) => {
+    console.error('Server error:', error);
+    
+    // If HLS fails, try fallback to Helvid
+    if (currentServer === 'hls' && currentEpisode) {
+      const helvidId = currentEpisode.servers.helvid;
+      if (helvidId) {
+        console.log('HLS failed, falling back to Helvid server');
+        setCurrentServer('helvid');
+        return;
+      }
+    }
+    
+    // If Helvid fails, try Hydax
+    if (currentServer === 'helvid' && currentEpisode) {
+      const hydaxId = currentEpisode.servers.hydax;
+      if (hydaxId) {
+        console.log('Helvid failed, falling back to Hydax server');
+        setCurrentServer('hydax');
+        return;
+      }
+    }
+    
+    // If all servers fail, show error message
+    console.error('All servers failed for episode:', currentEpisode?.id);
+  }, [currentServer, currentEpisode]);
 
   // Use scroll navigation hook
   const { refs, actions: scrollActions } = useScrollNavigation({
@@ -179,6 +227,7 @@ function AnimePageComponent() {
             episodeTitle={`Tập ${currentEpisode.id}`}
             autoPlay={true}
             muted={false}
+            onError={handleServerError}
           />
         </div>
 
