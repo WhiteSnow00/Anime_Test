@@ -87,12 +87,12 @@ export const animeData: Anime = {
     { 
       id: 4, 
       title: 'Episode 4', 
-      videoId: 'RNYvmmSXh',
+      videoId: 'p_BMmjguS',
       servers: {
-        hydax: 'RNYvmmSXh',
+        hydax: 'p_BMmjguS',
         mxdrop: 'k01exgz4ijqeod'
       },
-      downloadUrl: 'https://drive.google.com/file/d/11SdllkZheEmHJ2IoWAd_kUsZWxpm37rw/view?usp=sharing',
+      downloadUrl: 'https://drive.google.com/file/d/1EnWQNbCZvtDkB8vdvBwSsclJ4jgsjzj5/view?usp=sharing',
       rawDownloadUrl: 'https://drive.google.com/file/d/1n5j15eQR2umkpIW48yYz0Y5Wkm0uWNqw/view?usp=sharing'
     },
   ],
