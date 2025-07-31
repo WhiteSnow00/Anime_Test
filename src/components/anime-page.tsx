@@ -130,6 +130,11 @@ function AnimePageComponent() {
         actions.setEpisode(episode);
         scrollActions.scrollToTop();
         
+        // Reset server to HLS when changing episodes
+        // This ensures users always start with the main HLS server for each new episode
+        setCurrentServer('hls');
+        console.log(`Episode changed to ${episode.id}, resetting server to HLS`);
+        
         // Optional: Add analytics or user feedback
         
         return episode;
