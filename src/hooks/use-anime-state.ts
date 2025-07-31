@@ -15,7 +15,12 @@ export type AnimeAction =
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'ADD_TO_HISTORY'; payload: Episode }
   | { type: 'CLEAR_HISTORY' }
-  | { type: 'SET_PREFERENCES'; payload: Partial<UserPreferences> };
+  | { type: 'SET_PREFERENCES'; payload: Partial<UserPreferences> }
+  | { type: 'SET_SERVER_ERROR'; payload: { server: string; hasError: boolean } }
+  | { type: 'CLEAR_SERVER_ERRORS' }
+  | { type: 'SET_FALLBACK_HISTORY'; payload: string[] }
+  | { type: 'INCREMENT_RETRY_COUNT' }
+  | { type: 'RESET_RETRY_COUNT' };
 
 // State interface
 export interface AnimeState {
@@ -26,6 +31,9 @@ export interface AnimeState {
   error: string | null;
   history: Episode[];
   preferences: UserPreferences;
+  serverErrors: Record<string, boolean>;
+  fallbackHistory: string[];
+  retryAttempts: number;
 }
 
 export interface UserPreferences {
@@ -55,6 +63,9 @@ const initialState: AnimeState = {
   error: null,
   history: [],
   preferences: initialPreferences,
+  serverErrors: {},
+  fallbackHistory: [],
+  retryAttempts: 0,
 };
 
 // Reducer function

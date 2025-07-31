@@ -9,6 +9,18 @@ import { fp, performanceUtils } from '@/lib/advanced-utils';
 import { Loader2, Play, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { JWPlayerComponent } from './jwplayer';
+import { 
+  generateVideoUrl, 
+  findBestServer, 
+  recordServerError, 
+  getErrorMessage,
+  getNextFallbackServer,
+  createIframeErrorDetector,
+  validateEpisodeServers,
+  getBestAvailableServer,
+  updateServerStatus,
+  ServerType as VideoServerType 
+} from '@/lib/video-server-utils';
 
 export type ServerType = 'hls' | 'helvid' | 'hydax';
 
@@ -26,7 +38,7 @@ interface VideoPlayerProps {
 
 function VideoPlayerComponent({ 
   videoId,
-  server = 'helvid',
+  server = 'hls',
   autoPlay = false,
   muted = false,
   controls = true,
@@ -39,6 +51,56 @@ function VideoPlayerComponent({
   const viewport = useViewport();
   const [isHydrated, setIsHydrated] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [currentServer, setCurrentServer] = useState<ServerType>(server);
+  const [triedServers, setTriedServers] = useState<ServerType[]>([]);
+  const [retryCount, setRetryCount] = useState(0);
+  const serverPropRef = useRef<ServerType>(server);
+  const isInternalServerChange = useRef<boolean>(false);
+
+  // Function to convert any video ID format to HLS format (m3u8 filename)
+  const getHLSVideoId = useCallback((inputVideoId: string) => {
+    // If it's already in HLS format (contains .m3u8), return as is
+    if (inputVideoId.includes('.m3u8')) {
+      return inputVideoId;
+    }
+    
+    // Map from episode number to HLS filename
+    const episodeToHLS: { [key: string]: string } = {
+      '01': 'kanasub-01.m3u8',
+      '02': 'kanasub-02.m3u8', 
+      '03': 'kanasub-03.m3u8',
+      '04': 'kanasub-04.m3u8'
+    };
+    
+    // If the input is a simple episode number (01, 02, etc.)
+    if (episodeToHLS[inputVideoId]) {
+      return episodeToHLS[inputVideoId];
+    }
+    
+    // If the input is a server-specific ID, try to map it back to episode number
+    const serverIdToEpisode: { [key: string]: string } = {
+      // Helvid server IDs
+      '8c8edb8924a8': '01',
+      '34ebbd8b7a07': '02', 
+      '50909806cf25': '03',
+      '28b0a006506a': '04',
+      // Hydax server IDs  
+      'AkqMUVl6B': '01',
+      'ubMg6Vlex': '02',
+      'dibBTjuqH': '03', 
+      'p_BMmjguS': '04'
+    };
+    
+    const episodeNumber = serverIdToEpisode[inputVideoId];
+    if (episodeNumber && episodeToHLS[episodeNumber]) {
+      console.log(`Converted server ID ${inputVideoId} to HLS: ${episodeToHLS[episodeNumber]}`);
+      return episodeToHLS[episodeNumber];
+    }
+    
+    // Fallback: assume it's episode 01 if we can't determine
+    console.warn(`Could not determine HLS filename for videoId: ${inputVideoId}, defaulting to kanasub-01.m3u8`);
+    return 'kanasub-01.m3u8';
+  }, []);
 
   // Use video transition hook for smooth episode switching
   const {
@@ -53,6 +115,35 @@ function VideoPlayerComponent({
     preloadNext: true,
   });
 
+  // Sync internal currentServer state with server prop changes
+  useEffect(() => {
+    // Only sync if the server prop actually changed (not internal fallback changes)
+    if (server !== serverPropRef.current && !isInternalServerChange.current) {
+      console.log(`VideoPlayer: Switching server from ${currentServer} to ${server}`);
+      serverPropRef.current = server;
+      
+      // Clear any existing errors immediately
+      setLoadError(null);
+      setTriedServers([]);
+      setRetryCount(0);
+      
+      // If switching to HLS from external server, add small delay to prevent flicker
+      if (server === 'hls' && (currentServer === 'helvid' || currentServer === 'hydax')) {
+        // Brief loading state to mask the transition
+        transitionActions.startTransition();
+        setTimeout(() => {
+          setCurrentServer(server);
+          setTimeout(() => transitionActions.completeTransition(), 100);
+        }, 150);
+      } else {
+        // Immediate switch for other transitions
+        setCurrentServer(server);
+      }
+    }
+    // Reset the internal change flag
+    isInternalServerChange.current = false;
+  }, [server, currentServer, transitionActions]);
+
   // Track hydration to avoid hydration mismatch
   useEffect(() => {
     setIsHydrated(true);
@@ -60,33 +151,34 @@ function VideoPlayerComponent({
 
   // Memoized iframe URL with advanced parameters (for non-HLS servers)
   const iframeUrl = useMemo(() => {
-    if (server === 'hls') return ''; // HLS uses JWPlayer component, not iframe
+    if (currentServer === 'hls') return ''; // HLS uses JWPlayer component, not iframe
     
     const currentVideoId = transitionComputed.currentVideoId || videoId;
     
-    if (server === 'helvid') {
-      // Helvid server URL - use the actual video ID from episode data
-      return `https://helvid.net/play/index/${currentVideoId}`;
+    // Get episode data to extract the correct server ID
+    const episodeData = {
+      servers: {
+        helvid: currentVideoId === '01' ? '8c8edb8924a8' : 
+                 currentVideoId === '02' ? '34ebbd8b7a07' :
+                 currentVideoId === '03' ? '50909806cf25' :
+                 currentVideoId === '04' ? '28b0a006506a' : currentVideoId,
+        hydax: currentVideoId === '01' ? 'AkqMUVl6B' :
+               currentVideoId === '02' ? 'ubMg6Vlex' :
+               currentVideoId === '03' ? 'dibBTjuqH' :
+               currentVideoId === '04' ? 'p_BMmjguS' : currentVideoId
+      }
+    };
+    
+    let videoUrl = '';
+    if (currentServer === 'helvid') {
+      videoUrl = `https://helvid.net/play/index/${episodeData.servers.helvid}`;
+    } else if (currentServer === 'hydax') {
+      videoUrl = `https://short.icu/${episodeData.servers.hydax}`;
     }
     
-    // Hydax server URL (3rd server) - use the actual video ID from episode data
-    const baseUrl = `https://player.hidatv.live/player/`;
-    
-    let quality = 'hd1080'; 
-    if (isHydrated && viewport.width > 0) {
-      quality = viewport.width > 1920 ? 'hd1080' : viewport.width > 1280 ? 'hd720' : 'medium';
-    }
-    
-    const params = new URLSearchParams({
-      id: currentVideoId,
-      autoplay: autoPlay ? '1' : '0',
-      muted: muted ? '1' : '0',
-      controls: controls ? '1' : '0',
-      quality,
-    });
-    
-    return `${baseUrl}?${params.toString()}`;
-  }, [transitionComputed.currentVideoId, server, autoPlay, muted, controls, isHydrated, viewport.width]);
+    console.log(`Generated iframe URL for ${currentServer}: ${videoUrl}`);
+    return videoUrl;
+  }, [transitionComputed.currentVideoId, currentServer, videoId]);
 
   // Advanced iframe load handler with transition state management
   const handleIframeLoad = useCallback(
@@ -106,9 +198,10 @@ function VideoPlayerComponent({
   // Error handling for iframe with transition state management
   const handleIframeError = useCallback(
     fp.throttle((error: string) => {
+      console.error(`Video player error: ${error}`);
+      
       setLoadError(error);
       onError?.(error);
-      console.error(`Video player error: ${error}`);
       // Reset transition on error
       transitionActions.resetTransition();
     }, 1000),
@@ -154,6 +247,65 @@ function VideoPlayerComponent({
 
     return () => observer.disconnect();
   }, []);
+  
+  // Retry logic with fallback server
+  useEffect(() => {
+    // Only process actual load errors from iframe
+    if (loadError && loadError.includes('Failed to load video:')) {
+      const errorDetails = {
+        server: currentServer,
+        error: loadError,
+        timestamp: Date.now(),
+        episodeId: parseInt(videoId),
+        retryCount: retryCount,
+      };
+
+      recordServerError(errorDetails);
+
+      // Get error message for user
+      const userErrorMessage = getErrorMessage(errorDetails);
+      console.log('Video load error:', userErrorMessage);
+
+      // Try fallback server after a delay
+      const timeoutId = setTimeout(async () => {
+        const nextServer = getNextFallbackServer(currentServer, triedServers);
+        if (nextServer) {
+          console.log(`Switching from ${currentServer} to ${nextServer} due to error`);
+          const newTriedServers = [...triedServers, currentServer];
+          setTriedServers(newTriedServers);
+          // Mark this as an internal server change to prevent sync loop
+          isInternalServerChange.current = true;
+          setCurrentServer(nextServer);
+          setLoadError(null);  // clear error to retry loading
+          setRetryCount(retryCount + 1);
+        } else {
+          console.error('No available servers left to try.');
+          // Show permanent error state
+        }
+      }, 2000); // retry delay
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [loadError, currentServer, triedServers, videoId, retryCount]);
+  
+  // Reset tried servers when video ID changes
+  useEffect(() => {
+    setTriedServers([]);
+    setRetryCount(0);
+    setLoadError(null);
+    // Reset server state to match the prop when episode changes
+    if (server !== currentServer) {
+      console.log(`Episode changed: Resetting server to ${server}`);
+      setCurrentServer(server);
+      serverPropRef.current = server; // Update ref to prevent sync issues
+    }
+  }, [videoId, server, currentServer]);
+  
+  // Reset error when server changes manually
+  useEffect(() => {
+    setLoadError(null);
+    setTriedServers([]);
+  }, [server]);
 
   // Performance monitoring with transition tracking
   const performanceProfiler = useMemo(
@@ -169,9 +321,23 @@ function VideoPlayerComponent({
     };
   }, [performanceProfiler, videoId, transitionState.transitionPhase]);
 
+  // Enhanced iframe error detection
+  useEffect(() => {
+    if (currentServer !== 'hls' && iframeRef.current && iframeUrl) {
+      const cleanup = createIframeErrorDetector(
+        iframeRef.current,
+        currentServer,
+        videoId,
+        handleIframeError
+      );
+      
+      return cleanup;
+    }
+  }, [currentServer, iframeUrl, videoId, handleIframeError]);
+
   // Memoized iframe props for performance with transition support (only for non-HLS servers)
   const iframeProps = useMemo(() => {
-    if (server === 'hls') return {}; // HLS doesn't use iframe
+    if (currentServer === 'hls') return {}; // HLS doesn't use iframe
     
     return {
       ref: iframeRef,
@@ -183,7 +349,7 @@ function VideoPlayerComponent({
       allowFullScreen: true,
       allow: "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share",
       onLoad: handleIframeLoad,
-      onError: () => handleIframeError(`Failed to load video: ${videoId}`),
+      onError: () => handleIframeError(`Failed to load video: ${currentServer} - ${videoId}`),
       className: "w-full h-full touch-manipulation",
       style: {
         border: 'none',
@@ -195,7 +361,7 @@ function VideoPlayerComponent({
       'aria-label': `Video content for ${episodeTitle}`,
     };
   }, [
-    server,
+    currentServer,
     videoId,
     episodeTitle,
     iframeDimensions,
@@ -300,11 +466,11 @@ function VideoPlayerComponent({
         )}
         
         {/* Video player - JWPlayer for HLS, iframe for others */}
-        {server === 'hls' ? (
+        {currentServer === 'hls' ? (
           <JWPlayerComponent
-            key={`${server}-${transitionComputed.currentVideoId}`}
-            videoId={transitionComputed.currentVideoId || videoId}
-            server={server}
+            key={`${currentServer}-${transitionComputed.currentVideoId}`}
+            videoId={getHLSVideoId(transitionComputed.currentVideoId || videoId)}
+            server={currentServer}
             autoPlay={autoPlay}
             muted={muted}
             controls={controls}
@@ -314,7 +480,7 @@ function VideoPlayerComponent({
           />
         ) : (
           <iframe 
-            key={`${server}-${transitionComputed.currentVideoId}`} 
+            key={`${currentServer}-${transitionComputed.currentVideoId}`}
             {...iframeProps} 
             suppressHydrationWarning={true}
           />

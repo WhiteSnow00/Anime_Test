@@ -99,6 +99,22 @@ export async function GET(request: NextRequest) {
       // Read the m3u8 file
       let fileContent = await readFile(filePath, 'utf8');
       
+      // Rewrite external CDN URLs to use our proxy to avoid CORS issues
+      const lines = fileContent.split('\n');
+      const rewrittenLines = lines.map(line => {
+        // Check if line is a segment URL (not a comment or directive)
+        if (line.trim() && !line.startsWith('#') && line.includes('tiktokcdn.com')) {
+          // Rewrite to use our proxy
+          const originalUrl = line.trim();
+          const proxyUrl = `/api/hls-segment?url=${encodeURIComponent(originalUrl)}`;
+          console.log(`Rewriting segment URL:`, originalUrl, '->', proxyUrl);
+          return proxyUrl;
+        }
+        return line;
+      });
+      
+      fileContent = rewrittenLines.join('\n');
+      
       // Obfuscate the m3u8 content to make tracking harder
       if (obfuscatedFile && token && timestamp) {
         // Add noise comments to confuse parsers

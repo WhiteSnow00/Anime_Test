@@ -49,7 +49,8 @@ function AnimePageComponent() {
   // Get current video ID based on selected server with fallback logic
   const getCurrentVideoId = useCallback((episode: Episode) => {
     // Check if current server has video ID for this episode
-    const currentVideoId = episode.servers[currentServer];
+    const serverKey = currentServer as keyof typeof episode.servers;
+    const currentVideoId = episode.servers[serverKey];
     if (currentVideoId) {
       return currentVideoId;
     }
@@ -65,44 +66,40 @@ function AnimePageComponent() {
   const currentEpisode = state.currentEpisode || animeData.episodes[0];
   const currentSection = state.currentSection;
 
-  // Auto-reset server to HLS when episode changes (HLS as primary server)
-  useEffect(() => {
-    if (currentEpisode) {
-      // Always reset to HLS when episode changes, making HLS the primary server
-      // User can manually select other servers if needed for that specific episode
-      if (currentServer !== 'hls') {
-        console.log(`Episode changed to ${currentEpisode.id}, resetting to HLS server (primary)`);
-        setCurrentServer('hls');
-      }
-    }
-  }, [currentEpisode.id]); // Only depend on episode ID
+  // Keep current server selection when episode changes (don't force reset)
+  // This allows users to maintain their preferred server choice
 
   // Handle server errors and auto-fallback
   const handleServerError = useCallback((error: string) => {
     console.error('Server error:', error);
     
-    // If HLS fails, try fallback to Helvid
+    // Only trigger fallback for critical HLS errors, not timeouts from external servers
+    if (!error.includes('Failed to load video:')) {
+      return;
+    }
+    
+    // Only auto-fallback if HLS (main server) fails with a real error
     if (currentServer === 'hls' && currentEpisode) {
-      const helvidId = currentEpisode.servers.helvid;
-      if (helvidId) {
-        console.log('HLS failed, falling back to Helvid server');
-        setCurrentServer('helvid');
-        return;
+      // Check if this is a real HLS server failure (not just JWPlayer config issues)
+      if (error.includes('hls') && (error.includes('404') || error.includes('network'))) {
+        const helvidId = currentEpisode.servers.helvid;
+        if (helvidId) {
+          console.log('HLS server failed with critical error, falling back to Helvid');
+          setCurrentServer('helvid');
+          return;
+        }
       }
     }
     
-    // If Helvid fails, try Hydax
-    if (currentServer === 'helvid' && currentEpisode) {
-      const hydaxId = currentEpisode.servers.hydax;
-      if (hydaxId) {
-        console.log('Helvid failed, falling back to Hydax server');
-        setCurrentServer('hydax');
-        return;
-      }
+    // For external servers (Helvid/Hydax), don't auto-fallback - let user manually switch
+    if (currentServer === 'helvid' || currentServer === 'hydax') {
+      console.log(`${currentServer} failed - user should manually switch back to HLS main server`);
+      // Don't auto-switch, let user choose
+      return;
     }
     
-    // If all servers fail, show error message
-    console.error('All servers failed for episode:', currentEpisode?.id);
+    // Only log errors for other cases
+    console.error('Server error for episode:', currentEpisode?.id, error);
   }, [currentServer, currentEpisode]);
 
   // Use scroll navigation hook
@@ -228,6 +225,7 @@ function AnimePageComponent() {
             autoPlay={true}
             muted={false}
             onError={handleServerError}
+            onLoad={() => console.log(`Episode ${currentEpisode.id} loaded successfully on ${currentServer}`)}
           />
         </div>
 

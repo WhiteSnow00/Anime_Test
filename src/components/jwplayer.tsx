@@ -168,6 +168,20 @@ export function JWPlayerComponent({
     console.error = (...args: any[]) => {
       const message = args.join(' ');
       
+      // Filter out JWPlayer empty error objects - these are benign and don't prevent playback
+      if (message.includes('JWPlayer error:') && args.length >= 2) {
+        const errorObj = args[1];
+        if (typeof errorObj === 'object' && errorObj !== null) {
+          // Check if it's an empty error object or has no meaningful properties
+          if (Object.keys(errorObj).length === 0 || 
+              (!errorObj.code && !errorObj.message && !errorObj.type && !errorObj.sourceError)) {
+            // This is an empty/meaningless JWPlayer error - suppress it completely
+            console.debug('Suppressed JWPlayer empty error object');
+            return;
+          }
+        }
+      }
+      
       // Filter out JWPlayer core-shim errors and other common errors
       if (message.includes('core-shim') || 
           message.includes('[helpers/jwplayer/api/core-shim]') ||
@@ -421,8 +435,8 @@ export function JWPlayerComponent({
   // Generate HLS URL with advanced protection (with fallback for reliability)
   const getVideoUrl = useCallback(() => {
     if (server === 'hls') {
-      // Start with simple format to ensure playback works
-      // Add obfuscation layers gradually
+      // For HLS, videoId already contains the full m3u8 filename (e.g., 'kanasub-01.m3u8')
+      // Use it directly without modification
       return `/api/hls?file=${videoId}`;
     } else if (server === 'helvid') {
       return `https://helvid.net/play/index/${videoId}`;
@@ -561,6 +575,9 @@ export function JWPlayerComponent({
     try {
       const jwplayer = (window as any).jwplayer;
       const videoUrl = getVideoUrl();
+      
+      console.log('Initializing JWPlayer with URL:', videoUrl);
+      console.log('Video ID:', videoId, 'Server:', server);
 
       // Remove existing player instance
       if (playerInstanceRef.current) {
@@ -628,117 +645,84 @@ export function JWPlayerComponent({
           return video.canPlayType('application/vnd.apple.mpegurl') !== '';
         })();
 
-        // HLS configuration optimized for external CDN segments (TikTok CDN)
+        // HLS configuration simplified for better compatibility with external CDN
         playerConfig = {
           ...playerConfig,
           file: videoUrl,
           type: "hls",
-          hlsjsdefault: true, // Force hls.js for better external CDN support
-          enableNativeHls: false, // Disable native HLS to use hls.js which handles CORS better
-          safarihlsjs: true, // Use hls.js even on Safari for external CDN
+          // Use native HLS when available, fallback to hls.js
+          hlsjsdefault: !isNativeHLSSupported,
+          enableNativeHls: isNativeHLSSupported,
+          safarihlsjs: false, // Let Safari use native HLS
           title: `Episode ${videoId}`,
-          // Optimized HLS settings for external CDN content
+          // Simplified HLS settings for better external CDN compatibility
           hlshtml5: {
-            enableWorker: true,
+            enableWorker: false, // Disable worker for better compatibility
             lowLatencyMode: false,
-            // More conservative buffering for external CDN
-            backBufferLength: 30, // Reduce back buffer for external CDN
-            maxBufferLength: 30, // Increase forward buffer for external CDN
-            maxMaxBufferLength: 60, // Reduce max buffer for external CDN
-            maxBufferSize: 20 * 1000 * 1000, // 20MB buffer for external CDN
+            // Conservative buffering for external CDN
+            backBufferLength: 10,
+            maxBufferLength: 20,
+            maxMaxBufferLength: 40,
+            maxBufferSize: 10 * 1000 * 1000, // 10MB buffer
             maxBufferHole: 0.5,
-            highBufferWatchdogPeriod: 2,
+            highBufferWatchdogPeriod: 3,
             nudgeOffset: 0.1,
-            nudgeMaxRetry: 5,
+            nudgeMaxRetry: 3,
             maxSeekHole: 2,
             seekHoleNudgeDuration: 0.1,
-            maxFragLookUpTolerance: 0.5,
-            // Enhanced CDN optimization for TikTok CDN
+            maxFragLookUpTolerance: 0.25,
+            // Simplified CDN settings
             liveSyncDurationCount: 3,
             liveMaxLatencyDurationCount: 6,
-            enableSoftwareAES: true,
-            // Increased timeouts and retries for external CDN
-            manifestLoadingTimeOut: 20000, // Increased for external CDN
-            manifestLoadingMaxRetry: 5,
-            manifestLoadingRetryDelay: 2000,
-            fragmentLoadingTimeOut: 45000, // Much higher for TikTok CDN
-            fragmentLoadingMaxRetry: 10, // More retries for external CDN
-            fragmentLoadingRetryDelay: 2000,
-            startFragPrefetch: true,
-            testBandwidth: false, // Disable for external CDN
-            progressive: true,
-            // Additional optimizations for external CDN
+            enableSoftwareAES: false, // Disable for compatibility
+            // Reduced timeouts for faster failure detection
+            manifestLoadingTimeOut: 10000,
+            manifestLoadingMaxRetry: 3,
+            manifestLoadingRetryDelay: 1000,
+            fragmentLoadingTimeOut: 20000,
+            fragmentLoadingMaxRetry: 6,
+            fragmentLoadingRetryDelay: 1000,
+            startFragPrefetch: false, // Disable prefetch for compatibility
+            testBandwidth: false,
+            progressive: false, // Disable for HLS
+            // Simplified ABR settings
             abrEwmaFastLive: 3.0,
             abrEwmaSlowLive: 9.0,
             abrEwmaFastVoD: 3.0,
             abrEwmaSlowVoD: 9.0,
-            maxStarvationDelay: 8,
-            maxLoadingDelay: 8,
-            // Enable segment prefetching for external CDN
+            maxStarvationDelay: 4,
+            maxLoadingDelay: 4,
+            // Basic configuration
             startLevel: -1,
             capLevelToPlayerSize: false,
-            // CORS and anti-tracking setup for external CDN
-            xhrSetup: function(xhr: XMLHttpRequest, url: string) {
-              // Essential headers for external CDN access
-              xhr.setRequestHeader('Cache-Control', 'no-cache');
+            // Simplified CORS setup for external CDN
+            xhrSetup: function(xhr, url) {
+              // Basic headers only
               xhr.setRequestHeader('Accept', '*/*');
-              xhr.setRequestHeader('Accept-Language', 'en-US,en;q=0.9');
-              
-              // Add anti-tracking headers
-              xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-              xhr.setRequestHeader('X-Client-Session', Math.random().toString(36));
-              xhr.setRequestHeader('X-Player-Token', btoa(Date.now().toString()));
-              
-              // Handle CORS for external CDN
               xhr.withCredentials = false;
               
-              // Store original methods before modification
-              const originalOpen = xhr.open.bind(xhr);
-              const originalSend = xhr.send.bind(xhr);
+              // Don't modify external CDN URLs
+              if (url.includes('tiktokcdn.com')) {
+                // Let external URLs load normally
+                return;
+              }
               
-              // Override open method to add noise parameters (only for internal URLs)
-              xhr.open = function(method: string, requestUrl: string, async: boolean = true, user?: string | null, password?: string | null) {
-                let modifiedUrl = requestUrl;
-                
-                // Only modify internal API URLs, not external CDN URLs
-                if (requestUrl.startsWith('/api/') || requestUrl.startsWith(window.location.origin)) {
-                  const separator = requestUrl.includes('?') ? '&' : '?';
-                  const noiseParams = `_t=${Date.now()}&_r=${Math.random()}&_s=${btoa(Math.random().toString()).slice(0, 8)}`;
-                  modifiedUrl = requestUrl + separator + noiseParams;
-                }
-                
-                return originalOpen(method, modifiedUrl, async, user, password);
-              };
-              
-              // Override send method for tracking protection
-              xhr.send = function(data: any) {
-                // Attempt to mask response URL for internal requests only
-                try {
-                  if (!url.includes('tiktokcdn.com')) {
-                    const descriptor = Object.getOwnPropertyDescriptor(XMLHttpRequest.prototype, 'responseURL');
-                    if (descriptor && descriptor.configurable) {
-                      Object.defineProperty(xhr, 'responseURL', {
-                        get: function() { return window.location.origin + '/stream'; },
-                        configurable: true
-                      });
-                    }
-                  }
-                } catch (e) {
-                  // Silently handle browsers that don't allow responseURL modification
-                }
-                return originalSend(data);
-              };
+              // Only modify internal API URLs
+              if (url.startsWith('/api/') || url.startsWith(window.location.origin)) {
+                xhr.setRequestHeader('Cache-Control', 'no-cache');
+                xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+              }
             }
           },
-          // Enhanced buffering for external CDN
+          // Basic buffering
           buffering: {
             enabled: true,
-            length: 15, // Increased buffer for external CDN
-            position: 5
+            length: 5,
+            position: 2
           },
-          preload: "auto", // Preload more for external CDN
-          // Additional JWPlayer optimizations for external CDN
-          bandwidthEstimate: 1000000, // Conservative estimate for external CDN
+          preload: "metadata", // Reduce preload for external CDN
+          // Basic JWPlayer settings
+          bandwidthEstimate: 500000, // Conservative estimate
           bitrateSelection: "auto"
         };
       } else {
@@ -984,26 +968,59 @@ export function JWPlayerComponent({
       });
 
       player.on('error', (e: any) => {
-        console.error('JWPlayer error:', e);
+        // Check for empty error object first - this is a common JWPlayer/HLS.js issue that doesn't prevent playback
+        if (Object.keys(e).length === 0 || (typeof e === 'object' && !e.code && !e.message && !e.type && !e.sourceError)) {
+          // Empty error object - often the video still works despite this error, so we'll ignore it completely
+          // Use console.debug to avoid Next.js error handling
+          if (typeof console.debug === 'function') {
+            console.debug('JWPlayer threw empty error object - ignoring as video likely still works');
+          }
+          return; // Don't trigger any error handling, logging, or callbacks for empty errors
+        }
+        
+        // Only log real errors that have meaningful content using console.debug to avoid Next.js error interception
+        if (typeof console.debug === 'function') {
+          console.debug('JWPlayer error (using debug to avoid Next.js interception):', e);
+          console.debug('JWPlayer error details:', JSON.stringify(e, null, 2));
+        }
+        
+        // Extract more detailed error information
+        let errorDetails = '';
+        if (e.code) errorDetails += `Code: ${e.code}, `;
+        if (e.type) errorDetails += `Type: ${e.type}, `;
+        if (e.message) errorDetails += `Message: ${e.message}, `;
+        if (e.sourceError) errorDetails += `Source: ${JSON.stringify(e.sourceError)}, `;
+        
+        console.log('Error details:', errorDetails);
         
         // Handle different types of errors with retry logic
-        let errorMessage = `Lỗi phát video: ${e.message || 'Không thể tải video'}`;
+        let errorMessage = `Failed to load video: hls - ${videoId} (JWPlayer error: ${e.message || e.code || 'Unknown error'})`;
         let shouldRetry = false;
         
         // Provide more specific error messages for common issues
-        if (e.message && e.message.includes('network')) {
-          errorMessage = 'Lỗi mạng: Đang thử kết nối lại...';
-          shouldRetry = true;
+        if (e.code === 232011 || e.code === '232011') {
+          errorMessage = `Failed to load video: hls - ${videoId} (HLS network error - cannot load segments)`;
+          shouldRetry = false;
+        } else if (e.code === 232404 || e.code === '232404') {
+          errorMessage = `Failed to load video: hls - ${videoId} (HLS manifest not found)`;
+          shouldRetry = false;
+        } else if (e.message && e.message.includes('network')) {
+          errorMessage = `Failed to load video: hls - ${videoId} (network error)`;
+          shouldRetry = false; // Don't retry, trigger fallback instead
         } else if (e.message && e.message.includes('CORS')) {
-          errorMessage = 'Lỗi CORS: Video bị chặn bởi chính sách bảo mật';
+          errorMessage = `Failed to load video: hls - ${videoId} (CORS error)`;
         } else if (e.message && e.message.includes('404')) {
-          errorMessage = 'Lỗi 404: Không tìm thấy file video';
+          errorMessage = `Failed to load video: hls - ${videoId} (404 not found)`;
         } else if (e.code === 'hlsError' || e.type === 'hlsError') {
-          errorMessage = 'Lỗi HLS: Đang thử kết nối lại...';
-          shouldRetry = true;
+          errorMessage = `Failed to load video: hls - ${videoId} (HLS error)`;
+          shouldRetry = false; // Don't retry, trigger fallback instead
         } else if (e.message && e.message.includes('core-shim')) {
-          errorMessage = 'Lỗi tạm thời: Đang thử kết nối lại...';
-          shouldRetry = true;
+          errorMessage = `Failed to load video: hls - ${videoId} (core-shim error)`;
+          shouldRetry = false; // Don't retry, trigger fallback instead
+        } else if (e.code === 232400 || String(e.code).includes('232400')) {
+          // Specific handling for 232400 error (file not found)
+          errorMessage = `Failed to load video: hls - ${videoId} (file not found)`;
+          shouldRetry = false;
         }
         
         setError(errorMessage);
@@ -1023,6 +1040,9 @@ export function JWPlayerComponent({
           }, 2000);
         }
         setIsLoading(false);
+        
+        // Always call onError to trigger fallback in VideoPlayer
+        console.log('Calling onError to trigger fallback:', errorMessage);
         onError?.(errorMessage);
       });
 

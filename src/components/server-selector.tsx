@@ -4,10 +4,11 @@ import { memo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { Server, Play, Download } from 'lucide-react';
+import { Server, Play, Download, AlertCircle, CheckCircle } from 'lucide-react';
 import { withPerformanceOptimization } from '@/lib/higher-order-components';
 import { triggerDownload, isValidDownloadUrl, openGoogleDriveLink } from '@/lib/download-utils';
 import type { Episode } from '@/data/anime';
+import { getServerStatus, ServerStatus, validateEpisodeServers, getServerReliabilityScore } from '@/lib/video-server-utils';
 
 export type ServerType = 'hls' | 'helvid' | 'hydax';
 
@@ -16,12 +17,13 @@ interface ServerSelectorProps {
   onServerChange: (server: ServerType) => void;
   currentEpisode?: Episode; 
   className?: string;
+  serverStatus?: Record<string, ServerStatus>;
 }
 
 const serverConfig = {
   hls: {
     name: 'HLS Stream',
-    label: 'HD Local',
+    label: 'HD Quality',
     color: 'bg-purple-500 hover:bg-purple-600',
   },
   helvid: {
@@ -41,6 +43,7 @@ function ServerSelectorComponent({
   onServerChange,
   currentEpisode,
   className,
+  serverStatus,
 }: ServerSelectorProps) {
   const handleServerSelect = useCallback((server: ServerType) => {
     onServerChange(server);
@@ -105,6 +108,12 @@ function ServerSelectorComponent({
           {(Object.keys(serverConfig) as ServerType[]).map((server) => {
             const config = serverConfig[server];
             const isActive = currentServer === server;
+            const status = serverStatus?.[server] || getServerStatus(server);
+            
+            // Check server data validation
+            const episodeValidation = currentEpisode ? validateEpisodeServers(currentEpisode) : null;
+            const isValidServer = episodeValidation ? episodeValidation[server] : true;
+            const reliability = getServerReliabilityScore(server);
             
             // Hide helvid server if the current episode doesn't have helvid server data
             if (server === 'helvid' && currentEpisode && !currentEpisode.servers.helvid) {
@@ -133,7 +142,13 @@ function ServerSelectorComponent({
                 onClick={() => handleServerSelect(server)}
                 aria-label={`Select ${config.name} server`}
               >
-                <Play className="w-3 h-3 sm:w-4 sm:h-4" />
+                {status === 'online' ? (
+                  <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 text-green-500" />
+                ) : status === 'error' || status === 'offline' ? (
+                  <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4 text-red-500" />
+                ) : (
+                  <Play className="w-3 h-3 sm:w-4 sm:h-4" />
+                )}
                 <div className="flex flex-col items-start">
                   <span className="text-xs sm:text-sm font-semibold">{config.name}</span>
                   <span className="text-xs opacity-75 hidden sm:block">{config.label}</span>
