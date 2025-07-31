@@ -1,6 +1,5 @@
 "use client";
-
-import { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 
 interface JWPlayerProps {
@@ -248,75 +247,336 @@ export function JWPlayerComponent({
       }
     };
 
-    // Override DOM inspection methods to hide video element content
+    // Advanced DOM inspection protection system with proper TypeScript typing
     const originalQuerySelector = document.querySelector.bind(document);
     const originalQuerySelectorAll = document.querySelectorAll.bind(document);
     const originalGetElementById = document.getElementById.bind(document);
     const originalGetElementsByTagName = document.getElementsByTagName.bind(document);
 
-    // Intercept DOM queries for video elements
-    document.querySelector = function(selector: string) {
-      const result = originalQuerySelector(selector);
-      if (selector.includes('video') && result && result.tagName === 'VIDEO') {
-        // Return a proxy object that hides sensitive properties
-        return new Proxy(result, {
-          get(target, prop) {
-            if (prop === 'src' || prop === 'currentSrc') {
-              return 'blob:protected-stream';
-            }
-            if (prop === 'getAttribute') {
-              return function(attr: string) {
-                if (attr === 'src') return 'blob:protected-stream';
-                return target.getAttribute(attr);
-              };
-            }
-            if (prop === 'outerHTML' || prop === 'innerHTML') {
-              const html = target[prop as keyof HTMLVideoElement];
-              return typeof html === 'string' ? html.replace(/blob:[^"\s]+/g, 'blob:protected-stream') : html;
-            }
-            return target[prop as keyof HTMLVideoElement];
+    // Type-safe video element proxy handler
+    const createVideoElementProxy = (videoElement: HTMLVideoElement): HTMLVideoElement => {
+      return new Proxy(videoElement, {
+        get(target: HTMLVideoElement, prop: string | symbol, receiver: any): any {
+          // Handle property access interception
+          if (prop === 'src' || prop === 'currentSrc') {
+            return 'blob:protected-stream';
           }
-        });
+          
+          // Handle method interceptions
+          if (prop === 'getAttribute') {
+            return function(this: HTMLVideoElement, attr: string): string | null {
+              if (attr === 'src') return 'blob:protected-stream';
+              return HTMLVideoElement.prototype.getAttribute.call(this, attr);
+            };
+          }
+          
+          if (prop === 'setAttribute') {
+            return function(this: HTMLVideoElement, attr: string, value: string): void {
+              if (attr === 'src' && value.includes('blob:')) {
+                // Allow setting but mask the value in debugging
+                return HTMLVideoElement.prototype.setAttribute.call(this, attr, value);
+              }
+              return HTMLVideoElement.prototype.setAttribute.call(this, attr, value);
+            };
+          }
+          
+          // Handle HTML content properties
+          if (prop === 'outerHTML' || prop === 'innerHTML') {
+            const originalValue = Reflect.get(target, prop, receiver);
+            if (typeof originalValue === 'string') {
+              // Sanitize blob URLs in HTML content
+              return originalValue.replace(/blob:[^"\s'>]+/g, 'blob:protected-stream');
+            }
+            return originalValue;
+          }
+          
+          // Handle toString method
+          if (prop === 'toString') {
+            return function(this: HTMLVideoElement): string {
+              return '[object HTMLVideoElement (Protected)]';
+            };
+          }
+          
+          // Handle valueOf method
+          if (prop === 'valueOf') {
+            return function(this: HTMLVideoElement): HTMLVideoElement {
+              return this;
+            };
+          }
+          
+          // Default property access
+          return Reflect.get(target, prop, receiver);
+        },
+        
+        set(target: HTMLVideoElement, prop: string | symbol, value: any, receiver: any): boolean {
+          // Intercept src setting attempts
+          if (prop === 'src' && typeof value === 'string' && value.includes('blob:')) {
+            // Allow the setting but don't expose the real URL in debug
+            return Reflect.set(target, prop, value, receiver);
+          }
+          return Reflect.set(target, prop, value, receiver);
+        },
+        
+        has(target: HTMLVideoElement, prop: string | symbol): boolean {
+          return Reflect.has(target, prop);
+        },
+        
+        ownKeys(target: HTMLVideoElement): ArrayLike<string | symbol> {
+          return Reflect.ownKeys(target);
+        },
+        
+        getOwnPropertyDescriptor(target: HTMLVideoElement, prop: string | symbol): PropertyDescriptor | undefined {
+          const descriptor = Reflect.getOwnPropertyDescriptor(target, prop);
+          if (descriptor && (prop === 'src' || prop === 'currentSrc')) {
+            return {
+              ...descriptor,
+              value: 'blob:protected-stream'
+            };
+          }
+          return descriptor;
+        }
+      });
+    };
+
+    // Type-safe NodeList proxy for querySelectorAll results
+    const createNodeListProxy = (nodeList: NodeListOf<Element>): NodeListOf<Element> => {
+      return new Proxy(nodeList, {
+        get(target: NodeListOf<Element>, prop: string | symbol, receiver: any): any {
+          // Handle numeric indices
+          if (typeof prop === 'string' && /^\d+$/.test(prop)) {
+            const index = parseInt(prop, 10);
+            const element = target[index];
+            
+            if (element && element.tagName === 'VIDEO') {
+              return createVideoElementProxy(element as HTMLVideoElement);
+            }
+            return element;
+          }
+          
+          // Handle NodeList methods and properties
+          if (prop === 'forEach') {
+            return function(this: NodeListOf<Element>, callback: (value: Element, key: number, parent: NodeListOf<Element>) => void, thisArg?: any): void {
+              for (let i = 0; i < target.length; i++) {
+                const element = target[i];
+                const proxiedElement = element.tagName === 'VIDEO' ? 
+                  createVideoElementProxy(element as HTMLVideoElement) : element;
+                callback.call(thisArg, proxiedElement, i, this);
+              }
+            };
+          }
+          
+          if (prop === 'item') {
+            return function(this: NodeListOf<Element>, index: number): Element | null {
+              const element = target.item(index);
+              if (element && element.tagName === 'VIDEO') {
+                return createVideoElementProxy(element as HTMLVideoElement);
+              }
+              return element;
+            };
+          }
+          
+          // Handle entries, values, keys iterators
+          if (prop === 'entries') {
+            return function* (this: NodeListOf<Element>): IterableIterator<[number, Element]> {
+              for (let i = 0; i < target.length; i++) {
+                const element = target[i];
+                const proxiedElement = element.tagName === 'VIDEO' ? 
+                  createVideoElementProxy(element as HTMLVideoElement) : element;
+                yield [i, proxiedElement];
+              }
+            };
+          }
+          
+          if (prop === 'values') {
+            return function* (this: NodeListOf<Element>): IterableIterator<Element> {
+              for (let i = 0; i < target.length; i++) {
+                const element = target[i];
+                const proxiedElement = element.tagName === 'VIDEO' ? 
+                  createVideoElementProxy(element as HTMLVideoElement) : element;
+                yield proxiedElement;
+              }
+            };
+          }
+          
+          if (prop === 'keys') {
+            return function* (this: NodeListOf<Element>): IterableIterator<number> {
+              for (let i = 0; i < target.length; i++) {
+                yield i;
+              }
+            };
+          }
+          
+          // Handle Symbol.iterator
+          if (prop === Symbol.iterator) {
+            return function* (this: NodeListOf<Element>): IterableIterator<Element> {
+              for (let i = 0; i < target.length; i++) {
+                const element = target[i];
+                const proxiedElement = element.tagName === 'VIDEO' ? 
+                  createVideoElementProxy(element as HTMLVideoElement) : element;
+                yield proxiedElement;
+              }
+            };
+          }
+          
+          return Reflect.get(target, prop, receiver);
+        }
+      });
+    };
+
+    // Enhanced querySelector override with proper typing
+    document.querySelector = function<E extends Element>(selectors: string): E | null {
+      const result = originalQuerySelector(selectors);
+      
+      if (result && result.tagName === 'VIDEO' && selectors.includes('video')) {
+        return createVideoElementProxy(result as HTMLVideoElement) as any;
       }
+      
+      return result as E | null;
+    };
+
+    // Enhanced querySelectorAll override with proper typing
+    document.querySelectorAll = function<E extends Element>(selectors: string): NodeListOf<E> {
+      const results = originalQuerySelectorAll(selectors);
+      
+      if (selectors.includes('video')) {
+        return createNodeListProxy(results) as any;
+      }
+      
+      return results as NodeListOf<E>;
+    };
+
+    // Enhanced getElementById override
+    document.getElementById = function(elementId: string): HTMLElement | null {
+      const result = originalGetElementById(elementId);
+      
+      if (result && result.tagName === 'VIDEO') {
+        return createVideoElementProxy(result as HTMLVideoElement) as any;
+      }
+      
       return result;
     };
 
-    document.querySelectorAll = function(selector: string) {
-      const results = originalQuerySelectorAll(selector);
-      if (selector.includes('video')) {
+    // Enhanced getElementsByTagName override
+    document.getElementsByTagName = function(qualifiedName: string): HTMLCollectionOf<Element> {
+      const results = originalGetElementsByTagName(qualifiedName);
+      
+      if (qualifiedName.toLowerCase() === 'video') {
+        // Create a proxy for HTMLCollection to handle video elements
         return new Proxy(results, {
-          get(target, prop) {
+          get(target: HTMLCollectionOf<Element>, prop: string | symbol, receiver: any): any {
             if (typeof prop === 'string' && /^\d+$/.test(prop)) {
-              const element = target[parseInt(prop)];
+              const index = parseInt(prop, 10);
+              const element = target[index];
+              
               if (element && element.tagName === 'VIDEO') {
-                return new Proxy(element, {
-                  get(videoTarget, videoProp) {
-                    if (videoProp === 'src' || videoProp === 'currentSrc') {
-                      return 'blob:protected-stream';
-                    }
-                    return videoTarget[videoProp as keyof HTMLVideoElement];
-                  }
-                });
+                return createVideoElementProxy(element as HTMLVideoElement);
               }
               return element;
             }
-            return target[prop as keyof NodeListOf<Element>];
+            
+            if (prop === 'item') {
+              return function(this: HTMLCollectionOf<Element>, index: number): Element | null {
+                const element = target.item(index);
+                if (element && element.tagName === 'VIDEO') {
+                  return createVideoElementProxy(element as HTMLVideoElement);
+                }
+                return element;
+              };
+            }
+            
+            if (prop === 'namedItem') {
+              return function(this: HTMLCollectionOf<Element>, name: string): Element | null {
+                const element = target.namedItem(name);
+                if (element && element.tagName === 'VIDEO') {
+                  return createVideoElementProxy(element as HTMLVideoElement);
+                }
+                return element;
+              };
+            }
+            
+            return Reflect.get(target, prop, receiver);
           }
-        });
+        }) as any;
       }
+      
       return results;
     };
 
-    // Override console inspect methods
+    // Advanced console inspection protection with comprehensive object sanitization
     const originalConsoleDir = console.dir;
     const originalConsoleLog = console.log;
+    const originalConsoleTable = console.table;
+    const originalConsoleTrace = console.trace;
     
-    console.dir = function(obj: any) {
-      if (obj && obj.tagName === 'VIDEO') {
-        const sanitized = { ...obj, src: 'blob:protected-stream', currentSrc: 'blob:protected-stream' };
-        return originalConsoleDir(sanitized);
+    // Deep sanitization function for objects containing video elements
+    const sanitizeObjectForConsole = (obj: any, depth: number = 0): any => {
+      if (depth > 10) return '[Circular or Deep Object]'; // Prevent infinite recursion
+      
+      if (!obj || typeof obj !== 'object') return obj;
+      
+      // Handle video elements specifically
+      if (obj.tagName === 'VIDEO' || obj instanceof HTMLVideoElement) {
+        return {
+          tagName: 'VIDEO',
+          src: 'blob:protected-stream',
+          currentSrc: 'blob:protected-stream',
+          id: obj.id || '',
+          className: obj.className || '',
+          '[Protected Video Element]': true
+        };
       }
-      return originalConsoleDir(obj);
+      
+      // Handle arrays
+      if (Array.isArray(obj)) {
+        return obj.map(item => sanitizeObjectForConsole(item, depth + 1));
+      }
+      
+      // Handle NodeList and HTMLCollection
+      if (obj instanceof NodeList || obj instanceof HTMLCollection) {
+        const sanitized: any[] = [];
+        for (let i = 0; i < obj.length; i++) {
+          sanitized.push(sanitizeObjectForConsole(obj[i], depth + 1));
+        }
+        return sanitized;
+      }
+      
+      // Handle regular objects
+      const sanitized: any = {};
+      for (const key in obj) {
+        try {
+          if (obj.hasOwnProperty(key)) {
+            const value = obj[key];
+            
+            // Sanitize URL-like strings
+            if (typeof value === 'string' && value.includes('blob:')) {
+              sanitized[key] = value.replace(/blob:[^"\s]+/g, 'blob:protected-stream');
+            } else if (key === 'src' || key === 'currentSrc') {
+              sanitized[key] = 'blob:protected-stream';
+            } else {
+              sanitized[key] = sanitizeObjectForConsole(value, depth + 1);
+            }
+          }
+        } catch (e) {
+          sanitized[key] = '[Protected Property]';
+        }
+      }
+      
+      return sanitized;
+    };
+    
+    console.dir = function(obj: any, options?: any) {
+      const sanitized = sanitizeObjectForConsole(obj);
+      return originalConsoleDir(sanitized, options);
+    };
+    
+    console.table = function(tabularData: any, properties?: string[]) {
+      const sanitized = sanitizeObjectForConsole(tabularData);
+      return originalConsoleTable(sanitized, properties);
+    };
+    
+    console.trace = function(...data: any[]) {
+      const sanitizedData = data.map(item => sanitizeObjectForConsole(item));
+      return originalConsoleTrace(...sanitizedData);
     };
 
     // Advanced DOM mutation observer to continuously protect video elements
@@ -343,12 +603,12 @@ export function JWPlayerComponent({
                     protectVideoElement(video);
                   }
                 } catch (videoError) {
-                  console.debug('Error protecting individual video element:', videoError);
+                  // Error protecting individual video element
                 }
               });
             }
           } catch (nodeError) {
-            console.debug('Error processing mutation node:', nodeError);
+            // Error processing mutation node
           }
         });
       });
@@ -417,11 +677,13 @@ export function JWPlayerComponent({
         customContextMenu = null;
       }
       
-      // Restore original methods
+      // Restore original methods with proper cleanup
       console.log = originalLog;
       console.error = originalError;
       console.warn = originalWarn;
       console.dir = originalConsoleDir;
+      console.table = originalConsoleTable;
+      console.trace = originalConsoleTrace;
       window.fetch = originalFetch;
       document.querySelector = originalQuerySelector;
       document.querySelectorAll = originalQuerySelectorAll;
@@ -451,7 +713,6 @@ export function JWPlayerComponent({
     try {
       // Validate that video is a proper HTMLVideoElement
       if (!video || !(video instanceof HTMLVideoElement) || !video.nodeType) {
-        console.debug('Invalid video element provided to protectVideoElement');
         return;
       }
 
@@ -522,7 +783,6 @@ export function JWPlayerComponent({
 
         } catch (e) {
           // Silently handle protection failures
-          console.debug('Protection reapplication error:', e);
         }
       }, 2000); // Reapply protection every 2 seconds (less frequent to avoid conflicts)
 
@@ -541,7 +801,6 @@ export function JWPlayerComponent({
             });
           });
         } catch (observerError) {
-          console.debug('Cleanup observer error:', observerError);
           clearInterval(protectionInterval);
           cleanupObserver.disconnect();
         }
@@ -550,7 +809,7 @@ export function JWPlayerComponent({
       cleanupObserver.observe(document.body, { childList: true, subtree: true });
 
     } catch (e) {
-      console.debug('Video protection error:', e);
+      // Video protection error
     }
   }, []);
 
@@ -858,7 +1117,7 @@ export function JWPlayerComponent({
                   return result.replace(/blob:[^"\s]+/g, 'blob:protected-stream');
                 };
               } catch (e) {
-                console.debug('Cannot override toString, skipping...');
+                // Cannot override toString, skipping
               }
 
               // Add invisible overlay to prevent direct video interaction
@@ -879,7 +1138,6 @@ export function JWPlayerComponent({
                 playerContainer.appendChild(overlay);
               }
             } catch (protectionError) {
-              console.debug('Video protection failed:', protectionError);
               // Continue without protection if it fails
             }
           }
@@ -924,7 +1182,6 @@ export function JWPlayerComponent({
                 };
               }
             } catch (playerProtectionError) {
-              console.debug('Player obfuscation failed:', playerProtectionError);
               // Continue without player obfuscation if it fails
             }
           }
@@ -935,14 +1192,12 @@ export function JWPlayerComponent({
           try {
             // Try to play the video
             player.play();
-            console.log('Autoplay started successfully');
             
             // Set mute state after attempting autoplay
             if (!muted) {
               // Small delay to ensure player is ready
               setTimeout(() => {
                 player.setMute(false);
-                console.log('Âm thanh đã được bật sau autoplay');
               }, 100);
             }
           } catch (e) {
@@ -951,7 +1206,6 @@ export function JWPlayerComponent({
             try {
               player.setMute(true);
               player.play();
-              console.log('Autoplay tắt tiếng đã bắt đầu');
             } catch (e2) {
               console.warn('Tất cả các lần thử autoplay đều thất bại:', e2);
             }
@@ -960,7 +1214,6 @@ export function JWPlayerComponent({
           // If not autoplay, just set the mute state
           if (!muted) {
             player.setMute(false);
-            console.log('Âm thanh đã được bật thành công');
           }
         }
         
@@ -971,18 +1224,9 @@ export function JWPlayerComponent({
         // Check for empty error object first - this is a common JWPlayer/HLS.js issue that doesn't prevent playback
         if (Object.keys(e).length === 0 || (typeof e === 'object' && !e.code && !e.message && !e.type && !e.sourceError)) {
           // Empty error object - often the video still works despite this error, so we'll ignore it completely
-          // Use console.debug to avoid Next.js error handling
-          if (typeof console.debug === 'function') {
-            console.debug('JWPlayer threw empty error object - ignoring as video likely still works');
-          }
           return; // Don't trigger any error handling, logging, or callbacks for empty errors
         }
         
-        // Only log real errors that have meaningful content using console.debug to avoid Next.js error interception
-        if (typeof console.debug === 'function') {
-          console.debug('JWPlayer error (using debug to avoid Next.js interception):', e);
-          console.debug('JWPlayer error details:', JSON.stringify(e, null, 2));
-        }
         
         // Extract more detailed error information
         let errorDetails = '';
@@ -1028,7 +1272,6 @@ export function JWPlayerComponent({
         // Auto-retry for network/HLS errors after a short delay
         if (shouldRetry) {
           setTimeout(() => {
-            console.log('Attempting to retry video load...');
             try {
               // Try to reload the player
               player.load();
@@ -1042,7 +1285,6 @@ export function JWPlayerComponent({
         setIsLoading(false);
         
         // Always call onError to trigger fallback in VideoPlayer
-        console.log('Calling onError to trigger fallback:', errorMessage);
         onError?.(errorMessage);
       });
 
@@ -1056,14 +1298,12 @@ export function JWPlayerComponent({
 
       // Add more detailed event logging for debugging
       player.on('firstFrame', () => {
-        console.log('First frame loaded successfully');
         if (!muted) {
           player.setMute(false);
         }
       });
 
       player.on('bufferChange', (e: any) => {
-        console.log('Buffer status:', e.newstate ? 'buffering' : 'ready');
       });
 
       player.on('warning', (e: any) => {
@@ -1072,12 +1312,10 @@ export function JWPlayerComponent({
 
       // Monitor playback issues
       player.on('playbackRateChanged', (e: any) => {
-        console.log('Playback rate changed to:', e.playbackRate);
       });
 
       // Add network quality monitoring
       player.on('levels', () => {
-        console.log('Quality levels detected');
         const levels = player.getQualityLevels();
         if (levels && levels.length > 0) {
           console.log('Available quality levels:', levels.map((l: any) => l.label));
