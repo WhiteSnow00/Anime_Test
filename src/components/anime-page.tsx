@@ -83,6 +83,12 @@ const handleServerError = useCallback((error: string) => {
     debounceMs: 150,
   });
 
+  useEffect(() => {
+    if (!viewport?.isDesktop) {
+      setCurrentServer("helvid");
+    }
+  }, []);
+
   const episodeOps = useMemo(
     () => utils.createEpisodeOperations(animeData.episodes),
     [animeData.episodes]
@@ -94,7 +100,7 @@ const handleServerError = useCallback((error: string) => {
       (episode: Episode) => {
         actions.setEpisode(episode);
         scrollActions.scrollToTop();
-        setCurrentServer('hls');
+        setCurrentServer(viewport.isDesktop ? "hls" : "helvid");
         console.log(`Episode changed to ${episode.id}, resetting server to HLS`);
         
         return episode;
