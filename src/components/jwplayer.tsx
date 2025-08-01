@@ -30,27 +30,21 @@ export function JWPlayerComponent({
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const playerInstanceRef = useRef<any>(null);
 
-  // Advanced anti-tracking protection system
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Custom context menu implementation with complete override
     let customContextMenu: HTMLElement | null = null;
 
     const showCustomContextMenu = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (target.tagName === 'VIDEO' || target.closest('#kana-jwplayer')) {
-        // Completely prevent the default context menu
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
         
-        // Remove existing custom menu if any
         if (customContextMenu) {
           customContextMenu.remove();
         }
-        
-        // Create custom context menu
         customContextMenu = document.createElement('div');
         customContextMenu.style.cssText = `
           position: fixed;
@@ -69,7 +63,6 @@ export function JWPlayerComponent({
           user-select: none;
         `;
         
-        // Create menu item
         const menuItem = document.createElement('div');
         menuItem.style.cssText = `
           padding: 8px 16px;
@@ -82,7 +75,6 @@ export function JWPlayerComponent({
         customContextMenu.appendChild(menuItem);
         document.body.appendChild(customContextMenu);
         
-        // Position menu properly if it goes off screen
         const menuRect = customContextMenu.getBoundingClientRect();
         const windowWidth = window.innerWidth;
         const windowHeight = window.innerHeight;
@@ -98,7 +90,6 @@ export function JWPlayerComponent({
       }
     };
 
-    // More aggressive context menu blocking
     const blockContextMenu = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (target.tagName === 'VIDEO' || target.closest('#kana-jwplayer')) {
@@ -110,7 +101,6 @@ export function JWPlayerComponent({
       }
     };
 
-    // Hide custom context menu when clicking elsewhere
     const hideCustomContextMenu = (e: MouseEvent) => {
       if (customContextMenu && !customContextMenu.contains(e.target as Node)) {
         customContextMenu.remove();
@@ -118,42 +108,13 @@ export function JWPlayerComponent({
       }
     };
 
-    // Anti dev tools detection (basic deterrent)
-    let devtools = { open: false, orientation: null };
-    const threshold = 160;
 
-    const checkDevTools = () => {
-      if (window.outerHeight - window.innerHeight > threshold || 
-          window.outerWidth - window.innerWidth > threshold) {
-        if (!devtools.open) {
-          devtools.open = true;
-          // Obfuscate network requests when dev tools detected
-          console.clear();
-          console.log('%cDeveloper tools detected. Stream protection enabled.', 'color: red; font-size: 20px;');
-          
-          // Create fake network noise to confuse monitoring
-          for (let i = 0; i < 10; i++) {
-            setTimeout(() => {
-              fetch(`/api/decoy-${Math.random().toString(36)}?fake=${btoa(Math.random().toString())}`).catch(() => {});
-            }, i * 100);
-          }
-        }
-      } else {
-        devtools.open = false;
-      }
-    };
-
-    // Monitor for dev tools
-    const devToolsTimer = setInterval(checkDevTools, 1000);
-
-    // Obfuscate console messages
     const originalLog = console.log;
     const originalError = console.error;
     const originalWarn = console.warn;
 
     console.log = (...args: any[]) => {
       const message = args.join(' ');
-      // Allow HLS logs for debugging but filter sensitive content
       if (message.includes('m3u8') || message.includes('blob:') || message.includes('stream')) {
         const filteredArgs = args.map(arg => 
           typeof arg === 'string' ? arg.replace(/blob:[^"\s]+/g, 'blob:***').replace(/https?:\/\/[^\s"]+/g, 'https://***') : arg
@@ -167,29 +128,23 @@ export function JWPlayerComponent({
     console.error = (...args: any[]) => {
       const message = args.join(' ');
       
-      // Filter out JWPlayer empty error objects - these are benign and don't prevent playback
       if (message.includes('JWPlayer error:') && args.length >= 2) {
         const errorObj = args[1];
         if (typeof errorObj === 'object' && errorObj !== null) {
-          // Check if it's an empty error object or has no meaningful properties
           if (Object.keys(errorObj).length === 0 || 
               (!errorObj.code && !errorObj.message && !errorObj.type && !errorObj.sourceError)) {
-            // This is an empty/meaningless JWPlayer error - suppress it completely
             console.debug('Suppressed JWPlayer empty error object');
             return;
           }
         }
       }
       
-      // Filter out JWPlayer core-shim errors and other common errors
       if (message.includes('core-shim') || 
           message.includes('[helpers/jwplayer/api/core-shim]') ||
           message.includes('jwplayer.core.controls.js')) {
-        // Suppress these errors as they are typically non-critical JWPlayer internal errors
         return;
       }
       
-      // Allow HLS errors for debugging but filter sensitive content
       if (message.includes('m3u8') || message.includes('stream') || message.includes('segment')) {
         const filteredArgs = args.map(arg => 
           typeof arg === 'string' ? arg.replace(/blob:[^"\s]+/g, 'blob:***').replace(/https?:\/\/[^\s"]+/g, 'https://***') : arg
@@ -202,7 +157,6 @@ export function JWPlayerComponent({
 
     console.warn = (...args: any[]) => {
       const message = args.join(' ');
-      // Allow HLS warnings for debugging but filter sensitive content
       if (message.includes('m3u8') || message.includes('stream')) {
         const filteredArgs = args.map(arg => 
           typeof arg === 'string' ? arg.replace(/blob:[^"\s]+/g, 'blob:***').replace(/https?:\/\/[^\s"]+/g, 'https://***') : arg
@@ -213,7 +167,6 @@ export function JWPlayerComponent({
       originalWarn.apply(console, args);
     };
 
-    // Block text selection on player
     const preventSelection = (e: Event) => {
       const target = e.target as HTMLElement;
       if (target.closest('#kana-jwplayer')) {
@@ -222,7 +175,6 @@ export function JWPlayerComponent({
       }
     };
 
-    // Block drag operations on video
     const preventDrag = (e: DragEvent) => {
       const target = e.target as HTMLElement;
       if (target.tagName === 'VIDEO' || target.closest('#kana-jwplayer')) {
@@ -231,9 +183,7 @@ export function JWPlayerComponent({
       }
     };
 
-    // Block keyboard shortcuts that might expose URLs
     const blockKeyboardShortcuts = (e: KeyboardEvent) => {
-      // Block F12, Ctrl+Shift+I, Ctrl+U, Ctrl+S when focused on player
       const target = e.target as HTMLElement;
       if (target.closest('#kana-jwplayer')) {
         if (e.key === 'F12' || 
@@ -247,22 +197,18 @@ export function JWPlayerComponent({
       }
     };
 
-    // Advanced DOM inspection protection system with proper TypeScript typing
     const originalQuerySelector = document.querySelector.bind(document);
     const originalQuerySelectorAll = document.querySelectorAll.bind(document);
     const originalGetElementById = document.getElementById.bind(document);
     const originalGetElementsByTagName = document.getElementsByTagName.bind(document);
 
-    // Type-safe video element proxy handler
     const createVideoElementProxy = (videoElement: HTMLVideoElement): HTMLVideoElement => {
       return new Proxy(videoElement, {
         get(target: HTMLVideoElement, prop: string | symbol, receiver: any): any {
-          // Handle property access interception
           if (prop === 'src' || prop === 'currentSrc') {
             return 'blob:protected-stream';
           }
           
-          // Handle method interceptions
           if (prop === 'getAttribute') {
             return function(this: HTMLVideoElement, attr: string): string | null {
               if (attr === 'src') return 'blob:protected-stream';
@@ -273,45 +219,37 @@ export function JWPlayerComponent({
           if (prop === 'setAttribute') {
             return function(this: HTMLVideoElement, attr: string, value: string): void {
               if (attr === 'src' && value.includes('blob:')) {
-                // Allow setting but mask the value in debugging
                 return HTMLVideoElement.prototype.setAttribute.call(this, attr, value);
               }
               return HTMLVideoElement.prototype.setAttribute.call(this, attr, value);
             };
           }
           
-          // Handle HTML content properties
           if (prop === 'outerHTML' || prop === 'innerHTML') {
             const originalValue = Reflect.get(target, prop, receiver);
             if (typeof originalValue === 'string') {
-              // Sanitize blob URLs in HTML content
               return originalValue.replace(/blob:[^"\s'>]+/g, 'blob:protected-stream');
             }
             return originalValue;
           }
           
-          // Handle toString method
           if (prop === 'toString') {
             return function(this: HTMLVideoElement): string {
               return '[object HTMLVideoElement (Protected)]';
             };
           }
           
-          // Handle valueOf method
           if (prop === 'valueOf') {
             return function(this: HTMLVideoElement): HTMLVideoElement {
               return this;
             };
           }
           
-          // Default property access
           return Reflect.get(target, prop, receiver);
         },
         
         set(target: HTMLVideoElement, prop: string | symbol, value: any, receiver: any): boolean {
-          // Intercept src setting attempts
           if (prop === 'src' && typeof value === 'string' && value.includes('blob:')) {
-            // Allow the setting but don't expose the real URL in debug
             return Reflect.set(target, prop, value, receiver);
           }
           return Reflect.set(target, prop, value, receiver);
@@ -338,11 +276,9 @@ export function JWPlayerComponent({
       });
     };
 
-    // Type-safe NodeList proxy for querySelectorAll results
     const createNodeListProxy = (nodeList: NodeListOf<Element>): NodeListOf<Element> => {
       return new Proxy(nodeList, {
         get(target: NodeListOf<Element>, prop: string | symbol, receiver: any): any {
-          // Handle numeric indices
           if (typeof prop === 'string' && /^\d+$/.test(prop)) {
             const index = parseInt(prop, 10);
             const element = target[index];
@@ -353,7 +289,6 @@ export function JWPlayerComponent({
             return element;
           }
           
-          // Handle NodeList methods and properties
           if (prop === 'forEach') {
             return function(this: NodeListOf<Element>, callback: (value: Element, key: number, parent: NodeListOf<Element>) => void, thisArg?: any): void {
               for (let i = 0; i < target.length; i++) {
@@ -375,7 +310,6 @@ export function JWPlayerComponent({
             };
           }
           
-          // Handle entries, values, keys iterators
           if (prop === 'entries') {
             return function* (this: NodeListOf<Element>): IterableIterator<[number, Element]> {
               for (let i = 0; i < target.length; i++) {
@@ -406,7 +340,6 @@ export function JWPlayerComponent({
             };
           }
           
-          // Handle Symbol.iterator
           if (prop === Symbol.iterator) {
             return function* (this: NodeListOf<Element>): IterableIterator<Element> {
               for (let i = 0; i < target.length; i++) {
@@ -423,7 +356,6 @@ export function JWPlayerComponent({
       });
     };
 
-    // Enhanced querySelector override with proper typing
     document.querySelector = function<E extends Element>(selectors: string): E | null {
       const result = originalQuerySelector(selectors);
       
@@ -434,7 +366,6 @@ export function JWPlayerComponent({
       return result as E | null;
     };
 
-    // Enhanced querySelectorAll override with proper typing
     document.querySelectorAll = function<E extends Element>(selectors: string): NodeListOf<E> {
       const results = originalQuerySelectorAll(selectors);
       
@@ -445,7 +376,6 @@ export function JWPlayerComponent({
       return results as NodeListOf<E>;
     };
 
-    // Enhanced getElementById override
     document.getElementById = function(elementId: string): HTMLElement | null {
       const result = originalGetElementById(elementId);
       
@@ -456,12 +386,10 @@ export function JWPlayerComponent({
       return result;
     };
 
-    // Enhanced getElementsByTagName override
     document.getElementsByTagName = function(qualifiedName: string): HTMLCollectionOf<Element> {
       const results = originalGetElementsByTagName(qualifiedName);
       
       if (qualifiedName.toLowerCase() === 'video') {
-        // Create a proxy for HTMLCollection to handle video elements
         return new Proxy(results, {
           get(target: HTMLCollectionOf<Element>, prop: string | symbol, receiver: any): any {
             if (typeof prop === 'string' && /^\d+$/.test(prop)) {
@@ -502,19 +430,16 @@ export function JWPlayerComponent({
       return results;
     };
 
-    // Advanced console inspection protection with comprehensive object sanitization
     const originalConsoleDir = console.dir;
     const originalConsoleLog = console.log;
     const originalConsoleTable = console.table;
     const originalConsoleTrace = console.trace;
     
-    // Deep sanitization function for objects containing video elements
     const sanitizeObjectForConsole = (obj: any, depth: number = 0): any => {
-      if (depth > 10) return '[Circular or Deep Object]'; // Prevent infinite recursion
+      if (depth > 10) return '[Circular or Deep Object]';
       
       if (!obj || typeof obj !== 'object') return obj;
       
-      // Handle video elements specifically
       if (obj.tagName === 'VIDEO' || obj instanceof HTMLVideoElement) {
         return {
           tagName: 'VIDEO',
@@ -526,12 +451,10 @@ export function JWPlayerComponent({
         };
       }
       
-      // Handle arrays
       if (Array.isArray(obj)) {
         return obj.map(item => sanitizeObjectForConsole(item, depth + 1));
       }
       
-      // Handle NodeList and HTMLCollection
       if (obj instanceof NodeList || obj instanceof HTMLCollection) {
         const sanitized: any[] = [];
         for (let i = 0; i < obj.length; i++) {
@@ -540,14 +463,12 @@ export function JWPlayerComponent({
         return sanitized;
       }
       
-      // Handle regular objects
       const sanitized: any = {};
       for (const key in obj) {
         try {
           if (obj.hasOwnProperty(key)) {
             const value = obj[key];
             
-            // Sanitize URL-like strings
             if (typeof value === 'string' && value.includes('blob:')) {
               sanitized[key] = value.replace(/blob:[^"\s]+/g, 'blob:protected-stream');
             } else if (key === 'src' || key === 'currentSrc') {
@@ -579,7 +500,6 @@ export function JWPlayerComponent({
       return originalConsoleTrace(...sanitizedData);
     };
 
-    // Advanced DOM mutation observer to continuously protect video elements
     const observer = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
         mutation.addedNodes.forEach((node) => {
@@ -587,7 +507,6 @@ export function JWPlayerComponent({
             if (node && node.nodeType === Node.ELEMENT_NODE) {
               const element = node as Element;
               
-              // Find video elements and apply protection
               let videos: NodeListOf<HTMLVideoElement> | HTMLVideoElement[] = [];
               
               if (element.tagName === 'VIDEO' && element instanceof HTMLVideoElement) {
@@ -599,48 +518,23 @@ export function JWPlayerComponent({
               videos.forEach((video) => {
                 try {
                   if (video instanceof HTMLVideoElement && video.closest('#kana-jwplayer')) {
-                    // Apply real-time protection to video elements
                     protectVideoElement(video);
                   }
                 } catch (videoError) {
-                  // Error protecting individual video element
                 }
               });
             }
           } catch (nodeError) {
-            // Error processing mutation node
           }
         });
       });
     });
 
-    // Start observing DOM changes
     observer.observe(document.body, { childList: true, subtree: true });
 
-    // Create decoy video elements to confuse tracking
-    const createDecoyElements = () => {
-      for (let i = 0; i < 3; i++) {
-        const decoyVideo = document.createElement('video');
-        decoyVideo.src = `blob:decoy-${Math.random().toString(36).substring(7)}`;
-        decoyVideo.style.cssText = 'position: absolute; left: -9999px; opacity: 0; pointer-events: none;';
-        decoyVideo.id = `decoy-video-${i}`;
-        document.body.appendChild(decoyVideo);
-        
-        // Remove decoy after random time
-        setTimeout(() => {
-          decoyVideo.remove();
-        }, Math.random() * 10000 + 5000);
-      }
-    };
 
-    // Create initial decoys and periodic new ones
-    createDecoyElements();
-    const decoyInterval = setInterval(createDecoyElements, 15000);
-
-    // Override fetch to add protection
     const originalFetch = window.fetch;
     window.fetch = function(input: RequestInfo | URL, init?: RequestInit) {
-      // Add protection headers to all requests
       const headers = new Headers(init?.headers);
       headers.set('X-Anti-Track', btoa(Date.now().toString()));
       headers.set('X-Session-Guard', Math.random().toString(36));
@@ -653,17 +547,14 @@ export function JWPlayerComponent({
       return originalFetch(input, modifiedInit);
     };
 
-    // Add event listeners with more aggressive blocking
-    document.addEventListener('contextmenu', blockContextMenu, true); // Use capture phase
+    document.addEventListener('contextmenu', blockContextMenu, true);
     document.addEventListener('contextmenu', showCustomContextMenu, false); // Also listen in bubble phase
     document.addEventListener('click', hideCustomContextMenu);
     document.addEventListener('selectstart', preventSelection);
     document.addEventListener('dragstart', preventDrag);
     document.addEventListener('keydown', blockKeyboardShortcuts);
 
-    // Cleanup
     return () => {
-      clearInterval(devToolsTimer);
       document.removeEventListener('contextmenu', blockContextMenu, true);
       document.removeEventListener('contextmenu', showCustomContextMenu, false);
       document.removeEventListener('click', hideCustomContextMenu);
@@ -671,13 +562,11 @@ export function JWPlayerComponent({
       document.removeEventListener('dragstart', preventDrag);
       document.removeEventListener('keydown', blockKeyboardShortcuts);
       
-      // Remove custom context menu if it exists
       if (customContextMenu) {
         customContextMenu.remove();
         customContextMenu = null;
       }
       
-      // Restore original methods with proper cleanup
       console.log = originalLog;
       console.error = originalError;
       console.warn = originalWarn;
@@ -690,15 +579,11 @@ export function JWPlayerComponent({
       document.getElementById = originalGetElementById;
       document.getElementsByTagName = originalGetElementsByTagName;
       observer.disconnect();
-      clearInterval(decoyInterval);
     };
-  }, []); // Empty dependency array - run only once on mount
+  }, []);
 
-  // Generate HLS URL with advanced protection (with fallback for reliability)
   const getVideoUrl = useCallback(() => {
     if (server === 'hls') {
-      // For HLS, videoId already contains the full m3u8 filename (e.g., 'kanasub-01.m3u8')
-      // Use it directly without modification
       return `/api/hls?file=${videoId}`;
     } else if (server === 'helvid') {
       return `https://helvid.net/play/index/${videoId}`;
@@ -708,41 +593,33 @@ export function JWPlayerComponent({
     return '';
   }, [videoId, server]);
 
-  // Function to apply comprehensive protection to video elements
   const protectVideoElement = useCallback((video: HTMLVideoElement) => {
     try {
-      // Validate that video is a proper HTMLVideoElement
       if (!video || !(video instanceof HTMLVideoElement) || !video.nodeType) {
         return;
       }
 
-      // Safely override getAttribute specifically for src
       const originalGetAttribute = video.getAttribute;
       video.getAttribute = function(name: string) {
         if (name === 'src') return 'blob:protected-stream';
         return originalGetAttribute.call(this, name);
       };
 
-      // Safely override setAttribute to prevent URL leaks
       const originalSetAttribute = video.setAttribute;
       video.setAttribute = function(name: string, value: string) {
         if (name === 'src' && value.includes('blob:')) {
-          // Allow setting but don't expose the real URL
           return originalSetAttribute.call(this, name, value);
         }
         return originalSetAttribute.call(this, name, value);
       };
 
-      // Advanced property protection with periodic reapplication
       const protectionInterval = setInterval(() => {
         try {
-          // Check if video element still exists and is connected to DOM
           if (!video || !video.nodeType || !video.isConnected) {
             clearInterval(protectionInterval);
             return;
           }
 
-          // Safely redefine src and currentSrc properties periodically
           const srcDescriptor = Object.getOwnPropertyDescriptor(video, 'src');
           if (!srcDescriptor || srcDescriptor.configurable !== false) {
             Object.defineProperty(video, 'src', {
@@ -760,12 +637,10 @@ export function JWPlayerComponent({
             });
           }
 
-          // Safely hide the video from element inspection (avoid circular reference)
           const outerHTMLDescriptor = Object.getOwnPropertyDescriptor(video, 'outerHTML');
           if (!outerHTMLDescriptor || outerHTMLDescriptor.configurable !== false) {
             Object.defineProperty(video, 'outerHTML', {
               get: function() { 
-                // Get the original outerHTML from the prototype to avoid circular reference
                 const originalOuterHTML = Object.getOwnPropertyDescriptor(HTMLVideoElement.prototype, 'outerHTML')?.get;
                 if (originalOuterHTML) {
                   try {
@@ -782,16 +657,13 @@ export function JWPlayerComponent({
           }
 
         } catch (e) {
-          // Silently handle protection failures
         }
-      }, 2000); // Reapply protection every 2 seconds (less frequent to avoid conflicts)
+      }, 2000);
 
-      // Clean up protection when video is removed (with better error handling)
       const cleanupObserver = new MutationObserver((mutations) => {
         try {
           mutations.forEach((mutation) => {
             mutation.removedNodes.forEach((node) => {
-              // Proper type checking for nodes
               if (node && node.nodeType === Node.ELEMENT_NODE) {
                 if (node === video || (node as Element).contains(video)) {
                   clearInterval(protectionInterval);
@@ -809,7 +681,6 @@ export function JWPlayerComponent({
       cleanupObserver.observe(document.body, { childList: true, subtree: true });
 
     } catch (e) {
-      // Video protection error
     }
   }, []);
 
@@ -817,15 +688,11 @@ export function JWPlayerComponent({
     if (typeof window === 'undefined' || !(window as any).jwplayer) {
       return;
     }
-
-    // Check if we're in the middle of a fullscreen transition
     const isFullscreen = document.fullscreenElement !== null;
     if (isFullscreen && playerInstanceRef.current) {
       console.log('Skipping player initialization due to fullscreen state');
       return;
     }
-
-    // Check if player exists and is in fullscreen mode
     if (playerInstanceRef.current && playerInstanceRef.current._isFullscreen) {
       console.log('Skipping player initialization due to player fullscreen flag');
       return;
@@ -838,16 +705,13 @@ export function JWPlayerComponent({
       console.log('Initializing JWPlayer with URL:', videoUrl);
       console.log('Video ID:', videoId, 'Server:', server);
 
-      // Remove existing player instance
       if (playerInstanceRef.current) {
         try {
-          // Save current playback position before removing
           const currentPosition = playerInstanceRef.current.getPosition();
           const wasPlaying = playerInstanceRef.current.getState() === 'playing';
           
           playerInstanceRef.current.remove();
           
-          // If we had a position, we'll restore it after recreation
           if (currentPosition > 0) {
             console.log('Saving playback position:', currentPosition);
             playerInstanceRef.current._savedPosition = currentPosition;
@@ -858,7 +722,6 @@ export function JWPlayerComponent({
         }
       }
 
-      // Setup player configuration based on server type
       let playerConfig: any = {
         width: "100%",
         height: "100%",
@@ -898,27 +761,22 @@ export function JWPlayerComponent({
       };
 
       if (server === 'hls') {
-        // Check if browser supports native HLS (Safari, iOS, some Android browsers)
         const isNativeHLSSupported = (() => {
           const video = document.createElement('video');
           return video.canPlayType('application/vnd.apple.mpegurl') !== '';
         })();
 
-        // HLS configuration simplified for better compatibility with external CDN
         playerConfig = {
           ...playerConfig,
           file: videoUrl,
           type: "hls",
-          // Use native HLS when available, fallback to hls.js
           hlsjsdefault: !isNativeHLSSupported,
           enableNativeHls: isNativeHLSSupported,
-          safarihlsjs: false, // Let Safari use native HLS
+          safarihlsjs: false,
           title: `Episode ${videoId}`,
-          // Simplified HLS settings for better external CDN compatibility
           hlshtml5: {
-            enableWorker: false, // Disable worker for better compatibility
+            enableWorker: false,
             lowLatencyMode: false,
-            // Conservative buffering for external CDN
             backBufferLength: 10,
             maxBufferLength: 20,
             maxMaxBufferLength: 40,
@@ -930,81 +788,66 @@ export function JWPlayerComponent({
             maxSeekHole: 2,
             seekHoleNudgeDuration: 0.1,
             maxFragLookUpTolerance: 0.25,
-            // Simplified CDN settings
             liveSyncDurationCount: 3,
             liveMaxLatencyDurationCount: 6,
-            enableSoftwareAES: false, // Disable for compatibility
-            // Reduced timeouts for faster failure detection
+            enableSoftwareAES: false,
             manifestLoadingTimeOut: 10000,
             manifestLoadingMaxRetry: 3,
             manifestLoadingRetryDelay: 1000,
             fragmentLoadingTimeOut: 20000,
             fragmentLoadingMaxRetry: 6,
             fragmentLoadingRetryDelay: 1000,
-            startFragPrefetch: false, // Disable prefetch for compatibility
+            startFragPrefetch: false, 
             testBandwidth: false,
             progressive: false, // Disable for HLS
-            // Simplified ABR settings
             abrEwmaFastLive: 3.0,
             abrEwmaSlowLive: 9.0,
             abrEwmaFastVoD: 3.0,
             abrEwmaSlowVoD: 9.0,
             maxStarvationDelay: 4,
             maxLoadingDelay: 4,
-            // Basic configuration
             startLevel: -1,
             capLevelToPlayerSize: false,
-            // Simplified CORS setup for external CDN
-            xhrSetup: function(xhr, url) {
-              // Basic headers only
+            xhrSetup: function(xhr: any, url: any) {
               xhr.setRequestHeader('Accept', '*/*');
               xhr.withCredentials = false;
               
-              // Don't modify external CDN URLs
               if (url.includes('tiktokcdn.com')) {
-                // Let external URLs load normally
                 return;
               }
               
-              // Only modify internal API URLs
               if (url.startsWith('/api/') || url.startsWith(window.location.origin)) {
                 xhr.setRequestHeader('Cache-Control', 'no-cache');
                 xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
               }
             }
           },
-          // Basic buffering
           buffering: {
             enabled: true,
             length: 5,
             position: 2
           },
-          preload: "metadata", // Reduce preload for external CDN
-          // Basic JWPlayer settings
-          bandwidthEstimate: 500000, // Conservative estimate
+          preload: "metadata", 
+          bandwidthEstimate: 500000, 
           bitrateSelection: "auto"
         };
       } else {
-        // For external servers (Helvid, Hydax), use iframe or direct embed
         playerConfig = {
           ...playerConfig,
           file: videoUrl,
-          type: "mp4", // Default to mp4 for external servers
+          type: "mp4", 
         };
       }
 
-      // Initialize player
       const player = jwplayer("kana-jwplayer").setup(playerConfig);
       playerInstanceRef.current = player;
 
-      // Event listeners
       player.on('ready', () => {
         console.log('JWPlayer ready');
         setPlayerLoaded(true);
         setIsLoading(false);
         setError(null);
         
-        // Restore saved position if available (from fullscreen or other reinitialization)
         if (playerInstanceRef.current && playerInstanceRef.current._savedPosition) {
           const savedPosition = playerInstanceRef.current._savedPosition;
           const wasPlaying = playerInstanceRef.current._wasPlaying;
@@ -1016,42 +859,34 @@ export function JWPlayerComponent({
             if (wasPlaying) {
               player.play();
             }
-            // Clear saved position
             playerInstanceRef.current._savedPosition = null;
             playerInstanceRef.current._wasPlaying = false;
-          }, 1000); // Wait a bit for player to be fully ready
+          }, 1000); 
         }
         
-        // Additional UI customizations and protection after player is ready
         setTimeout(() => {
-          // Hide JWPlayer branding if still visible
           const jwLogo = document.querySelector('.jw-logo');
           if (jwLogo) (jwLogo as HTMLElement).style.display = 'none';
           
           const jwWatermark = document.querySelector('.jw-watermark');
           if (jwWatermark) (jwWatermark as HTMLElement).style.display = 'none';
           
-          // Custom volume control styling
           const volumeSlider = document.querySelector('.jw-slider-volume .jw-progress');
           if (volumeSlider) {
             (volumeSlider as HTMLElement).style.backgroundColor = '#ff6b35';
           }
 
-          // Add advanced video element protection
           const videoElement = document.querySelector('#kana-jwplayer video');
           if (videoElement) {
             try {
-              // Apply comprehensive protection immediately
               protectVideoElement(videoElement as HTMLVideoElement);
 
-              // Additional event-based protection with complete context menu override
               videoElement.addEventListener('contextmenu', (e) => {
                 const mouseEvent = e as MouseEvent;
                 mouseEvent.preventDefault();
                 mouseEvent.stopPropagation();
                 mouseEvent.stopImmediatePropagation();
                 
-                // Create and show custom context menu directly
                 const existingMenu = document.querySelector('#kana-custom-menu');
                 if (existingMenu) {
                   existingMenu.remove();
@@ -1088,7 +923,6 @@ export function JWPlayerComponent({
                 customMenu.appendChild(menuItem);
                 document.body.appendChild(customMenu);
                 
-                // Auto-hide menu after 3 seconds or on click elsewhere
                 const hideMenu = () => {
                   if (customMenu && customMenu.parentNode) {
                     customMenu.remove();
@@ -1097,7 +931,6 @@ export function JWPlayerComponent({
                 
                 setTimeout(hideMenu, 3000);
                 
-                // Hide on click elsewhere
                 const clickHandler = (clickEvent: Event) => {
                   if (!customMenu.contains(clickEvent.target as Node)) {
                     hideMenu();
@@ -1109,7 +942,6 @@ export function JWPlayerComponent({
                 return false;
               });
 
-              // Override video element's toString methods to hide URLs
               try {
                 const originalToString = HTMLVideoElement.prototype.toString;
                 videoElement.toString = function() {
@@ -1117,10 +949,8 @@ export function JWPlayerComponent({
                   return result.replace(/blob:[^"\s]+/g, 'blob:protected-stream');
                 };
               } catch (e) {
-                // Cannot override toString, skipping
               }
 
-              // Add invisible overlay to prevent direct video interaction
               const overlay = document.createElement('div');
               overlay.style.cssText = `
                 position: absolute;
@@ -1138,11 +968,9 @@ export function JWPlayerComponent({
                 playerContainer.appendChild(overlay);
               }
             } catch (protectionError) {
-              // Continue without protection if it fails
             }
           }
 
-          // Obfuscate player internal references
           if (playerInstanceRef.current) {
             try {
               const originalGetPlaylist = playerInstanceRef.current.getPlaylist;
@@ -1182,27 +1010,20 @@ export function JWPlayerComponent({
                 };
               }
             } catch (playerProtectionError) {
-              // Continue without player obfuscation if it fails
             }
           }
         }, 500);
         
-        // Handle autoplay and muting based on browser policies
         if (autoPlay) {
           try {
-            // Try to play the video
             player.play();
-            
-            // Set mute state after attempting autoplay
             if (!muted) {
-              // Small delay to ensure player is ready
               setTimeout(() => {
                 player.setMute(false);
               }, 100);
             }
           } catch (e) {
             console.warn('Autoplay failed, trying muted autoplay:', e);
-            // If autoplay fails, try with muted
             try {
               player.setMute(true);
               player.play();
@@ -1211,24 +1032,18 @@ export function JWPlayerComponent({
             }
           }
         } else {
-          // If not autoplay, just set the mute state
           if (!muted) {
             player.setMute(false);
           }
         }
         
-        onLoad?.(); // Call onLoad callback
+        onLoad?.(); 
       });
 
       player.on('error', (e: any) => {
-        // Check for empty error object first - this is a common JWPlayer/HLS.js issue that doesn't prevent playback
         if (Object.keys(e).length === 0 || (typeof e === 'object' && !e.code && !e.message && !e.type && !e.sourceError)) {
-          // Empty error object - often the video still works despite this error, so we'll ignore it completely
-          return; // Don't trigger any error handling, logging, or callbacks for empty errors
+          return; 
         }
-        
-        
-        // Extract more detailed error information
         let errorDetails = '';
         if (e.code) errorDetails += `Code: ${e.code}, `;
         if (e.type) errorDetails += `Type: ${e.type}, `;
@@ -1237,12 +1052,9 @@ export function JWPlayerComponent({
         
         console.log('Error details:', errorDetails);
         
-        // Handle different types of errors with retry logic
         let errorMessage = `Failed to load video: hls - ${videoId} (JWPlayer error: ${e.message || e.code || 'Unknown error'})`;
         let shouldRetry = false;
-        
-        // Provide more specific error messages for common issues
-        if (e.code === 232011 || e.code === '232011') {
+                if (e.code === 232011 || e.code === '232011') {
           errorMessage = `Failed to load video: hls - ${videoId} (HLS network error - cannot load segments)`;
           shouldRetry = false;
         } else if (e.code === 232404 || e.code === '232404') {
@@ -1250,30 +1062,27 @@ export function JWPlayerComponent({
           shouldRetry = false;
         } else if (e.message && e.message.includes('network')) {
           errorMessage = `Failed to load video: hls - ${videoId} (network error)`;
-          shouldRetry = false; // Don't retry, trigger fallback instead
+          shouldRetry = false; 
         } else if (e.message && e.message.includes('CORS')) {
           errorMessage = `Failed to load video: hls - ${videoId} (CORS error)`;
         } else if (e.message && e.message.includes('404')) {
           errorMessage = `Failed to load video: hls - ${videoId} (404 not found)`;
         } else if (e.code === 'hlsError' || e.type === 'hlsError') {
           errorMessage = `Failed to load video: hls - ${videoId} (HLS error)`;
-          shouldRetry = false; // Don't retry, trigger fallback instead
+          shouldRetry = false; 
         } else if (e.message && e.message.includes('core-shim')) {
           errorMessage = `Failed to load video: hls - ${videoId} (core-shim error)`;
-          shouldRetry = false; // Don't retry, trigger fallback instead
+          shouldRetry = false; 
         } else if (e.code === 232400 || String(e.code).includes('232400')) {
-          // Specific handling for 232400 error (file not found)
           errorMessage = `Failed to load video: hls - ${videoId} (file not found)`;
           shouldRetry = false;
         }
         
         setError(errorMessage);
         
-        // Auto-retry for network/HLS errors after a short delay
         if (shouldRetry) {
           setTimeout(() => {
             try {
-              // Try to reload the player
               player.load();
               setError(null);
             } catch (retryError) {
@@ -1284,7 +1093,6 @@ export function JWPlayerComponent({
         }
         setIsLoading(false);
         
-        // Always call onError to trigger fallback in VideoPlayer
         onError?.(errorMessage);
       });
 
@@ -1296,7 +1104,6 @@ export function JWPlayerComponent({
         onError?.(errorMessage);
       });
 
-      // Add more detailed event logging for debugging
       player.on('firstFrame', () => {
         if (!muted) {
           player.setMute(false);
@@ -1310,11 +1117,9 @@ export function JWPlayerComponent({
         console.warn('JWPlayer warning:', e);
       });
 
-      // Monitor playback issues
       player.on('playbackRateChanged', (e: any) => {
       });
 
-      // Add network quality monitoring
       player.on('levels', () => {
         const levels = player.getQualityLevels();
         if (levels && levels.length > 0) {
@@ -1334,12 +1139,10 @@ export function JWPlayerComponent({
         console.log('Player idle');
       });
 
-      // Handle autoplay blocked by browser
       player.on('autostartNotAllowed', () => {
         console.log('Autoplay was blocked by browser policy');
         setAutoplayBlocked(true);
         
-        // Try to unmute since autoplay is blocked anyway
         if (!muted) {
           setTimeout(() => {
             player.setMute(false);
@@ -1348,12 +1151,10 @@ export function JWPlayerComponent({
         }
       });
 
-      // Handle successful play events
       player.on('play', () => {
         console.log('Bắt đầu phát video');
-        setAutoplayBlocked(false); // Hide autoplay blocked message
+        setAutoplayBlocked(false); 
         
-        // Ensure audio is unmuted when playback starts (if not intended to be muted)
         if (!muted && autoPlay) {
           setTimeout(() => {
             player.setMute(false);
@@ -1362,34 +1163,27 @@ export function JWPlayerComponent({
         }
       });
 
-      // Handle first interaction to unmute if needed
       player.on('firstFrame', () => {
         console.log('First frame loaded');
         if (!muted) {
           player.setMute(false);
         }
       });
-
-      // Additional event handlers for enhanced UX
       player.on('complete', () => {
         console.log('Video playback completed');
-        // Could trigger next episode functionality here
       });
 
       player.on('time', (e: any) => {
-        // Update progress, could be used for analytics
         const progress = (e.position / e.duration) * 100;
-        if (progress % 25 === 0) { // Log every 25% progress
+        if (progress % 25 === 0) { 
           console.log(`Playback progress: ${Math.round(progress)}%`);
         }
       });
 
       player.on('levels', () => {
         console.log('Quality levels available');
-        // Auto-select best quality based on connection
         const levels = player.getQualityLevels();
         if (levels && levels.length > 0) {
-          // Select highest quality by default
           const highestQuality = levels[levels.length - 1];
           console.log('Auto-selected highest quality:', highestQuality.label);
         }
@@ -1398,16 +1192,12 @@ export function JWPlayerComponent({
       player.on('fullscreen', (e: any) => {
         console.log('Fullscreen toggled:', e.fullscreen);
         
-        // Prevent player reinitialization during fullscreen changes
         if (e.fullscreen) {
           console.log('Entering fullscreen mode - preventing player reload');
-          // Add a flag to prevent reinitialization
           playerInstanceRef.current._isFullscreen = true;
         } else {
           console.log('Exiting fullscreen mode - preventing player reload');
-          // Track when we exit fullscreen to prevent immediate reinitialization
           playerInstanceRef.current._lastFullscreenExit = Date.now();
-          // Remove the flag after a short delay to prevent immediate reinitialization
           setTimeout(() => {
             if (playerInstanceRef.current) {
               playerInstanceRef.current._isFullscreen = false;
@@ -1418,19 +1208,14 @@ export function JWPlayerComponent({
 
       player.on('resize', (e: any) => {
         console.log('Player resized:', e.width, 'x', e.height);
-        // Handle responsive adjustments
       });
 
-      // Handle volume changes
       player.on('volume', (e: any) => {
         console.log('Volume changed to:', e.volume);
-        // Could save volume preference
       });
 
-      // Handle mute changes
       player.on('mute', (e: any) => {
         console.log('Mute toggled:', e.mute);
-        // Could save mute preference
       });
 
     } catch (err) {
@@ -1444,13 +1229,11 @@ export function JWPlayerComponent({
     let scriptLoaded = false;
 
     const loadJWPlayer = () => {
-      // Check if JWPlayer is already loaded
       if (typeof window !== 'undefined' && (window as any).jwplayer) {
         initializePlayer();
         return;
       }
 
-      // Load JWPlayer script
       const script = document.createElement('script');
       script.src = 'https://ssl.p.jwpcdn.com/player/v/8.38.3/jwplayer.js';
       script.async = true;
@@ -1472,7 +1255,6 @@ export function JWPlayerComponent({
 
     loadJWPlayer();
 
-    // Cleanup
     return () => {
       if (playerInstanceRef.current) {
         try {
@@ -1482,19 +1264,16 @@ export function JWPlayerComponent({
         }
       }
     };
-  }, [videoId, server]); // Remove initializePlayer from dependencies to prevent constant reinitializations
+  }, [videoId, server]);
 
-  // Handle server/video changes separately to prevent fullscreen issues
   useEffect(() => {
     if (playerLoaded && playerInstanceRef.current) {
-      // Don't reinitialize if only fullscreen state changed
       const isFullscreen = document.fullscreenElement !== null;
       if (isFullscreen || (playerInstanceRef.current && playerInstanceRef.current._isFullscreen)) {
         console.log('Skipping player reinitialization due to fullscreen state');
         return;
       }
       
-      // Also check if we just exited fullscreen recently
       const now = Date.now();
       if (playerInstanceRef.current._lastFullscreenExit && (now - playerInstanceRef.current._lastFullscreenExit) < 2000) {
         console.log('Skipping player reinitialization - recently exited fullscreen');
