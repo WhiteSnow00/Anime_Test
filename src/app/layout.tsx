@@ -4,10 +4,10 @@ import { Toaster } from '@/components/ui/toaster';
 
 export const metadata: Metadata = {
   metadataBase: new URL('http://ayaya-kana.id.vn/'),
-  title: 'Xem Anime Online',
+  title: 'Hoa Thơm Kiêu Hãnh',
   description: 'Web coi anime thay gdrive!',
   openGraph: {
-    title: 'Xem Anime Online',
+    title: 'Hoa Thơm Kiêu Hãnh',
     description: 'Web coi anime thay gdrive!',
     url: 'http://ayaya-kana.id.vn/',
     siteName: 'Ayaya Webpage',
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Xem Anime Online',
+    title: 'Hoa Thơm Kiêu Hãnh',
     description: 'Web coi anime thay gdrive!',
     images: ['/images/thumb.jpg'],
   },
