@@ -14,8 +14,8 @@ export const metadata: Metadata = {
     images: [
       {
         url: '/images/thumb.jpg',
-        width: 1200,
-        height: 630,
+        width: 1536,
+        height: 1099,
         alt: 'Web coi anime thay gdrive!',
       },
     ],
