@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-/**
- * HLS Segment Proxy API Route
- * Proxies external CDN segments to avoid CORS issues
- */
-
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -17,7 +12,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Security: Only allow TikTok CDN URLs
     if (!url.includes('tiktokcdn.com')) {
       return NextResponse.json(
         { error: 'Invalid URL domain' },
@@ -27,7 +21,6 @@ export async function GET(request: NextRequest) {
 
     console.log('Proxying segment:', url);
 
-    // Fetch the segment from the external CDN with timeout and retry logic
     let response;
     let lastError;
     
@@ -36,7 +29,7 @@ export async function GET(request: NextRequest) {
         console.log(`Attempting to fetch segment (attempt ${attempt}/3):`, url);
         
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 30000); 
         
         response = await fetch(url, {
           signal: controller.signal,
@@ -44,14 +37,13 @@ export async function GET(request: NextRequest) {
             'Accept': '*/*',
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
             'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Encoding': 'identity', // Don't use compression to avoid issues
+            'Accept-Encoding': 'identity', 
             'Connection': 'keep-alive',
             'Cache-Control': 'no-cache',
             'Pragma': 'no-cache',
             'Referer': 'https://tiktok.com/',
             'Origin': 'https://tiktok.com'
           },
-          // Don't include credentials for external requests
           credentials: 'omit'
         });
         
@@ -67,8 +59,6 @@ export async function GET(request: NextRequest) {
       } catch (error) {
         lastError = error;
         console.warn(`Attempt ${attempt} failed:`, error);
-        
-        // Wait before retry (exponential backoff)
         if (attempt < 3) {
           await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
         }
@@ -82,22 +72,16 @@ export async function GET(request: NextRequest) {
         { status: response?.status || 500 }
       );
     }
-
-    // Get the segment data
     const segmentData = await response.arrayBuffer();
-
-    // Set appropriate headers for video segments
     const headers = new Headers({
       'Content-Type': response.headers.get('Content-Type') || 'video/mp2t',
       'Content-Length': segmentData.byteLength.toString(),
-      'Cache-Control': 'public, max-age=3600', // Cache for 1 hour
+      'Cache-Control': 'public, max-age=3600', 
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
       'Access-Control-Allow-Headers': 'Range, Content-Type',
       'Accept-Ranges': 'bytes',
     });
-
-    // Handle range requests for seeking
     const rangeHeader = request.headers.get('range');
     if (rangeHeader) {
       const range = rangeHeader.replace(/bytes=/, '').split('-');
@@ -110,7 +94,7 @@ export async function GET(request: NextRequest) {
 
       const chunk = segmentData.slice(start, end + 1);
       return new NextResponse(chunk, {
-        status: 206, // Partial Content
+        status: 206, 
         headers,
       });
     }
@@ -127,8 +111,6 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-
-// Handle OPTIONS for CORS
 export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,

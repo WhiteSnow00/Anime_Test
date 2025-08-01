@@ -2,27 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 
-/**
- * HLS Streaming API Route
- * Serves m3u8 playlist files and video segments for JWPlayer
- */
-
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     
-    // Handle both old and new parameter formats for backward compatibility
-    let file = searchParams.get('file'); // Legacy format
-    const obfuscatedFile = searchParams.get('f'); // New obfuscated format
+    let file = searchParams.get('file'); 
+    const obfuscatedFile = searchParams.get('f'); 
     const token = searchParams.get('t');
     const sessionId = searchParams.get('s');
     const timestamp = searchParams.get('ts');
     const ref = searchParams.get('ref');
 
-    // Advanced security validation for new format
     if (obfuscatedFile && token && sessionId && timestamp && ref) {
       try {
-        // Verify referrer
         const decodedRef = atob(ref);
         const requestHost = request.headers.get('host') || '';
         
@@ -32,8 +24,6 @@ export async function GET(request: NextRequest) {
             { status: 403 }
           );
         }
-
-        // Verify timestamp (reject requests older than 5 minutes)
         const requestTime = parseInt(timestamp);
         const currentTime = Date.now();
         if (currentTime - requestTime > 5 * 60 * 1000) {
@@ -42,8 +32,6 @@ export async function GET(request: NextRequest) {
             { status: 403 }
           );
         }
-
-        // Decode obfuscated file parameter
         try {
           const decoded = atob(obfuscatedFile);
           const timestampIndex = decoded.lastIndexOf(Date.now().toString(36).slice(0, 8));
@@ -86,25 +74,18 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       );
     }
-
-    // Additional security headers for obfuscation
     const userAgent = request.headers.get('user-agent') || '';
     const clientSession = request.headers.get('x-client-session');
     const playerToken = request.headers.get('x-player-token');
 
-    // Construct file path
     const filePath = join(process.cwd(), 'src', 'm3u8', file);
     
     try {
-      // Read the m3u8 file
       let fileContent = await readFile(filePath, 'utf8');
       
-      // Rewrite external CDN URLs to use our proxy to avoid CORS issues
       const lines = fileContent.split('\n');
       const rewrittenLines = lines.map(line => {
-        // Check if line is a segment URL (not a comment or directive)
         if (line.trim() && !line.startsWith('#') && line.includes('tiktokcdn.com')) {
-          // Rewrite to use our proxy
           const originalUrl = line.trim();
           const proxyUrl = `/api/hls-segment?url=${encodeURIComponent(originalUrl)}`;
           console.log(`Rewriting segment URL:`, originalUrl, '->', proxyUrl);
@@ -114,10 +95,7 @@ export async function GET(request: NextRequest) {
       });
       
       fileContent = rewrittenLines.join('\n');
-      
-      // Obfuscate the m3u8 content to make tracking harder
       if (obfuscatedFile && token && timestamp) {
-        // Add noise comments to confuse parsers
         const noiseComments = [
           `# Protected Stream - Session: ${sessionId || 'unknown'}`,
           `# Anti-Track Token: ${token.slice(0, 8)}...`,
@@ -127,9 +105,7 @@ export async function GET(request: NextRequest) {
         
         fileContent = noiseComments.join('\n') + '\n' + fileContent;
       }
-      
-      // Set appropriate headers for HLS streaming with additional protection
-      const headers = new Headers({
+            const headers = new Headers({
         'Content-Type': 'application/vnd.apple.mpegurl',
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
@@ -137,7 +113,6 @@ export async function GET(request: NextRequest) {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
         'Access-Control-Allow-Headers': 'Range, Content-Type, X-Client-Session, X-Player-Token, X-Anti-Track, X-Session-Guard',
-        // Additional protection headers
         'X-Content-Type-Options': 'nosniff',
         'X-Frame-Options': 'SAMEORIGIN',
         'X-Stream-Protected': 'true',
@@ -164,7 +139,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Handle OPTIONS for CORS with enhanced headers
 export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,

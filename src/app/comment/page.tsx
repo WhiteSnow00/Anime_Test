@@ -32,14 +32,11 @@ export default function CommentManagement() {
   const [authError, setAuthError] = useState('');
   const [filter, setFilter] = useState<'all' | 'approved' | 'pending'>('all');
   const [searchTerm, setSearchTerm] = useState('');
-
-  // Only initialize admin hook when authenticated
   const { comments, stats, isLoading, toggleApproval, deleteComment, refreshComments } = useAdminComments(
     isAuthenticated && password ? password : ''
   );
 
   useEffect(() => {
-    // Clear any existing session on mount to force re-authentication
     sessionStorage.removeItem('comment-admin-auth');
     sessionStorage.removeItem('comment-admin-password');
   }, []);
@@ -47,9 +44,7 @@ export default function CommentManagement() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
-    
-    // Validate password by calling the admin API
-    try {
+      try {
       const response = await fetch(`/api/comments/admin?password=${encodeURIComponent(password)}`);
       const result = await response.json();
       
@@ -74,7 +69,6 @@ export default function CommentManagement() {
     sessionStorage.removeItem('comment-admin-password');
   };
 
-  // Get filtered comments
   const filteredComments = comments.filter(comment => {
     const matchesFilter = filter === 'all' || 
       (filter === 'approved' && comment.isApproved) ||

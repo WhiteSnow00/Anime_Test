@@ -1,4 +1,3 @@
-/* Comment Section Styles */
 .comment-content {
   word-wrap: break-word;
   word-break: break-word;
@@ -13,13 +12,11 @@
   white-space: nowrap;
 }
 
-/* Vietnamese text optimization */
 .vietnamese-text {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   line-height: 1.6;
 }
 
-/* Touch targets for mobile */
 .touch-target-lg {
   min-height: 44px;
   min-width: 44px;
@@ -30,7 +27,6 @@
   min-width: 36px;
 }
 
-/* Mobile comment adjustments */
 @media (max-width: 768px) {
   .comment-content {
     font-size: 0.9rem;
@@ -42,32 +38,27 @@
     font-size: 0.875rem;
   }
 
-  /* Ensure proper spacing for mobile keyboards */
   .comment-form-container {
     padding-bottom: 2rem;
   }
 
-  /* Mobile-specific input styling */
   .mobile-input {
-    font-size: 16px; /* Prevents zoom on iOS */
+    font-size: 16px;
     border-radius: 8px;
   }
 
-  /* Better emoji helper on mobile */
   .emoji-helper-mobile {
     max-height: 200px;
     border-radius: 12px;
     -webkit-overflow-scrolling: touch;
   }
 
-  /* Improved touch targets */
   .emoji-button-mobile {
     min-height: 44px;
     min-width: 44px;
     font-size: 0.75rem;
   }
 
-  /* Prevent zoom on input focus (iOS) */
   input[type="text"],
   input[type="email"], 
   input[type="number"],
@@ -75,25 +66,21 @@
     font-size: 16px !important;
   }
 
-  /* Smooth scrolling for mobile */
   .comment-section-mobile {
     scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch;
   }
 
-  /* Fix for mobile bottom nav interference */
   .comment-form-container {
     margin-bottom: 1rem;
   }
 
-  /* Better focus states on mobile */
   .mobile-input:focus {
     transform: scale(1.01);
     transition: transform 0.2s ease;
   }
 }
 
-/* Admin panel enhancements */
 .admin-stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -109,7 +96,6 @@
   transform: translateY(-1px);
 }
 
-/* Mobile admin optimizations */
 @media (max-width: 768px) {
   .admin-stats-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -117,7 +103,6 @@
   }
   
   .admin-comment-card {
-    /* Prevent hover effects on mobile */
     transform: none !important;
   }
   
@@ -126,7 +111,6 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   }
   
-  /* Better spacing for mobile admin */
   .admin-header {
     padding: 0.75rem;
   }
@@ -142,7 +126,6 @@
     gap: 0.5rem;
   }
   
-  /* Improve admin button sizes for touch */
   .admin-action-button {
     min-height: 36px;
     min-width: 36px;
@@ -150,7 +133,6 @@
   }
 }
 
-/* Loading animations */
 @keyframes commentFadeIn {
   from {
     opacity: 0;
@@ -166,7 +148,6 @@
   animation: commentFadeIn 0.3s ease-out;
 }
 
-/* Success message animation */
 @keyframes slideInDown {
   from {
     opacity: 0;

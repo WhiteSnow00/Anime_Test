@@ -1,19 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-/**
- * Dynamic Decoy API Route
- * Handles random decoy endpoints to create fake network traffic
- */
-
 export async function GET(request: NextRequest, { params }: { params: { slug: string[] } }) {
-  // Generate random delay to simulate real processing
   const delay = Math.floor(Math.random() * 600) + 200;
   await new Promise(resolve => setTimeout(resolve, delay));
 
   const { searchParams } = new URL(request.url);
   const fake = searchParams.get('fake');
   
-  // Generate realistic but fake streaming data
   const decoyData = {
     endpoint: params.slug?.join('/') || 'unknown',
     stream_id: `fake_${Math.random().toString(36).substring(2)}`,
@@ -52,7 +45,6 @@ export async function GET(request: NextRequest, { params }: { params: { slug: st
     }
   };
 
-  // Sometimes return errors to make it more realistic
   if (Math.random() < 0.15) {
     return NextResponse.json(
       { 

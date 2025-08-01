@@ -15,13 +15,11 @@ export default function DownloadRedirectContent() {
 
   const url = searchParams.get('url');
   const filename = searchParams.get('filename') || 'Tập';
-  const type = searchParams.get('type') || 'download'; // 'download' or 'raw'
+  const type = searchParams.get('type') || 'download'; 
   const episodeId = parseInt(searchParams.get('episodeId') || '0');
   
-  // Check if this episode is H.265 encoded
   const isH265 = isH265Episode(episodeId);
 
-  // Debug logging
   console.log('DownloadRedirect Debug:', {
     episodeId,
     episodeIdRaw: searchParams.get('episodeId'),
@@ -32,7 +30,6 @@ export default function DownloadRedirectContent() {
 
   const redirectToUrl = (targetUrl: string) => {
     setIsRedirecting(true);
-    // Redirect directly to Google Drive instead of opening new tab
     window.location.href = targetUrl;
   };
 
@@ -46,7 +43,6 @@ export default function DownloadRedirectContent() {
       setCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          // Redirect to Google Drive after countdown
           setTimeout(() => redirectToUrl(url), 500);
           return 0;
         }
@@ -73,16 +69,13 @@ export default function DownloadRedirectContent() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-pink-50 dark:from-pink-950/20 dark:via-purple-950/20 dark:to-pink-950/20 flex items-center justify-center p-4">
-      {/* Background decoration */}
       <div className="absolute inset-0 bg-gradient-to-r from-pink-100/30 via-transparent to-purple-100/30 dark:from-pink-900/10 dark:via-transparent dark:to-purple-900/10" />
       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-pink-400 via-purple-400 to-pink-400" />
 
       <Card className="w-full max-w-md mx-auto shadow-xl border-pink-200/50 dark:border-pink-800/50 backdrop-blur-sm relative overflow-hidden">
-        {/* Card header decoration */}
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-pink-400 via-purple-400 to-pink-400" />
         
         <CardContent className="p-6 space-y-6">
-          {/* Header */}
           <div className="text-center space-y-2">
             <div className="w-16 h-16 mx-auto bg-gradient-to-r from-pink-100 to-purple-100 dark:from-pink-900/50 dark:to-purple-900/50 rounded-full flex items-center justify-center shadow-md">
               <Download className="w-8 h-8 text-pink-600 dark:text-pink-400 animate-bounce" />
@@ -94,7 +87,7 @@ export default function DownloadRedirectContent() {
               {type === 'raw' ? 'Phim RAW (Không phụ đề)' : 'Phim có phụ đề'}: {filename}
             </p>
           </div>
-          {/* Warning message - only show for H.265 episodes AND non-RAW downloads */}
+
           {isH265Episode(episodeId) && type !== 'raw' && (
             <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
               <div className="flex items-start gap-3">

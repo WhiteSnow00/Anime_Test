@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SimpleMongoDBService } from '@/lib/simple-mongodb-service';
 
-// GET - Fetch all approved comments
 export async function GET() {
   try {
     const comments = await SimpleMongoDBService.getComments();
@@ -40,7 +39,6 @@ export async function GET() {
   }
 }
 
-// POST - Add new comment
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -48,24 +46,22 @@ export async function POST(request: NextRequest) {
 
     console.log(`[COMMENTS-POST] Data received: user=${userName}, content length=${content?.length}, episode=${episodeViewing}`);
 
-    // Get client info
     const userAgent = request.headers.get('user-agent') || '';
     const forwardedFor = request.headers.get('x-forwarded-for');
     const realIp = request.headers.get('x-real-ip');
     const ipAddress = forwardedFor?.split(',')[0] || realIp || 'localhost';
 
-    // Add comment using unified service (auto-approve new comments)
     const savedComment = await SimpleMongoDBService.addComment({
       userName,
       content,
       timestamp: new Date(),
-      isApproved: true, // Auto-approve new comments so they show immediately
+      isApproved: true, 
       userAgent,
       ipAddress,
       episodeViewing
     });
 
-    console.log(`[COMMENTS-POST] ✅ New comment added to MongoDB: ${savedComment._id}`);
+    console.log(`[COMMENTS-POST] New comment added to MongoDB: ${savedComment._id}`);
 
     return NextResponse.json({
       success: true,
@@ -74,9 +70,8 @@ export async function POST(request: NextRequest) {
       message: 'Comment submitted successfully and pending approval'
     });
   } catch (error) {
-    console.error('[COMMENTS-POST] ❌ Failed to add comment:', error);
+    console.error('[COMMENTS-POST] Failed to add comment:', error);
     
-    // Enhanced error handling with Vietnamese messages
     let errorMessage = 'Có lỗi xảy ra khi gửi bình luận';
     let isValidation = false;
     let statusCode = 500;
@@ -85,7 +80,6 @@ export async function POST(request: NextRequest) {
       const errorMsg = error.message;
       console.error(`[COMMENTS-POST] Error details: ${errorMsg}`);
       
-      // Check for validation errors
       if (errorMsg.includes('không được để trống') || 
           errorMsg.includes('quá dài') || 
           errorMsg.includes('spam') ||
@@ -94,7 +88,6 @@ export async function POST(request: NextRequest) {
         errorMessage = errorMsg;
         statusCode = 400;
       }
-      // Check for database connection errors
       else if (errorMsg.includes('connection') || 
                errorMsg.includes('timeout') || 
                errorMsg.includes('network') ||
@@ -104,14 +97,12 @@ export async function POST(request: NextRequest) {
         statusCode = 503;
         console.error('[COMMENTS-POST] Database connection error detected');
       }
-      // Check for rate limiting or overload
       else if (errorMsg.includes('too many') || 
                errorMsg.includes('rate limit') ||
                errorMsg.includes('overload')) {
         errorMessage = 'Hệ thống đang quá tải. Vui lòng thử lại sau ít phút.';
         statusCode = 429;
       }
-      // Check for duplicate errors
       else if (errorMsg.includes('duplicate') || errorMsg.includes('E11000')) {
         errorMessage = 'Bình luận này đã tồn tại. Vui lòng thử lại.';
         statusCode = 409;
@@ -130,7 +121,6 @@ export async function POST(request: NextRequest) {
         isValidation: isValidation,
         database: 'MongoDB',
         timestamp: new Date().toISOString(),
-        // Include retry suggestion for connection errors
         canRetry: statusCode === 503 || statusCode === 429,
         debug: {
           hasMongoUri: !!process.env.MONGODB_URI,

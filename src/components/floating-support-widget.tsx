@@ -19,10 +19,8 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
   const [loadTimeout, setLoadTimeout] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Set client flag to true after hydration
     setIsClient(true);
     
-    // Test primary image availability and fallback if needed
     const initializeQRImage = async () => {
       const primaryAvailable = await testImageAvailability('https://stash.del4yowo.id.vn/qr.png', 3000);
       
@@ -34,12 +32,9 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
       setIsLoading(false);
     };
 
-    // Start the initialization process
     initializeQRImage();
     
-    // Preload QR images for faster loading
     const preloadImage = () => {
-      // Preload primary image
       const primaryLink = document.createElement('link');
       primaryLink.rel = 'preload';
       primaryLink.as = 'image';
@@ -47,7 +42,6 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
       primaryLink.crossOrigin = 'anonymous';
       document.head.appendChild(primaryLink);
 
-      // Preload fallback image
       const fallbackLink = document.createElement('link');
       fallbackLink.rel = 'preload';
       fallbackLink.as = 'image';
@@ -56,7 +50,6 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
       document.head.appendChild(fallbackLink);
     };
     
-    // Preload image after a short delay to not block initial render
     const preloadTimeout = setTimeout(preloadImage, 100);
     
     let timeoutId: NodeJS.Timeout;
@@ -69,11 +62,9 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
       }, 10);
     };
 
-    // Set initial scroll position after client-side hydration
     const initialScrollTop = window.pageYOffset || document.documentElement.scrollTop;
     setScrollTop(initialScrollTop);
     
-    // Add scroll listener
     window.addEventListener('scroll', handleScroll, { passive: true });
     
     return () => {
@@ -102,7 +93,6 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
       setImageError(true);
       setQrImageSrc('https://i.ibb.co/v4MMFJcN/qr.png');
       setIsLoading(false);
-      // Clear timeout if it exists
       if (loadTimeout) {
         clearTimeout(loadTimeout);
         setLoadTimeout(null);
@@ -112,7 +102,6 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
 
   const handleImageLoad = useCallback(() => {
     setIsLoading(false);
-    // Clear timeout on successful load
     if (loadTimeout) {
       clearTimeout(loadTimeout);
       setLoadTimeout(null);
@@ -128,7 +117,6 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
     }
   }, [imageError]);
 
-  // Test image availability with timeout
   const testImageAvailability = useCallback((url: string, timeout: number = 5000): Promise<boolean> => {
     return new Promise((resolve) => {
       const img = new Image();
@@ -152,7 +140,6 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
     });
   }, []);
 
-  // Don't render on server or until client hydration is complete
   if (!isClient) {
     return null;
   }
@@ -161,7 +148,7 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
     <div
       className={cn(
         "absolute left-0 z-50 group",
-        "hidden lg:block", // Only show on desktop/PC
+        "hidden lg:block",
         className
       )}
       style={{
@@ -172,7 +159,6 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      {/* Main Widget Container */}
       <div
         className={cn(
           "relative flex items-center transition-all duration-300 ease-in-out",
@@ -180,7 +166,6 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
           isExpanded ? "translate-x-0" : "-translate-x-2"
         )}
       >
-        {/* Floating Icon Button */}
         <div
           className={cn(
             "relative bg-gradient-to-br from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700",
@@ -194,7 +179,6 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
           tabIndex={0}
           aria-label="Ủng hộ nhóm dịch"
         >
-          {/* Animated Star Icon */}
           <div className="relative">
             <Star 
               className={cn(
@@ -207,13 +191,11 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
             )}
           </div>
           
-          {/* Support Text */}
           <div className="text-[10px] font-medium text-center leading-tight vietnamese-text">
             <div>Ủng Hộ</div>
             <div>Nhóm Dịch</div>
           </div>
           
-          {/* Pulse Animation Ring */}
           <div 
             className={cn(
               "absolute inset-0 rounded-r-xl border-2 border-pink-300/50",
@@ -223,7 +205,6 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
           />
         </div>
 
-        {/* Expanded QR Code Panel */}
         <div
           className={cn(
             "absolute left-full top-1/2 -translate-y-1/2",
@@ -236,7 +217,6 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
               : "opacity-0 scale-95 translate-x-4 invisible"
           )}
         >
-          {/* Panel Header */}
           <div className="text-center mb-4">
             <div className="flex items-center justify-center gap-2 mb-2">
               <Gift className="w-5 h-5 text-pink-600" />
@@ -250,7 +230,6 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
             </p>
           </div>
 
-          {/* QR Code Container */}
           <div 
             className="relative bg-white rounded-xl p-4 shadow-inner border border-gray-100 select-none"
             onContextMenu={(e) => e.preventDefault()}
@@ -289,7 +268,6 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
             </div>
           </div>
 
-          {/* Instructions */}
           <div className="mt-4 text-center">
             <p className="text-xs text-gray-500 vietnamese-text leading-relaxed">
               Cảm ơn bạn đã ủng hộ nhóm!<br />
@@ -297,13 +275,11 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
             </p>
           </div>
 
-          {/* Decorative Elements */}
           <div className="absolute -top-2 -right-2 w-4 h-4 bg-gradient-to-br from-pink-400 to-purple-500 rounded-full opacity-60" />
           <div className="absolute -bottom-2 -left-2 w-3 h-3 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full opacity-60" />
         </div>
       </div>
 
-      {/* Background Overlay (subtle) */}
       {isExpanded && (
         <div 
           className="fixed inset-0 bg-black/5 backdrop-blur-[1px] pointer-events-none -z-10"
@@ -314,7 +290,6 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
   );
 }
 
-// Add custom keyframes for animations
 const styles = `
   @keyframes fadeIn {
     from { opacity: 0; }
@@ -322,7 +297,6 @@ const styles = `
   }
 `;
 
-// Inject styles
 if (typeof document !== 'undefined') {
   const styleSheet = document.createElement('style');
   styleSheet.textContent = styles;

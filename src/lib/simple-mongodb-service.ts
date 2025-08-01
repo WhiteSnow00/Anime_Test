@@ -1,20 +1,14 @@
-// Simplified MongoDB service that avoids client-side issues
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
-// Only run MongoDB code on the server side
 const isServer = typeof window === 'undefined';
 
-// MongoDB connection configuration - using environment variables for security
 const MONGODB_URI = process.env.MONGODB_URI;
 const DATABASE_NAME = process.env.MONGODB_DB_NAME || 'anime_streaming';
 const MAX_POOL_SIZE = parseInt(process.env.MONGODB_MAX_POOL_SIZE || '25');
 const SERVER_SELECTION_TIMEOUT = parseInt(process.env.MONGODB_SERVER_SELECTION_TIMEOUT || '15000');
-// Removed corrupted line
 const MAX_IDLE_TIME = parseInt(process.env.MONGODB_MAX_IDLE_TIME || '1800000');
 
-
-// Validate required environment variables at runtime, not build time
 function validateEnvironment() {
   if (!MONGODB_URI) {
     throw new Error(
@@ -24,7 +18,6 @@ function validateEnvironment() {
   }
 }
 
-// Interfaces
 export interface Comment {
   _id?: string;
   userName: string;
@@ -46,7 +39,6 @@ export interface Admin {
   isActive: boolean;
 }
 
-// Mongoose Schemas - only define on server
 let CommentModel: any = null;
 let AdminModel: any = null;
 
@@ -55,12 +47,12 @@ if (isServer) {
     userName: { type: String, required: true, maxlength: 100 },
     content: { type: String, required: true, maxlength: 1000 },
     timestamp: { type: Date, default: Date.now },
-    isApproved: { type: Boolean, default: true }, // Auto-approve new comments
+    isApproved: { type: Boolean, default: true },
     userAgent: { type: String },
     ipAddress: { type: String, maxlength: 45 },
     episodeViewing: { type: Number }
   }, {
-    collection: 'comments' // Use original collection
+    collection: 'comments'
   });
 
   const adminSchema = new mongoose.Schema({
@@ -74,13 +66,10 @@ if (isServer) {
     collection: 'admins'
   });
 
-  // Create indexes
   commentSchema.index({ timestamp: -1 });
   commentSchema.index({ isApproved: 1 });
   commentSchema.index({ episodeViewing: 1 });
-  // Note: username index is automatically created by unique: true
 
-  // Models
   CommentModel = mongoose.models.Comment || mongoose.model('Comment', commentSchema);
   AdminModel = mongoose.models.Admin || mongoose.model('Admin', adminSchema);
 }
@@ -98,7 +87,6 @@ export class SimpleMongoDBService {
     successfulConnections: 0,
   };
 
-  // Enhanced connection monitoring
   private static logConnectionStatus(message: string, isError = false) {
     if (process.env.ENABLE_DB_LOGGING === 'true') {
       const timestamp = new Date().toISOString();
@@ -112,7 +100,6 @@ export class SimpleMongoDBService {
     }
   }
 
-  // Helper method for retrying database operations
   private static async retryOperation<T>(
     operation: () => Promise<T>,
     operationName: string,
@@ -122,7 +109,6 @@ export class SimpleMongoDBService {
     
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
-        // Ensure connection is healthy before operation
         if (!this.isConnected || mongoose.connection.readyState !== 1) {
           this.logConnectionStatus(`Reconnecting before ${operationName} (attempt ${attempt + 1})`);
           await this.connect();
@@ -143,20 +129,16 @@ export class SimpleMongoDBService {
           true
         );
         
-        // Check if this is a connection-related error that we should retry
         const isRetryableError = this.isRetryableError(lastError);
         
         if (!isRetryableError || attempt === maxRetries - 1) {
-          // Don't retry non-retryable errors or on last attempt
           break;
         }
         
-        // Wait before retrying with exponential backoff
         const delay = this.calculateBackoffDelay(attempt);
         this.logConnectionStatus(`Retrying ${operationName} in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
         
-        // Mark connection as potentially broken
         this.isConnected = false;
       }
     }
@@ -166,7 +148,6 @@ export class SimpleMongoDBService {
     );
   }
 
-  // Check if error is retryable
   private static isRetryableError(error: Error): boolean {
     const retryableErrors = [
       'MongoServerSelectionError',
@@ -188,12 +169,10 @@ export class SimpleMongoDBService {
     );
   }
 
-  // Calculate exponential backoff delay
   private static calculateBackoffDelay(attempt: number): number {
     return Math.min(this.RECONNECT_DELAY_BASE * Math.pow(2, attempt), 30000);
   }
 
-  // Get connection health status
   static getConnectionHealth() {
     return {
       ...this.connectionHealth,
@@ -210,7 +189,6 @@ export class SimpleMongoDBService {
     };
   }
 
-  // Test MongoDB connection with retry logic
   static async testConnection(): Promise<boolean> {
     if (!isServer) return false;
     
@@ -219,7 +197,6 @@ export class SimpleMongoDBService {
         await this.connect();
       }
       
-      // Simple ping test with timeout
       const pingPromise = new Promise<boolean>((resolve) => {
         if (mongoose.connection.readyState === 1) {
           this.connectionHealth.status = 'connected';
@@ -255,14 +232,11 @@ export class SimpleMongoDBService {
     }
   }
 
-  // Connect to MongoDB with retry logic and enhanced monitoring
   static async connect(): Promise<void> {
     if (!isServer) throw new Error('MongoDB operations are server-side only');
     
-    // Validate environment variables at runtime
     validateEnvironment();
     
-    // Check if already connected
     if (this.isConnected && mongoose.connection.readyState === 1) {
       this.logConnectionStatus('Already connected to MongoDB');
       return;
@@ -281,12 +255,10 @@ export class SimpleMongoDBService {
             maxPoolSize: MAX_POOL_SIZE,
             serverSelectionTimeoutMS: SERVER_SELECTION_TIMEOUT,
             maxIdleTimeMS: MAX_IDLE_TIME,
-            // Additional optimizations for MongoDB Atlas free tier
             retryWrites: true,
             w: 'majority',
             readPreference: 'primary',
             compressors: ['zlib'],
-            // Connection monitoring
             heartbeatFrequencyMS: 10000,
           });
         }
@@ -297,7 +269,6 @@ export class SimpleMongoDBService {
         this.connectionHealth.errorCount = 0;
         this.logConnectionStatus(`Connected to MongoDB successfully (attempt ${attempt + 1})`);
         
-        // Set up connection event listeners
         this.setupConnectionEventListeners();
         return;
         
@@ -310,7 +281,6 @@ export class SimpleMongoDBService {
           true
         );
 
-        // If this isn't the last attempt, wait before retrying
         if (attempt < this.MAX_RECONNECT_ATTEMPTS - 1) {
           const delay = this.calculateBackoffDelay(attempt);
           this.logConnectionStatus(`Retrying in ${delay}ms...`);
@@ -319,7 +289,6 @@ export class SimpleMongoDBService {
       }
     }
 
-    // All attempts failed
     this.connectionHealth.status = 'error';
     this.isConnected = false;
     throw new Error(
@@ -329,7 +298,6 @@ export class SimpleMongoDBService {
     );
   }
 
-  // Set up connection event listeners for monitoring
   private static setupConnectionEventListeners(): void {
     if (mongoose.connection.listeners('error').length === 0) {
       mongoose.connection.on('error', (error) => {
@@ -359,14 +327,12 @@ export class SimpleMongoDBService {
     }
   }
 
-  // Initialize database collections and indexes
   static async initDatabase(): Promise<void> {
     if (!isServer) throw new Error('Database initialization is server-side only');
     
     try {
       await this.connect();
 
-      // Create default admin if none exists
       if (AdminModel) {
         const adminCount = await AdminModel.countDocuments();
         if (adminCount === 0) {
@@ -381,7 +347,6 @@ export class SimpleMongoDBService {
     }
   }
 
-  // Create default admin accounts
   static async createDefaultAdmins(): Promise<void> {
     if (!isServer || !AdminModel) return;
     
@@ -410,13 +375,12 @@ export class SimpleMongoDBService {
     }
   }
 
-  // Comment operations
   static async getComments(): Promise<Comment[]> {
     if (!isServer || !CommentModel) return [];
     
     return this.retryOperation(
       async () => {
-        const comments = await CommentModel.find() // Show all comments (approved and pending)
+        const comments = await CommentModel.find()
           .sort({ timestamp: -1 })
           .lean();
         
@@ -485,14 +449,12 @@ export class SimpleMongoDBService {
     try {
       await this.connect();
       
-      // First get the current approval status
       const comment = await CommentModel.findOne({ _id: commentId });
       if (!comment) {
         console.error('Comment not found:', commentId);
         return false;
       }
       
-      // Toggle the approval status
       const newApprovalStatus = !comment.isApproved;
       const result = await CommentModel.updateOne(
         { _id: commentId },
@@ -520,7 +482,6 @@ export class SimpleMongoDBService {
     }
   }
 
-  // Admin operations
   static async validateAdmin(username: string, password: string): Promise<Admin | null> {
     if (!isServer || !AdminModel) return null;
     
@@ -540,7 +501,6 @@ export class SimpleMongoDBService {
         return null;
       }
 
-      // Update last login
       await AdminModel.updateOne(
         { _id: admin._id },
         { lastLogin: new Date() }
@@ -561,12 +521,10 @@ export class SimpleMongoDBService {
     }
   }
 
-  // Admin methods
   static async getAllCommentsAdmin(password: string): Promise<{comments: Comment[], stats: any} | null> {
     if (!isServer || !CommentModel) throw new Error('Server-side only operation');
     
     try {
-      // Validate admin password first
       const admin = await this.validateAdmin('admin', password);
       if (!admin) {
         return null;
@@ -574,18 +532,15 @@ export class SimpleMongoDBService {
 
       await this.connect();
       
-      // Get all comments (approved and unapproved)
       const comments = await CommentModel.find({})
         .sort({ timestamp: -1 })
         .lean()
         .exec();
       
-      // Calculate stats
       const totalComments = comments.length;
       const approvedComments = comments.filter((c: any) => c.isApproved).length;
       const pendingComments = totalComments - approvedComments;
       
-      // Calculate comments from today
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const commentsToday = comments.filter((c: any) => {
@@ -620,7 +575,6 @@ export class SimpleMongoDBService {
     }
   }
 
-  // Migration helper
   static async migrateFromPostgreSQL(postgresComments: any[]): Promise<void> {
     if (!isServer || !CommentModel) throw new Error('Server-side only operation');
     
@@ -638,8 +592,6 @@ export class SimpleMongoDBService {
           episodeViewing: pgComment.episode_viewing || pgComment.episodeViewing
         };
 
-        // Check if comment already exists (skip for migration since we don't have original _id)
-        // Just create the comment - duplicates will be handled by MongoDB
         await CommentModel.create(mongoComment);
       }
       
@@ -649,7 +601,6 @@ export class SimpleMongoDBService {
     }
   }
 
-  // Close connections
   static async disconnect(): Promise<void> {
     if (!isServer) return;
     
@@ -666,5 +617,4 @@ export class SimpleMongoDBService {
   }
 }
 
-// Export singleton instance
 export const mongoDbService = new SimpleMongoDBService();

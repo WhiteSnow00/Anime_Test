@@ -1,8 +1,3 @@
-/**
- * Video Server Utilities
- * Handles server status checking, URL generation, and fallback logic
- */
-
 export type ServerType = 'hls' | 'helvid' | 'hydax';
 export type ServerStatus = 'online' | 'offline' | 'error' | 'checking';
 
@@ -23,7 +18,6 @@ export interface ServerConfig {
   fallbackServers: ServerType[];
 }
 
-// Server configurations with corrected URLs
 export const SERVER_CONFIGS: Record<ServerType, ServerConfig> = {
   hls: {
     name: 'HLS Stream',
@@ -55,9 +49,6 @@ export const SERVER_CONFIGS: Record<ServerType, ServerConfig> = {
 const serverErrors = new Map<string, VideoServerError>();
 const serverStatus = new Map<ServerType, ServerStatus>();
 
-/**
- * Generate the correct URL for a video server
- */
 export function generateVideoUrl(
   server: ServerType,
   videoId: string,
@@ -74,15 +65,12 @@ export function generateVideoUrl(
 
   switch (server) {
     case 'hls':
-      // HLS uses the m3u8 filename as videoId
       generatedUrl = `${config.baseUrl}?file=${videoId}`;
       break;
     case 'helvid':
-      // Helvid uses direct ID in path
       generatedUrl = `${config.baseUrl}${videoId}`;
       break;
     case 'hydax':
-      // Hydax uses short.icu with the video ID
       generatedUrl = `${config.baseUrl}${videoId}`;
       break;
     default:
@@ -94,20 +82,12 @@ export function generateVideoUrl(
   return generatedUrl;
 }
 
-/**
- * Check if a video URL is accessible
- */
 export async function checkVideoUrl(url: string, timeout: number = 5000): Promise<boolean> {
   try {
-    // For iframe-based servers, we can't directly fetch due to CORS
-    // Instead, we'll use a different approach
     if (url.includes('helvid.net') || url.includes('short.icu')) {
-      // For external iframe servers, we assume they're working unless proven otherwise
-      // The actual error detection happens in the video player component
       return true;
     }
     
-    // For HLS, we can check the m3u8 file
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
     
@@ -124,28 +104,18 @@ export async function checkVideoUrl(url: string, timeout: number = 5000): Promis
   }
 }
 
-/**
- * Get server status with caching
- */
 export function getServerStatus(server: ServerType): ServerStatus {
   return serverStatus.get(server) || 'checking';
 }
 
-/**
- * Update server status
- */
 export function updateServerStatus(server: ServerType, status: ServerStatus) {
   serverStatus.set(server, status);
 }
 
-/**
- * Record a server error
- */
 export function recordServerError(error: VideoServerError) {
   const key = `${error.server}-${error.episodeId}`;
   serverErrors.set(key, error);
   
-  // Update server status based on errors
   const serverErrorCount = Array.from(serverErrors.values()).filter(
     (e) => e.server === error.server && Date.now() - e.timestamp < 300000 // 5 minutes
   ).length;
@@ -155,9 +125,6 @@ export function recordServerError(error: VideoServerError) {
   }
 }
 
-/**
- * Get error for a specific server and episode
- */
 export function getServerError(server: ServerType, episodeId: number): VideoServerError | null {
   const key = `${server}-${episodeId}`;
   const error = serverErrors.get(key);
@@ -169,9 +136,6 @@ export function getServerError(server: ServerType, episodeId: number): VideoServ
   return null;
 }
 
-/**
- * Clear old errors
- */
 export function clearOldErrors() {
   const now = Date.now();
   for (const [key, error] of serverErrors.entries()) {
@@ -181,9 +145,6 @@ export function clearOldErrors() {
   }
 }
 
-/**
- * Get the next fallback server
- */
 export function getNextFallbackServer(
   currentServer: ServerType,
   triedServers: ServerType[] = []
@@ -197,15 +158,11 @@ export function getNextFallbackServer(
     return null;
   }
   
-  // Sort by priority and return the best available
   return availableServers.sort(
     (a, b) => SERVER_CONFIGS[a].priority - SERVER_CONFIGS[b].priority
   )[0];
 }
 
-/**
- * Test all servers for an episode and return the best working one
- */
 export async function findBestServer(
   episode: {
     servers: {
@@ -218,7 +175,6 @@ export async function findBestServer(
 ): Promise<ServerType | null> {
   const servers: ServerType[] = ['hls', 'helvid', 'hydax'];
   
-  // Try preferred server first
   if (preferredServer && episode.servers[preferredServer]) {
     const url = generateVideoUrl(preferredServer, episode.servers[preferredServer]!);
     const isWorking = await checkVideoUrl(url, 3000);
@@ -228,7 +184,6 @@ export async function findBestServer(
     }
   }
   
-  // Try other servers by priority
   const sortedServers = servers
     .filter((s) => s !== preferredServer && episode.servers[s])
     .sort((a, b) => SERVER_CONFIGS[a].priority - SERVER_CONFIGS[b].priority);
@@ -251,9 +206,6 @@ export async function findBestServer(
   return null;
 }
 
-/**
- * Get user-friendly error message
- */
 export function getErrorMessage(error: VideoServerError, locale: 'vi' | 'en' = 'vi'): string {
   const messages = {
     vi: {
@@ -285,9 +237,6 @@ export function getErrorMessage(error: VideoServerError, locale: 'vi' | 'en' = '
   return messages[locale][errorType as keyof typeof messages.vi];
 }
 
-/**
- * Enhanced iframe error detection for external video servers
- */
 export function createIframeErrorDetector(
   iframe: HTMLIFrameElement,
   server: ServerType,
@@ -298,27 +247,22 @@ export function createIframeErrorDetector(
   let timeoutId: NodeJS.Timeout;
   let isDestroyed = false;
   
-  // Create a more generous load timeout for external servers
   const loadTimeout = () => {
     const timeout = server === 'hls' ? 10000 : 20000; // 20 seconds for external servers
     timeoutId = setTimeout(() => {
       if (!hasLoaded && !isDestroyed) {
         console.warn(`Video load timeout after ${timeout}ms: ${server} - ${videoId}`);
-        // Only call onError for actual timeout issues, not just slow loading
-        // Allow more time for iframe content to load
         const extendedTimeoutId = setTimeout(() => {
           if (!hasLoaded && !isDestroyed) {
             onError(`Failed to load video: ${server} - ${videoId} (timeout)`);
           }
         }, 10000); // Additional 10 seconds
         
-        // Store the extended timeout for cleanup
         (timeoutId as any).extended = extendedTimeoutId;
       }
     }, timeout);
   };
   
-  // Listen for successful load
   const handleLoad = () => {
     if (isDestroyed) return;
     
@@ -330,30 +274,24 @@ export function createIframeErrorDetector(
     
     console.log(`Iframe loaded successfully: ${server} - ${videoId}`);
     
-    // For external servers, do a delayed check to ensure content is actually playable
     if (server !== 'hls') {
       setTimeout(() => {
         if (isDestroyed) return;
         try {
-          // Try to access iframe content (will fail for CORS, but that's expected)
           if (iframe.contentWindow) {
-            // CORS error is expected and means the iframe loaded successfully
             console.log(`Iframe content verified: ${server} - ${videoId}`);
           }
         } catch (e) {
-          // CORS error is expected for external servers
           if (e instanceof DOMException && e.name === 'SecurityError') {
             console.log(`Iframe loaded successfully (CORS expected): ${server} - ${videoId}`);
           } else {
             console.warn(`Unexpected iframe error: ${e}`);
-            // Don't trigger error for unexpected issues during verification
           }
         }
       }, 2000); // Wait 2 seconds before verification
     }
   };
   
-  // Listen for errors - but be more selective about what constitutes an error
   const handleError = (event: Event) => {
     if (isDestroyed) return;
     
@@ -366,14 +304,11 @@ export function createIframeErrorDetector(
     onError(`Failed to load video: ${server} - ${videoId} (iframe error)`);
   };
   
-  // Attach listeners
   iframe.addEventListener('load', handleLoad);
   iframe.addEventListener('error', handleError);
   
-  // Start timeout
   loadTimeout();
   
-  // Return cleanup function
   return () => {
     isDestroyed = true;
     clearTimeout(timeoutId);
@@ -385,9 +320,6 @@ export function createIframeErrorDetector(
   };
 }
 
-/**
- * Check if an episode's server URLs are valid
- */
 export function validateEpisodeServers(episode: {
   id: number;
   servers: {
@@ -402,19 +334,16 @@ export function validateEpisodeServers(episode: {
     hydax: false,
   };
   
-  // Validate HLS
   if (episode.servers.hls && episode.servers.hls.endsWith('.m3u8')) {
     validation.hls = true;
   }
   
-  // Validate Helvid (should be 12 character hex string)
   if (episode.servers.helvid && /^[a-f0-9]{12}$/.test(episode.servers.helvid)) {
     validation.helvid = true;
   } else {
     console.warn(`Invalid Helvid ID for episode ${episode.id}: ${episode.servers.helvid}`);
   }
   
-  // Validate Hydax (should be alphanumeric string of 8-10 characters)
   if (episode.servers.hydax && /^[a-zA-Z0-9_-]{8,10}$/.test(episode.servers.hydax)) {
     validation.hydax = true;
   } else {
@@ -424,23 +353,16 @@ export function validateEpisodeServers(episode: {
   return validation;
 }
 
-/**
- * Get server reliability score based on recent errors
- */
 export function getServerReliabilityScore(server: ServerType): number {
   const now = Date.now();
   const recentErrors = Array.from(serverErrors.values()).filter(
     (error) => error.server === server && (now - error.timestamp) < 300000 // 5 minutes
   );
   
-  // Base score is 100, subtract 20 for each recent error
   const score = Math.max(0, 100 - (recentErrors.length * 20));
   return score;
 }
 
-/**
- * Get the best available server based on reliability and priority
- */
 export function getBestAvailableServer(
   episode: {
     servers: {
@@ -463,7 +385,6 @@ export function getBestAvailableServer(
       priority: SERVER_CONFIGS[server].priority
     }))
     .sort((a, b) => {
-      // Sort by reliability first, then by priority
       if (a.reliability !== b.reliability) {
         return b.reliability - a.reliability;
       }
@@ -473,7 +394,6 @@ export function getBestAvailableServer(
   return availableServers.length > 0 ? availableServers[0].server : null;
 }
 
-// Clean up old errors periodically
 if (typeof window !== 'undefined') {
   setInterval(clearOldErrors, 60000); // Every minute
 }
