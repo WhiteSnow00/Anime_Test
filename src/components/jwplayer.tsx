@@ -30,6 +30,24 @@ export function JWPlayerComponent({
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const playerInstanceRef = useRef<any>(null);
 
+  // Mobile detection helper function
+  const isMobileDevice = useCallback((): boolean => {
+    if (typeof window === 'undefined') return false;
+    
+    try {
+      // Feature-based detection
+      const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      const isSmallScreen = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+      const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      
+      // Combine multiple detection methods for accuracy
+      return (hasTouch && isSmallScreen) || isMobileUA;
+    } catch (e) {
+      console.warn('Error detecting mobile device:', e);
+      return false;
+    }
+  }, []);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -37,7 +55,7 @@ export function JWPlayerComponent({
 
     const showCustomContextMenu = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (target.tagName === 'VIDEO' || target.closest('#kana-jwplayer')) {
+      if (target && ((target.tagName === 'VIDEO') || (target.closest && target.closest('#kana-jwplayer')))) {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
@@ -92,7 +110,7 @@ export function JWPlayerComponent({
 
     const blockContextMenu = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (target.tagName === 'VIDEO' || target.closest('#kana-jwplayer')) {
+      if (target && ((target.tagName === 'VIDEO') || (target.closest && target.closest('#kana-jwplayer')))) {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
@@ -169,7 +187,7 @@ export function JWPlayerComponent({
 
     const preventSelection = (e: Event) => {
       const target = e.target as HTMLElement;
-      if (target.closest('#kana-jwplayer')) {
+      if (target && target.closest && target.closest('#kana-jwplayer')) {
         e.preventDefault();
         return false;
       }
@@ -177,7 +195,7 @@ export function JWPlayerComponent({
 
     const preventDrag = (e: DragEvent) => {
       const target = e.target as HTMLElement;
-      if (target.tagName === 'VIDEO' || target.closest('#kana-jwplayer')) {
+      if (target && ((target.tagName === 'VIDEO') || (target.closest && target.closest('#kana-jwplayer')))) {
         e.preventDefault();
         return false;
       }
@@ -185,7 +203,7 @@ export function JWPlayerComponent({
 
     const blockKeyboardShortcuts = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
-      if (target.closest('#kana-jwplayer')) {
+      if (target && target.closest && target.closest('#kana-jwplayer')) {
         if (e.key === 'F12' || 
             (e.ctrlKey && e.shiftKey && e.key === 'I') ||
             (e.ctrlKey && e.key === 'u') ||
@@ -766,6 +784,95 @@ export function JWPlayerComponent({
           return video.canPlayType('application/vnd.apple.mpegurl') !== '';
         })();
 
+        // Check if it's a mobile device
+        const isMobile = isMobileDevice();
+        console.log('Device type:', isMobile ? 'Mobile' : 'Desktop');
+
+        // Base HLS configuration
+        let hlsConfig = {
+          enableWorker: false,
+          lowLatencyMode: false,
+          backBufferLength: 10,
+          maxBufferLength: 20,
+          maxMaxBufferLength: 40,
+          maxBufferSize: 10 * 1000 * 1000, // 10MB buffer
+          maxBufferHole: 0.5,
+          highBufferWatchdogPeriod: 3,
+          nudgeOffset: 0.1,
+          nudgeMaxRetry: 3,
+          maxSeekHole: 2,
+          seekHoleNudgeDuration: 0.1,
+          maxFragLookUpTolerance: 0.25,
+          liveSyncDurationCount: 3,
+          liveMaxLatencyDurationCount: 6,
+          enableSoftwareAES: false,
+          manifestLoadingTimeOut: 10000,
+          manifestLoadingMaxRetry: 3,
+          manifestLoadingRetryDelay: 1000,
+          fragmentLoadingTimeOut: 20000,
+          fragmentLoadingMaxRetry: 6,
+          fragmentLoadingRetryDelay: 1000,
+          startFragPrefetch: false, 
+          testBandwidth: false,
+          progressive: false, // Disable for HLS
+          abrEwmaFastLive: 3.0,
+          abrEwmaSlowLive: 9.0,
+          abrEwmaFastVoD: 3.0,
+          abrEwmaSlowVoD: 9.0,
+          maxStarvationDelay: 4,
+          maxLoadingDelay: 4,
+          startLevel: -1,
+          capLevelToPlayerSize: false,
+          xhrSetup: function(xhr: any, url: any) {
+            xhr.setRequestHeader('Accept', '*/*');
+            xhr.withCredentials = false;
+            
+            if (url.includes('tiktokcdn.com')) {
+              return;
+            }
+            
+            if (url.startsWith('/api/') || url.startsWith(window.location.origin)) {
+              xhr.setRequestHeader('Cache-Control', 'no-cache');
+              xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+            }
+          }
+        };
+
+        // Apply mobile-specific optimizations
+        if (isMobile) {
+          console.log('Applying mobile-specific HLS optimizations');
+          hlsConfig = {
+            ...hlsConfig,
+            // Enable worker for better performance on mobile
+            enableWorker: true,
+            // Increase buffer sizes for mobile to prevent freezing during seek
+            maxBufferLength: 30,
+            maxMaxBufferLength: 60,
+            backBufferLength: 30, // Keep more data in back buffer for scrubbing
+            maxBufferSize: 20 * 1000 * 1000, // 20MB buffer for mobile
+            // Increase tolerance for seek operations
+            maxSeekHole: 5,
+            seekHoleNudgeDuration: 0.5,
+            maxFragLookUpTolerance: 0.5,
+            // Reduce stall delays
+            maxStarvationDelay: 2,
+            maxLoadingDelay: 2,
+            // Mobile-optimized fragment loading
+            fragmentLoadingTimeOut: 30000, // More time for mobile networks
+            fragmentLoadingMaxRetry: 10,
+            fragmentLoadingRetryDelay: 500,
+            // Enable fragment prefetching on mobile
+            startFragPrefetch: true,
+            // Lower initial quality for faster start
+            startLevel: 0,
+            // Optimize ABR for mobile
+            abrEwmaFastVoD: 5.0,
+            abrEwmaSlowVoD: 15.0,
+            // Enable bandwidth testing
+            testBandwidth: true
+          };
+        }
+
         playerConfig = {
           ...playerConfig,
           file: videoUrl,
@@ -774,61 +881,14 @@ export function JWPlayerComponent({
           enableNativeHls: isNativeHLSSupported,
           safarihlsjs: false,
           title: `Episode ${videoId}`,
-          hlshtml5: {
-            enableWorker: false,
-            lowLatencyMode: false,
-            backBufferLength: 10,
-            maxBufferLength: 20,
-            maxMaxBufferLength: 40,
-            maxBufferSize: 10 * 1000 * 1000, // 10MB buffer
-            maxBufferHole: 0.5,
-            highBufferWatchdogPeriod: 3,
-            nudgeOffset: 0.1,
-            nudgeMaxRetry: 3,
-            maxSeekHole: 2,
-            seekHoleNudgeDuration: 0.1,
-            maxFragLookUpTolerance: 0.25,
-            liveSyncDurationCount: 3,
-            liveMaxLatencyDurationCount: 6,
-            enableSoftwareAES: false,
-            manifestLoadingTimeOut: 10000,
-            manifestLoadingMaxRetry: 3,
-            manifestLoadingRetryDelay: 1000,
-            fragmentLoadingTimeOut: 20000,
-            fragmentLoadingMaxRetry: 6,
-            fragmentLoadingRetryDelay: 1000,
-            startFragPrefetch: false, 
-            testBandwidth: false,
-            progressive: false, // Disable for HLS
-            abrEwmaFastLive: 3.0,
-            abrEwmaSlowLive: 9.0,
-            abrEwmaFastVoD: 3.0,
-            abrEwmaSlowVoD: 9.0,
-            maxStarvationDelay: 4,
-            maxLoadingDelay: 4,
-            startLevel: -1,
-            capLevelToPlayerSize: false,
-            xhrSetup: function(xhr: any, url: any) {
-              xhr.setRequestHeader('Accept', '*/*');
-              xhr.withCredentials = false;
-              
-              if (url.includes('tiktokcdn.com')) {
-                return;
-              }
-              
-              if (url.startsWith('/api/') || url.startsWith(window.location.origin)) {
-                xhr.setRequestHeader('Cache-Control', 'no-cache');
-                xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-              }
-            }
-          },
+          hlshtml5: hlsConfig,
           buffering: {
             enabled: true,
-            length: 5,
-            position: 2
+            length: isMobile ? 10 : 5, // Longer buffer for mobile
+            position: isMobile ? 5 : 2  // More aggressive buffering on mobile
           },
-          preload: "metadata", 
-          bandwidthEstimate: 500000, 
+          preload: isMobile ? "auto" : "metadata", // Auto preload on mobile
+          bandwidthEstimate: isMobile ? 1000000 : 500000, // Higher estimate for mobile
           bitrateSelection: "auto"
         };
       } else {
@@ -1223,7 +1283,7 @@ export function JWPlayerComponent({
       setError('Khởi tạo player thất bại');
       setIsLoading(false);
     }
-  }, [videoId, server, autoPlay, muted, onLoad, onError, getVideoUrl, protectVideoElement]);
+  }, [videoId, server, autoPlay, muted, onLoad, onError, getVideoUrl, protectVideoElement, isMobileDevice]);
 
   useEffect(() => {
     let scriptLoaded = false;

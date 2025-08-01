@@ -185,7 +185,7 @@ const handleServerError = useCallback((error: string) => {
           <Alert className="mx-3 sm:mx-0 border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
             <Info className="h-4 w-4 text-amber-600 dark:text-amber-400" />
             <AlertDescription className="text-xs sm:text-sm text-amber-800 dark:text-amber-200 vietnamese-text leading-relaxed ml-1">
-              Web vừa cập nhật server video mới, nếu gặp lỗi gì xin hãy comment hoặc thông báo trên Discord của Fanpage KaoruHana 
+              Web vừa cập nhật server video mới, nếu gặp lỗi gì xin hãy comment hoặc thông báo trên Discord. Xem trên PC để có trải nghiệm tốt nhất. 
             </AlertDescription>
           </Alert>
         </div>
