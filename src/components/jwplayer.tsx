@@ -30,18 +30,11 @@ export function JWPlayerComponent({
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const playerInstanceRef = useRef<any>(null);
 
-  // Mobile device detection
   const isMobileDevice = () => {
     if (typeof window === 'undefined') return false;
-    
-    // Check if it has touch capability
     const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    
-    // Check user agent for mobile devices
     const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
     const mobileRegex = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i;
-    
-    // Check screen size
     const isSmallScreen = window.innerWidth <= 768;
     
     return hasTouch && (mobileRegex.test(userAgent.toLowerCase()) || isSmallScreen);
@@ -49,16 +42,10 @@ export function JWPlayerComponent({
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-
-    // Skip all protection features on mobile for better performance
     const isMobile = isMobileDevice();
-    if (isMobile) {
-      console.log('Skipping protection features on mobile device');
-      return;
-    }
-
-    let customContextMenu: HTMLElement | null = null;
-    const showCustomContextMenu = (e: MouseEvent) => {
+    if (!isMobile) {
+      let customContextMenu: HTMLElement | null = null;
+      const showCustomContextMenu = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (target.tagName === 'VIDEO' || target.closest('#kana-jwplayer')) {
         e.preventDefault();
@@ -631,6 +618,9 @@ export function JWPlayerComponent({
       observer.disconnect();
       clearInterval(decoyInterval);
     };
+    } else {
+      console.log('Mobile device detected - protection features disabled for performance');
+    }
   }, []); 
 
   const getVideoUrl = useCallback(() => {
@@ -646,6 +636,10 @@ export function JWPlayerComponent({
   }, [videoId, server]);
 
   const protectVideoElement = useCallback((video: HTMLVideoElement) => {
+    if (isMobileDevice()) {
+      return;
+    }
+    
     try {
       if (!video || !(video instanceof HTMLVideoElement) || !video.nodeType) {
         return;
