@@ -33,6 +33,13 @@ export function JWPlayerComponent({
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
+    // Skip all protection features on mobile for better performance
+    const isMobile = isMobileDevice();
+    if (isMobile) {
+      console.log('Skipping protection features on mobile device');
+      return;
+    }
+
     let customContextMenu: HTMLElement | null = null;
     const showCustomContextMenu = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
