@@ -838,38 +838,34 @@ export function JWPlayerComponent({
           }
         };
 
-        // Apply mobile-specific optimizations
         if (isMobile) {
           console.log('Applying mobile-specific HLS optimizations');
           hlsConfig = {
             ...hlsConfig,
-            // Enable worker for better performance on mobile
-            enableWorker: true,
-            // Increase buffer sizes for mobile to prevent freezing during seek
-            maxBufferLength: 30,
-            maxMaxBufferLength: 60,
-            backBufferLength: 30, // Keep more data in back buffer for scrubbing
-            maxBufferSize: 20 * 1000 * 1000, // 20MB buffer for mobile
-            // Increase tolerance for seek operations
-            maxSeekHole: 5,
+            enableWorker: false, // Disable worker to avoid potential mobile issues
+            maxBufferLength: 10, // Reduce for faster loading
+            maxMaxBufferLength: 20, // Keep minimal for quick start
+            backBufferLength: 30, // Keep higher back buffer for seeking
+            maxBufferSize: 15 * 1000 * 1000, // 15MB - balance between performance and seeking
+            maxBufferHole: 1.0, // More tolerant of buffer holes
+            maxSeekHole: 10, // Very tolerant of seek holes
             seekHoleNudgeDuration: 0.5,
             maxFragLookUpTolerance: 0.5,
-            // Reduce stall delays
-            maxStarvationDelay: 2,
-            maxLoadingDelay: 2,
-            // Mobile-optimized fragment loading
-            fragmentLoadingTimeOut: 30000, // More time for mobile networks
-            fragmentLoadingMaxRetry: 10,
+            maxStarvationDelay: 1,
+            maxLoadingDelay: 1,
+            fragmentLoadingTimeOut: 20000,
+            fragmentLoadingMaxRetry: 6,
             fragmentLoadingRetryDelay: 500,
-            // Enable fragment prefetching on mobile
-            startFragPrefetch: true,
-            // Lower initial quality for faster start
-            startLevel: 0,
-            // Optimize ABR for mobile
-            abrEwmaFastVoD: 5.0,
-            abrEwmaSlowVoD: 15.0,
-            // Enable bandwidth testing
-            testBandwidth: true
+            startFragPrefetch: false, // Disable for faster initial load
+            startLevel: -1, // Auto select quality
+            abrEwmaFastVoD: 3.0,
+            abrEwmaSlowVoD: 9.0,
+            testBandwidth: false, // Skip bandwidth test for faster start
+            // Additional mobile optimizations
+            forceKeyFrameOnDiscontinuity: true,
+            abrBandWidthFactor: 0.95,
+            abrBandWidthUpFactor: 0.7,
+            lowLatencyMode: false
           };
         }
 
@@ -884,11 +880,11 @@ export function JWPlayerComponent({
           hlshtml5: hlsConfig,
           buffering: {
             enabled: true,
-            length: isMobile ? 10 : 5, // Longer buffer for mobile
-            position: isMobile ? 5 : 2  // More aggressive buffering on mobile
+            length: isMobile ? 10 : 5, 
+            position: isMobile ? 5 : 2  
           },
-          preload: isMobile ? "auto" : "metadata", // Auto preload on mobile
-          bandwidthEstimate: isMobile ? 1000000 : 500000, // Higher estimate for mobile
+          preload: isMobile ? "auto" : "metadata", 
+          bandwidthEstimate: isMobile ? 1000000 : 500000, 
           bitrateSelection: "auto"
         };
       } else {
