@@ -23,26 +23,21 @@ function EpisodeSelectorComponent({
   onSelectEpisode,
   className,
 }: EpisodeSelectorProps) {
-  // Track hydration to prevent SSR mismatch
-  const [isHydrated, setIsHydrated] = useState(false);
+const [isHydrated, setIsHydrated] = useState(false);
   const viewport = useViewport();
 
   useEffect(() => {
     setIsHydrated(true);
   }, []);
 
-  // Use static grid for SSR, then responsive after hydration
-  const gridConfig = useMemo(() => {
+const gridConfig = useMemo(() => {
     if (!isHydrated) {
-      // Static configuration for SSR to prevent hydration mismatch
       return {
         columns: 6,
         className: "grid-cols-6 md:grid-cols-8",
         buttonSize: "h-12 w-full text-sm",
       };
     }
-
-    // Dynamic configuration after hydration
     const { width, isMobile, isTablet } = viewport;
     
     if (isMobile) {
@@ -66,16 +61,13 @@ function EpisodeSelectorComponent({
     }
   }, [viewport, isHydrated]);
 
-  // Enhanced episode selection with performance optimization
-  const handleEpisodeSelect = useCallback(
+const handleEpisodeSelect = useCallback(
     fp.compose(
       fp.debounce,
       (episode: Episode) => {
-        // Performance measurement
         const measure = performanceUtils.measure((ep: Episode) => {
           onSelectEpisode(ep);
         }, 'Episode Selection');
-        
         measure(episode);
       }
     ),

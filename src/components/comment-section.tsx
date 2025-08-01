@@ -14,7 +14,7 @@ import { MessageCircle, User, Clock, Send, Loader2, Smile, ChevronDown, Play, Ch
 import { cn } from '@/lib/utils';
 
 interface CommentSectionProps {
-  currentEpisodeId?: number; // Track current episode being watched
+  currentEpisodeId?: number;
   className?: string;
 }
 

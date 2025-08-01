@@ -23,64 +23,41 @@ import { withPerformanceOptimization, withErrorBoundary } from '@/lib/higher-ord
 import { FloatingSupportWidget } from './floating-support-widget';
 
 function AnimePageComponent() {
-  // Track hydration to avoid hydration mismatch
-  const [isHydrated, setIsHydrated] = useState(false);
+const [isHydrated, setIsHydrated] = useState(false);
   
   useEffect(() => {
     setIsHydrated(true);
-    
-    // Clear the download position flag after user returns to the page
-    // This ensures the download position only affects the initial load
     const timeoutId = setTimeout(() => {
       clearEpisodePosition();
     }, 1000);
-    
     return () => clearTimeout(timeoutId);
   }, []);
 
-  // Server state management
-  const [currentServer, setCurrentServer] = useState<ServerType>('hls');
+const [currentServer, setCurrentServer] = useState<ServerType>('hls');
 
-  // Handle server change
   const handleServerChange = useCallback((server: ServerType) => {
     setCurrentServer(server);
   }, []);
 
-  // Get current video ID based on selected server with fallback logic
-  const getCurrentVideoId = useCallback((episode: Episode) => {
-    // Check if current server has video ID for this episode
+const getCurrentVideoId = useCallback((episode: Episode) => {
     const serverKey = currentServer as keyof typeof episode.servers;
     const currentVideoId = episode.servers[serverKey];
     if (currentVideoId) {
       return currentVideoId;
     }
-    
-    // If current server doesn't have video ID, fallback to HLS
     return episode.servers.hls || '';
   }, [currentServer]);
 
-  // Initialize advanced state management
-  const { state, actions, computed } = useAnimeState(animeData);
-
-  // Use the current episode from useAnimeState directly
+const { state, actions, computed } = useAnimeState(animeData);
   const currentEpisode = state.currentEpisode || animeData.episodes[0];
   const currentSection = state.currentSection;
 
-  // Keep current server selection when episode changes (don't force reset)
-  // This allows users to maintain their preferred server choice
-
-  // Handle server errors and auto-fallback
-  const handleServerError = useCallback((error: string) => {
+const handleServerError = useCallback((error: string) => {
     console.error('Server error:', error);
-    
-    // Only trigger fallback for critical HLS errors, not timeouts from external servers
     if (!error.includes('Failed to load video:')) {
       return;
     }
-    
-    // Only auto-fallback if HLS (main server) fails with a real error
     if (currentServer === 'hls' && currentEpisode) {
-      // Check if this is a real HLS server failure (not just JWPlayer config issues)
       if (error.includes('hls') && (error.includes('404') || error.includes('network'))) {
         const helvidId = currentEpisode.servers.helvid;
         if (helvidId) {
@@ -90,15 +67,10 @@ function AnimePageComponent() {
         }
       }
     }
-    
-    // For external servers (Helvid/Hydax), don't auto-fallback - let user manually switch
     if (currentServer === 'helvid' || currentServer === 'hydax') {
       console.log(`${currentServer} failed - user should manually switch back to HLS main server`);
-      // Don't auto-switch, let user choose
       return;
     }
-    
-    // Only log errors for other cases
     console.error('Server error for episode:', currentEpisode?.id, error);
   }, [currentServer, currentEpisode]);
 
