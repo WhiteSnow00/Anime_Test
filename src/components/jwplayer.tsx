@@ -68,7 +68,7 @@ export function JWPlayerComponent({
           color: #ccc;
           font-weight: 500;
         `;
-        menuItem.textContent = 'Powered by KanaFansub';
+        menuItem.textContent = 'Được Tạo Bởi KanaFansub';
         
         customContextMenu.appendChild(menuItem);
         document.body.appendChild(customContextMenu);
@@ -761,7 +761,7 @@ export function JWPlayerComponent({
         logo: {
           hide: true
         },
-        abouttext: "Powered by KanaFansub",
+        abouttext: "Được Tạo Bởi KanaFansub",
         aboutlink: "#",
         localization: {
           player: "Trình phát video",
@@ -935,7 +935,7 @@ export function JWPlayerComponent({
                   color: #ccc;
                   font-weight: 500;
                 `;
-                menuItem.textContent = 'Powered by KanaFansub';
+                menuItem.textContent = 'Được Tạo Bởi KanaFansub';
                 
                 customMenu.appendChild(menuItem);
                 document.body.appendChild(customMenu);
