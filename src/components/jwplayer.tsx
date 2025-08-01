@@ -30,36 +30,16 @@ export function JWPlayerComponent({
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const playerInstanceRef = useRef<any>(null);
 
-  // Mobile detection helper function
-  const isMobileDevice = useCallback((): boolean => {
-    if (typeof window === 'undefined') return false;
-    
-    try {
-      // Feature-based detection
-      const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-      const isSmallScreen = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
-      const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      
-      // Combine multiple detection methods for accuracy
-      return (hasTouch && isSmallScreen) || isMobileUA;
-    } catch (e) {
-      console.warn('Error detecting mobile device:', e);
-      return false;
-    }
-  }, []);
-
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     let customContextMenu: HTMLElement | null = null;
-
     const showCustomContextMenu = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (target && ((target.tagName === 'VIDEO') || (target.closest && target.closest('#kana-jwplayer')))) {
+      if (target.tagName === 'VIDEO' || target.closest('#kana-jwplayer')) {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
-        
         if (customContextMenu) {
           customContextMenu.remove();
         }
@@ -88,11 +68,10 @@ export function JWPlayerComponent({
           color: #ccc;
           font-weight: 500;
         `;
-        menuItem.textContent = 'Được Tạo Bởi KanaFansub';
+        menuItem.textContent = 'Powered by KanaFansub';
         
         customContextMenu.appendChild(menuItem);
         document.body.appendChild(customContextMenu);
-        
         const menuRect = customContextMenu.getBoundingClientRect();
         const windowWidth = window.innerWidth;
         const windowHeight = window.innerHeight;
@@ -110,7 +89,7 @@ export function JWPlayerComponent({
 
     const blockContextMenu = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (target && ((target.tagName === 'VIDEO') || (target.closest && target.closest('#kana-jwplayer')))) {
+      if (target.tagName === 'VIDEO' || target.closest('#kana-jwplayer')) {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
@@ -126,6 +105,28 @@ export function JWPlayerComponent({
       }
     };
 
+    let devtools = { open: false, orientation: null };
+    const threshold = 160;
+
+    const checkDevTools = () => {
+      if (window.outerHeight - window.innerHeight > threshold || 
+          window.outerWidth - window.innerWidth > threshold) {
+        if (!devtools.open) {
+          devtools.open = true;
+          console.clear();
+          console.log('%cDeveloper tools detected. Stream protection enabled.', 'color: red; font-size: 20px;');
+          
+          for (let i = 0; i < 10; i++) {
+            setTimeout(() => {
+              fetch(`/api/decoy-${Math.random().toString(36)}?fake=${btoa(Math.random().toString())}`).catch(() => {});
+            }, i * 100);
+          }
+        }
+      } else {
+        devtools.open = false;
+      }
+    };
+    const devToolsTimer = setInterval(checkDevTools, 1000);
 
     const originalLog = console.log;
     const originalError = console.error;
@@ -187,15 +188,14 @@ export function JWPlayerComponent({
 
     const preventSelection = (e: Event) => {
       const target = e.target as HTMLElement;
-      if (target && target.closest && target.closest('#kana-jwplayer')) {
+      if (target.closest('#kana-jwplayer')) {
         e.preventDefault();
         return false;
       }
     };
-
     const preventDrag = (e: DragEvent) => {
       const target = e.target as HTMLElement;
-      if (target && ((target.tagName === 'VIDEO') || (target.closest && target.closest('#kana-jwplayer')))) {
+      if (target.tagName === 'VIDEO' || target.closest('#kana-jwplayer')) {
         e.preventDefault();
         return false;
       }
@@ -203,7 +203,7 @@ export function JWPlayerComponent({
 
     const blockKeyboardShortcuts = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
-      if (target && target.closest && target.closest('#kana-jwplayer')) {
+      if (target.closest('#kana-jwplayer')) {
         if (e.key === 'F12' || 
             (e.ctrlKey && e.shiftKey && e.key === 'I') ||
             (e.ctrlKey && e.key === 'u') ||
@@ -214,7 +214,6 @@ export function JWPlayerComponent({
         }
       }
     };
-
     const originalQuerySelector = document.querySelector.bind(document);
     const originalQuerySelectorAll = document.querySelectorAll.bind(document);
     const originalGetElementById = document.getElementById.bind(document);
@@ -236,8 +235,7 @@ export function JWPlayerComponent({
           
           if (prop === 'setAttribute') {
             return function(this: HTMLVideoElement, attr: string, value: string): void {
-              if (attr === 'src' && value.includes('blob:')) {
-                return HTMLVideoElement.prototype.setAttribute.call(this, attr, value);
+              if (attr === 'src' && value.includes('blob:')) {                return HTMLVideoElement.prototype.setAttribute.call(this, attr, value);
               }
               return HTMLVideoElement.prototype.setAttribute.call(this, attr, value);
             };
@@ -454,10 +452,9 @@ export function JWPlayerComponent({
     const originalConsoleTrace = console.trace;
     
     const sanitizeObjectForConsole = (obj: any, depth: number = 0): any => {
-      if (depth > 10) return '[Circular or Deep Object]';
+      if (depth > 10) return '[Circular or Deep Object]'; 
       
       if (!obj || typeof obj !== 'object') return obj;
-      
       if (obj.tagName === 'VIDEO' || obj instanceof HTMLVideoElement) {
         return {
           tagName: 'VIDEO',
@@ -468,8 +465,7 @@ export function JWPlayerComponent({
           '[Protected Video Element]': true
         };
       }
-      
-      if (Array.isArray(obj)) {
+        if (Array.isArray(obj)) {
         return obj.map(item => sanitizeObjectForConsole(item, depth + 1));
       }
       
@@ -480,13 +476,11 @@ export function JWPlayerComponent({
         }
         return sanitized;
       }
-      
       const sanitized: any = {};
       for (const key in obj) {
         try {
           if (obj.hasOwnProperty(key)) {
             const value = obj[key];
-            
             if (typeof value === 'string' && value.includes('blob:')) {
               sanitized[key] = value.replace(/blob:[^"\s]+/g, 'blob:protected-stream');
             } else if (key === 'src' || key === 'currentSrc') {
@@ -524,7 +518,6 @@ export function JWPlayerComponent({
           try {
             if (node && node.nodeType === Node.ELEMENT_NODE) {
               const element = node as Element;
-              
               let videos: NodeListOf<HTMLVideoElement> | HTMLVideoElement[] = [];
               
               if (element.tagName === 'VIDEO' && element instanceof HTMLVideoElement) {
@@ -547,9 +540,23 @@ export function JWPlayerComponent({
         });
       });
     });
-
     observer.observe(document.body, { childList: true, subtree: true });
 
+    const createDecoyElements = () => {
+      for (let i = 0; i < 3; i++) {
+        const decoyVideo = document.createElement('video');
+        decoyVideo.src = `blob:decoy-${Math.random().toString(36).substring(7)}`;
+        decoyVideo.style.cssText = 'position: absolute; left: -9999px; opacity: 0; pointer-events: none;';
+        decoyVideo.id = `decoy-video-${i}`;
+        document.body.appendChild(decoyVideo);
+          setTimeout(() => {
+          decoyVideo.remove();
+        }, Math.random() * 10000 + 5000);
+      }
+    };
+
+    createDecoyElements();
+    const decoyInterval = setInterval(createDecoyElements, 15000);
 
     const originalFetch = window.fetch;
     window.fetch = function(input: RequestInfo | URL, init?: RequestInit) {
@@ -565,14 +572,15 @@ export function JWPlayerComponent({
       return originalFetch(input, modifiedInit);
     };
 
-    document.addEventListener('contextmenu', blockContextMenu, true);
-    document.addEventListener('contextmenu', showCustomContextMenu, false); // Also listen in bubble phase
+    document.addEventListener('contextmenu', blockContextMenu, true); 
+    document.addEventListener('contextmenu', showCustomContextMenu, false); 
     document.addEventListener('click', hideCustomContextMenu);
     document.addEventListener('selectstart', preventSelection);
     document.addEventListener('dragstart', preventDrag);
     document.addEventListener('keydown', blockKeyboardShortcuts);
 
     return () => {
+      clearInterval(devToolsTimer);
       document.removeEventListener('contextmenu', blockContextMenu, true);
       document.removeEventListener('contextmenu', showCustomContextMenu, false);
       document.removeEventListener('click', hideCustomContextMenu);
@@ -597,11 +605,13 @@ export function JWPlayerComponent({
       document.getElementById = originalGetElementById;
       document.getElementsByTagName = originalGetElementsByTagName;
       observer.disconnect();
+      clearInterval(decoyInterval);
     };
-  }, []);
+  }, []); 
 
   const getVideoUrl = useCallback(() => {
     if (server === 'hls') {
+
       return `/api/hls?file=${videoId}`;
     } else if (server === 'helvid') {
       return `https://helvid.net/play/index/${videoId}`;
@@ -616,13 +626,11 @@ export function JWPlayerComponent({
       if (!video || !(video instanceof HTMLVideoElement) || !video.nodeType) {
         return;
       }
-
       const originalGetAttribute = video.getAttribute;
       video.getAttribute = function(name: string) {
         if (name === 'src') return 'blob:protected-stream';
         return originalGetAttribute.call(this, name);
       };
-
       const originalSetAttribute = video.setAttribute;
       video.setAttribute = function(name: string, value: string) {
         if (name === 'src' && value.includes('blob:')) {
@@ -630,19 +638,17 @@ export function JWPlayerComponent({
         }
         return originalSetAttribute.call(this, name, value);
       };
-
       const protectionInterval = setInterval(() => {
         try {
           if (!video || !video.nodeType || !video.isConnected) {
             clearInterval(protectionInterval);
             return;
           }
-
           const srcDescriptor = Object.getOwnPropertyDescriptor(video, 'src');
           if (!srcDescriptor || srcDescriptor.configurable !== false) {
             Object.defineProperty(video, 'src', {
               get: () => 'blob:protected-stream',
-              set: () => {}, // Ignore attempts to read src
+              set: () => {}, 
               configurable: true
             });
           }
@@ -654,7 +660,6 @@ export function JWPlayerComponent({
               configurable: true
             });
           }
-
           const outerHTMLDescriptor = Object.getOwnPropertyDescriptor(video, 'outerHTML');
           if (!outerHTMLDescriptor || outerHTMLDescriptor.configurable !== false) {
             Object.defineProperty(video, 'outerHTML', {
@@ -677,7 +682,6 @@ export function JWPlayerComponent({
         } catch (e) {
         }
       }, 2000);
-
       const cleanupObserver = new MutationObserver((mutations) => {
         try {
           mutations.forEach((mutation) => {
@@ -699,6 +703,7 @@ export function JWPlayerComponent({
       cleanupObserver.observe(document.body, { childList: true, subtree: true });
 
     } catch (e) {
+      // Video protection error
     }
   }, []);
 
@@ -729,8 +734,7 @@ export function JWPlayerComponent({
           const wasPlaying = playerInstanceRef.current.getState() === 'playing';
           
           playerInstanceRef.current.remove();
-          
-          if (currentPosition > 0) {
+            if (currentPosition > 0) {
             console.log('Saving playback position:', currentPosition);
             playerInstanceRef.current._savedPosition = currentPosition;
             playerInstanceRef.current._wasPlaying = wasPlaying;
@@ -757,7 +761,7 @@ export function JWPlayerComponent({
         logo: {
           hide: true
         },
-        abouttext: "Được Tạo Bởi KanaFansub",
+        abouttext: "Powered by KanaFansub",
         aboutlink: "#",
         localization: {
           player: "Trình phát video",
@@ -783,92 +787,6 @@ export function JWPlayerComponent({
           const video = document.createElement('video');
           return video.canPlayType('application/vnd.apple.mpegurl') !== '';
         })();
-
-        // Check if it's a mobile device
-        const isMobile = isMobileDevice();
-        console.log('Device type:', isMobile ? 'Mobile' : 'Desktop');
-
-        // Base HLS configuration
-        let hlsConfig = {
-          enableWorker: false,
-          lowLatencyMode: false,
-          backBufferLength: 10,
-          maxBufferLength: 20,
-          maxMaxBufferLength: 40,
-          maxBufferSize: 10 * 1000 * 1000, // 10MB buffer
-          maxBufferHole: 0.5,
-          highBufferWatchdogPeriod: 3,
-          nudgeOffset: 0.1,
-          nudgeMaxRetry: 3,
-          maxSeekHole: 2,
-          seekHoleNudgeDuration: 0.1,
-          maxFragLookUpTolerance: 0.25,
-          liveSyncDurationCount: 3,
-          liveMaxLatencyDurationCount: 6,
-          enableSoftwareAES: false,
-          manifestLoadingTimeOut: 10000,
-          manifestLoadingMaxRetry: 3,
-          manifestLoadingRetryDelay: 1000,
-          fragmentLoadingTimeOut: 20000,
-          fragmentLoadingMaxRetry: 6,
-          fragmentLoadingRetryDelay: 1000,
-          startFragPrefetch: false, 
-          testBandwidth: false,
-          progressive: false, // Disable for HLS
-          abrEwmaFastLive: 3.0,
-          abrEwmaSlowLive: 9.0,
-          abrEwmaFastVoD: 3.0,
-          abrEwmaSlowVoD: 9.0,
-          maxStarvationDelay: 4,
-          maxLoadingDelay: 4,
-          startLevel: -1,
-          capLevelToPlayerSize: false,
-          xhrSetup: function(xhr: any, url: any) {
-            xhr.setRequestHeader('Accept', '*/*');
-            xhr.withCredentials = false;
-            
-            if (url.includes('tiktokcdn.com')) {
-              return;
-            }
-            
-            if (url.startsWith('/api/') || url.startsWith(window.location.origin)) {
-              xhr.setRequestHeader('Cache-Control', 'no-cache');
-              xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-            }
-          }
-        };
-
-        if (isMobile) {
-          console.log('Applying mobile-specific HLS optimizations');
-          hlsConfig = {
-            ...hlsConfig,
-            enableWorker: false, // Disable worker to avoid potential mobile issues
-            maxBufferLength: 10, // Reduce for faster loading
-            maxMaxBufferLength: 20, // Keep minimal for quick start
-            backBufferLength: 30, // Keep higher back buffer for seeking
-            maxBufferSize: 15 * 1000 * 1000, // 15MB - balance between performance and seeking
-            maxBufferHole: 1.0, // More tolerant of buffer holes
-            maxSeekHole: 10, // Very tolerant of seek holes
-            seekHoleNudgeDuration: 0.5,
-            maxFragLookUpTolerance: 0.5,
-            maxStarvationDelay: 1,
-            maxLoadingDelay: 1,
-            fragmentLoadingTimeOut: 20000,
-            fragmentLoadingMaxRetry: 6,
-            fragmentLoadingRetryDelay: 500,
-            startFragPrefetch: false, // Disable for faster initial load
-            startLevel: -1, // Auto select quality
-            abrEwmaFastVoD: 3.0,
-            abrEwmaSlowVoD: 9.0,
-            testBandwidth: false, // Skip bandwidth test for faster start
-            // Additional mobile optimizations
-            forceKeyFrameOnDiscontinuity: true,
-            abrBandWidthFactor: 0.95,
-            abrBandWidthUpFactor: 0.7,
-            lowLatencyMode: false
-          };
-        }
-
         playerConfig = {
           ...playerConfig,
           file: videoUrl,
@@ -877,14 +795,59 @@ export function JWPlayerComponent({
           enableNativeHls: isNativeHLSSupported,
           safarihlsjs: false,
           title: `Episode ${videoId}`,
-          hlshtml5: hlsConfig,
+          hlshtml5: {
+            enableWorker: false, 
+            lowLatencyMode: false,
+            backBufferLength: 10,
+            maxBufferLength: 20,
+            maxMaxBufferLength: 40,
+            maxBufferSize: 10 * 1000 * 1000,
+            maxBufferHole: 0.5,
+            highBufferWatchdogPeriod: 3,
+            nudgeOffset: 0.1,
+            nudgeMaxRetry: 3,
+            maxSeekHole: 2,
+            seekHoleNudgeDuration: 0.1,
+            maxFragLookUpTolerance: 0.25,
+            liveSyncDurationCount: 3,
+            liveMaxLatencyDurationCount: 6,
+            enableSoftwareAES: false,
+            manifestLoadingTimeOut: 10000,
+            manifestLoadingMaxRetry: 3,
+            manifestLoadingRetryDelay: 1000,
+            fragmentLoadingTimeOut: 20000,
+            fragmentLoadingMaxRetry: 6,
+            fragmentLoadingRetryDelay: 1000,
+            startFragPrefetch: false,
+            testBandwidth: false,
+            progressive: false, 
+            abrEwmaFastLive: 3.0,
+            abrEwmaSlowLive: 9.0,
+            abrEwmaFastVoD: 3.0,
+            abrEwmaSlowVoD: 9.0,
+            maxStarvationDelay: 4,
+            maxLoadingDelay: 4,
+            startLevel: -1,
+            capLevelToPlayerSize: false,
+            xhrSetup: function(xhr, url) {
+              xhr.setRequestHeader('Accept', '*/*');
+              xhr.withCredentials = false;
+                if (url.includes('tiktokcdn.com')) {
+                return;
+              }
+                if (url.startsWith('/api/') || url.startsWith(window.location.origin)) {
+                xhr.setRequestHeader('Cache-Control', 'no-cache');
+                xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+              }
+            }
+          },
           buffering: {
             enabled: true,
-            length: isMobile ? 10 : 5, 
-            position: isMobile ? 5 : 2  
+            length: 5,
+            position: 2
           },
-          preload: isMobile ? "auto" : "metadata", 
-          bandwidthEstimate: isMobile ? 1000000 : 500000, 
+          preload: "metadata", 
+          bandwidthEstimate: 500000, 
           bitrateSelection: "auto"
         };
       } else {
@@ -917,9 +880,8 @@ export function JWPlayerComponent({
             }
             playerInstanceRef.current._savedPosition = null;
             playerInstanceRef.current._wasPlaying = false;
-          }, 1000); 
+          }, 1000);
         }
-        
         setTimeout(() => {
           const jwLogo = document.querySelector('.jw-logo');
           if (jwLogo) (jwLogo as HTMLElement).style.display = 'none';
@@ -931,7 +893,6 @@ export function JWPlayerComponent({
           if (volumeSlider) {
             (volumeSlider as HTMLElement).style.backgroundColor = '#ff6b35';
           }
-
           const videoElement = document.querySelector('#kana-jwplayer video');
           if (videoElement) {
             try {
@@ -974,19 +935,17 @@ export function JWPlayerComponent({
                   color: #ccc;
                   font-weight: 500;
                 `;
-                menuItem.textContent = 'Được Tạo Bởi KanaFansub';
-
+                menuItem.textContent = 'Powered by KanaFansub';
+                
                 customMenu.appendChild(menuItem);
                 document.body.appendChild(customMenu);
-                
-                const hideMenu = () => {
+                  const hideMenu = () => {
                   if (customMenu && customMenu.parentNode) {
                     customMenu.remove();
                   }
                 };
                 
                 setTimeout(hideMenu, 3000);
-                
                 const clickHandler = (clickEvent: Event) => {
                   if (!customMenu.contains(clickEvent.target as Node)) {
                     hideMenu();
@@ -1005,6 +964,7 @@ export function JWPlayerComponent({
                   return result.replace(/blob:[^"\s]+/g, 'blob:protected-stream');
                 };
               } catch (e) {
+                // Cannot override toString, skipping
               }
 
               const overlay = document.createElement('div');
@@ -1066,6 +1026,7 @@ export function JWPlayerComponent({
                 };
               }
             } catch (playerProtectionError) {
+              // Continue without player obfuscation if it fails
             }
           }
         }, 500);
@@ -1073,6 +1034,7 @@ export function JWPlayerComponent({
         if (autoPlay) {
           try {
             player.play();
+            
             if (!muted) {
               setTimeout(() => {
                 player.setMute(false);
@@ -1100,6 +1062,7 @@ export function JWPlayerComponent({
         if (Object.keys(e).length === 0 || (typeof e === 'object' && !e.code && !e.message && !e.type && !e.sourceError)) {
           return; 
         }
+        
         let errorDetails = '';
         if (e.code) errorDetails += `Code: ${e.code}, `;
         if (e.type) errorDetails += `Type: ${e.type}, `;
@@ -1110,7 +1073,8 @@ export function JWPlayerComponent({
         
         let errorMessage = `Failed to load video: hls - ${videoId} (JWPlayer error: ${e.message || e.code || 'Unknown error'})`;
         let shouldRetry = false;
-                if (e.code === 232011 || e.code === '232011') {
+        
+        if (e.code === 232011 || e.code === '232011') {
           errorMessage = `Failed to load video: hls - ${videoId} (HLS network error - cannot load segments)`;
           shouldRetry = false;
         } else if (e.code === 232404 || e.code === '232404') {
@@ -1148,7 +1112,6 @@ export function JWPlayerComponent({
           }, 2000);
         }
         setIsLoading(false);
-        
         onError?.(errorMessage);
       });
 
@@ -1210,8 +1173,7 @@ export function JWPlayerComponent({
       player.on('play', () => {
         console.log('Bắt đầu phát video');
         setAutoplayBlocked(false); 
-        
-        if (!muted && autoPlay) {
+          if (!muted && autoPlay) {
           setTimeout(() => {
             player.setMute(false);
             console.log('Âm thanh đã được bật trong quá trình phát');
@@ -1225,13 +1187,14 @@ export function JWPlayerComponent({
           player.setMute(false);
         }
       });
+
       player.on('complete', () => {
         console.log('Video playback completed');
       });
 
       player.on('time', (e: any) => {
         const progress = (e.position / e.duration) * 100;
-        if (progress % 25 === 0) { 
+        if (progress % 25 === 0) {
           console.log(`Playback progress: ${Math.round(progress)}%`);
         }
       });
@@ -1247,8 +1210,7 @@ export function JWPlayerComponent({
 
       player.on('fullscreen', (e: any) => {
         console.log('Fullscreen toggled:', e.fullscreen);
-        
-        if (e.fullscreen) {
+          if (e.fullscreen) {
           console.log('Entering fullscreen mode - preventing player reload');
           playerInstanceRef.current._isFullscreen = true;
         } else {
@@ -1279,7 +1241,7 @@ export function JWPlayerComponent({
       setError('Khởi tạo player thất bại');
       setIsLoading(false);
     }
-  }, [videoId, server, autoPlay, muted, onLoad, onError, getVideoUrl, protectVideoElement, isMobileDevice]);
+  }, [videoId, server, autoPlay, muted, onLoad, onError, getVideoUrl, protectVideoElement]);
 
   useEffect(() => {
     let scriptLoaded = false;
@@ -1329,7 +1291,6 @@ export function JWPlayerComponent({
         console.log('Skipping player reinitialization due to fullscreen state');
         return;
       }
-      
       const now = Date.now();
       if (playerInstanceRef.current._lastFullscreenExit && (now - playerInstanceRef.current._lastFullscreenExit) < 2000) {
         console.log('Skipping player reinitialization - recently exited fullscreen');
@@ -1342,7 +1303,6 @@ export function JWPlayerComponent({
   }, [videoId, server, playerLoaded]);
 
   if (server !== 'hls') {
-    // For external servers (Helvid, Hydax), use iframe embed
     const iframeUrl = getVideoUrl();
     
     return (
@@ -1371,7 +1331,6 @@ export function JWPlayerComponent({
     );
   }
 
-  // For HLS server, use JWPlayer
   return (
     <div className={cn("relative w-full aspect-video bg-black rounded-lg overflow-hidden", className)}>
       {error ? (
