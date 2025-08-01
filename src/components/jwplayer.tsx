@@ -812,7 +812,7 @@ export function JWPlayerComponent({
           hlsjsdefault: !isNativeHLSSupported,
           enableNativeHls: isNativeHLSSupported,
           safarihlsjs: false,
-          title: `Episode ${videoId}`,
+          title: `Hoa Thơm Kiêu hãnh ${videoId}`,
           hlshtml5: {
             enableWorker: false, 
             lowLatencyMode: false,

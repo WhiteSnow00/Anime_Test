@@ -57,7 +57,7 @@ export const animeData: Anime = {
       title: 'Episode 1', 
       videoId: '01',
       servers: {
-        hls: 'kanasub-01.m3u8',
+        hls: 'Tập1.m3u8',
         helvid: '8c8edb8924a8',
         hydax: 'AkqMUVl6B'
       },
@@ -69,7 +69,7 @@ export const animeData: Anime = {
       title: 'Episode 2', 
       videoId: '02',
       servers: {
-        hls: 'kanasub-02.m3u8',
+        hls: 'Tập2.m3u8',
         helvid: '34ebbd8b7a07',
         hydax: 'ubMg6Vlex'
       },
@@ -81,7 +81,7 @@ export const animeData: Anime = {
       title: 'Episode 3', 
       videoId: '03',
       servers: {
-        hls: 'kanasub-03.m3u8',
+        hls: 'Tập3.m3u8',
         helvid: '50909806cf25',
         hydax: 'dibBTjuqH'
       },
@@ -93,7 +93,7 @@ export const animeData: Anime = {
       title: 'Episode 4', 
       videoId: '04',
       servers: {
-        hls: 'kanasub-04.m3u8',
+        hls: 'Tập4.m3u8',
         helvid: '28b0a006506a',
         hydax: 'p_BMmjguS'
       },

@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Security: Only allow specific file patterns
-    const allowedPattern = /^kanasub-\d{2}\.m3u8$/;
+    const allowedPattern = /^Tập\d+\.m3u8$/;
     if (!allowedPattern.test(file)) {
       return NextResponse.json(
         { error: 'Invalid file format' },

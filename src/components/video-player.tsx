@@ -95,7 +95,7 @@ function VideoPlayerComponent({
     }
     
     console.warn(`Could not determine HLS filename for videoId: ${inputVideoId}, defaulting to first episode`);
-    return animeData.episodes[0]?.servers.hls || 'kanasub-01.m3u8';
+    return animeData.episodes[0]?.servers.hls || 'Tập1.m3u8';
   }, []);
 
   const {
