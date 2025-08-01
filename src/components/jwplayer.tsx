@@ -30,6 +30,23 @@ export function JWPlayerComponent({
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const playerInstanceRef = useRef<any>(null);
 
+  // Mobile device detection
+  const isMobileDevice = () => {
+    if (typeof window === 'undefined') return false;
+    
+    // Check if it has touch capability
+    const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    
+    // Check user agent for mobile devices
+    const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+    const mobileRegex = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i;
+    
+    // Check screen size
+    const isSmallScreen = window.innerWidth <= 768;
+    
+    return hasTouch && (mobileRegex.test(userAgent.toLowerCase()) || isSmallScreen);
+  };
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
