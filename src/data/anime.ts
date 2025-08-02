@@ -70,10 +70,10 @@ export const animeData: Anime = {
       videoId: '02',
       servers: {
         hls: 'Tập2.m3u8',
-        helvid: '34ebbd8b7a07',
-        hydax: 'ubMg6Vlex'
+        helvid: 'f2daff898ca2',
+        hydax: '7iGNIKWEk'
       },
-      downloadUrl: 'https://drive.google.com/file/d/1DdFaT7f-BXdC8S7P3vNZx_j0CC6gzWSA/view?usp=sharing',
+      downloadUrl: 'https://drive.google.com/file/d/19dd9pWCaARRVs1kvO21-Bw5BDePiq2Kd/view?usp=sharing',
       rawDownloadUrl: 'https://drive.google.com/file/d/1fgCgQPckMHU1kDyUaS5DG_kVayL_dsth/view?usp=sharing'
     },
     { 
