@@ -65,14 +65,14 @@ export function MobileServerSelector({
   };
 
   return (
-    <Card className={cn("w-full", className)}>
+    <Card className={cn("w-full", className)} suppressHydrationWarning>
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-semibold flex items-center gap-2">
           <Play className="h-4 w-4" />
           Chọn Server (Mobile)
         </CardTitle>
       </CardHeader>
-      <CardContent className="pt-0">
+      <CardContent className="pt-0" suppressHydrationWarning>
         <div className="grid grid-cols-2 gap-2">
           {servers.map((server) => {
             const config = MOBILE_SERVER_CONFIG[server];

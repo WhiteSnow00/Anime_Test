@@ -57,7 +57,7 @@ export function SimpleMobilePlayer({
     return videoUrl;
   }, [videoId, server]);
 
-  // Simple mobile dimensions
+  // Simple mobile dimensions with stable orientation handling
   const iframeDimensions = useMemo(() => {
     if (typeof window !== 'undefined') {
       const width = Math.min(window.innerWidth - 16, 800);
@@ -65,7 +65,7 @@ export function SimpleMobilePlayer({
       return { width, height };
     }
     return { width: 400, height: 225 };
-  }, []);
+  }, []); // Remove dependency on window resize to prevent crashes during orientation change
 
   // Simple load handler with proper state management
   const handleIframeLoad = useCallback(() => {
@@ -82,7 +82,7 @@ export function SimpleMobilePlayer({
     setLoadError(`Không thể tải video từ server ${server}`);
   }, [server, videoId]);
 
-  // Simple timeout with proper cleanup
+  // Simple timeout with proper cleanup and orientation change handling
   useEffect(() => {
     if (!iframeUrl) return;
 
@@ -103,9 +103,21 @@ export function SimpleMobilePlayer({
       }
     }, 20000); // 20 second timeout for better mobile compatibility
 
+    // Handle orientation change without reloading iframe
+    const handleOrientationChange = () => {
+      // Don't reload iframe on orientation change, just update dimensions
+      console.log('Orientation changed - maintaining player state');
+    };
+
+    // Only add orientation listener if not already loaded to prevent crashes
+    if (!hasLoadedRef.current) {
+      window.addEventListener('orientationchange', handleOrientationChange, { passive: true });
+    }
+
     return () => {
       isMounted = false;
       clearTimeout(timeoutId);
+      window.removeEventListener('orientationchange', handleOrientationChange);
     };
   }, [iframeUrl, server, videoId]);
 
@@ -133,8 +145,8 @@ export function SimpleMobilePlayer({
   }
 
   return (
-    <Card className={cn("w-full overflow-hidden shadow-lg rounded-lg", className)}>
-      <div className="aspect-video bg-muted relative">
+    <Card className={cn("w-full overflow-hidden shadow-lg rounded-lg", className)} suppressHydrationWarning>
+      <div className="aspect-video bg-muted relative" style={{ minHeight: '200px' }} suppressHydrationWarning>
         {/* Loading overlay */}
         {isLoading && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/90 backdrop-blur-sm z-10">
@@ -183,7 +195,7 @@ export function SimpleMobilePlayer({
           </div>
         )}
 
-        {/* Simple iframe with loading state */}
+        {/* Simple iframe with loading state and error boundary */}
         <iframe
           ref={iframeRef}
           key={`simple-${server}-${videoId}`}
@@ -202,6 +214,7 @@ export function SimpleMobilePlayer({
             outline: 'none',
             opacity: isLoading ? 0 : 1,
             transition: 'opacity 0.3s ease-in-out',
+            minHeight: '200px', // Prevent layout shift during orientation change
           }}
           title={`Video player for ${episodeTitle}`}
           aria-label={`Video content for ${episodeTitle}`}

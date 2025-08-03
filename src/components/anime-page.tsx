@@ -13,7 +13,7 @@ import { MobileBottomNav } from './mobile-bottom-nav';
 import { CommentSection } from './comment-section';
 import { NotificationHeader } from './notification-header';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Heart, Info } from 'lucide-react';
+import { Heart, Info, Loader2 } from 'lucide-react';
 import { clearEpisodePosition, triggerDownload, openGoogleDriveLink } from '@/lib/download-utils';
 import { useScrollNavigation } from '@/hooks/use-scroll-navigation';
 import { useViewport } from '@/hooks/use-viewport';
@@ -119,8 +119,18 @@ const handleServerError = useCallback((error: string) => {
   });
 
   useEffect(() => {
-    if (!viewport?.isDesktop) {
-      // For mobile, set to helvid if available, otherwise hydax
+    if (!viewport?.isActualMobile) {
+      // For desktop, set default server based on availability
+      const firstEpisode = animeData.episodes[0];
+      if (firstEpisode.servers.hls) {
+        setCurrentServer('hls');
+      } else if (firstEpisode.servers.helvid) {
+        setCurrentServer("helvid");
+      } else if (firstEpisode.servers.hydax) {
+        setCurrentServer("hydax");
+      }
+    } else {
+      // For actual mobile devices, set to mobile-compatible servers
       const firstEpisode = animeData.episodes[0];
       if (firstEpisode.servers.helvid) {
         setCurrentServer("helvid");
@@ -128,7 +138,7 @@ const handleServerError = useCallback((error: string) => {
         setCurrentServer("hydax");
       }
     }
-  }, []);
+  }, [viewport?.isActualMobile]);
 
   const episodeOps = useMemo(
     () => utils.createEpisodeOperations(animeData.episodes),
@@ -142,8 +152,15 @@ const handleServerError = useCallback((error: string) => {
         actions.setEpisode(episode);
         scrollActions.scrollToTop();
         
-        // Set server based on availability
-        if (viewport.isDesktop && episode.servers.hls) {
+        // Set server based on device type and availability  
+        if (viewport.isActualMobile) {
+          // For actual mobile devices, prefer mobile-compatible servers
+          if (episode.servers.helvid) {
+            setCurrentServer('helvid');
+          } else if (episode.servers.hydax) {
+            setCurrentServer('hydax');
+          }
+        } else if (viewport.isDesktop && episode.servers.hls) {
           setCurrentServer('hls');
         } else if (episode.servers.helvid) {
           setCurrentServer('helvid');
@@ -156,7 +173,7 @@ const handleServerError = useCallback((error: string) => {
         return episode;
       }
     ),
-    [actions.setEpisode, scrollActions.scrollToTop, viewport]
+    [actions.setEpisode, scrollActions.scrollToTop, viewport.isActualMobile, viewport.isDesktop]
   );
 
   const handleNavigate = useCallback((section: string) => {
@@ -198,23 +215,35 @@ const layoutConfig = useMemo(() => {
       };
     }
     
-    const { isMobile, isTablet, isDesktop } = viewport;
+    const { isMobile, isTablet, isDesktop, isActualMobile } = viewport;
     
     return {
-      containerClass: isMobile
+      containerClass: isActualMobile
         ? "px-2 sm:px-4 pb-32"
         : isTablet
         ? "px-4 lg:px-6 pb-20"
         : "px-6 pb-6",
-      spacing: isMobile ? "space-y-4" : "space-y-6",
+      spacing: isActualMobile ? "space-y-4" : "space-y-6",
       showDesktopFooter: isDesktop,
-      showMobileHeader: isMobile,
+      showMobileHeader: isActualMobile,
     };
   }, [isHydrated, viewport]);
 
-  // Switch to mobile player component for mobile devices
+  // Switch to mobile player component for actual mobile devices
   const videoPlayerComponent = useMemo(() => {
-    if (viewport.isMobile && ['helvid', 'hydax'].includes(currentServer)) {
+    if (!isHydrated) {
+      // Return a placeholder during hydration to prevent mismatch
+      return (
+        <div className="aspect-video bg-muted relative flex items-center justify-center" suppressHydrationWarning>
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mb-2 mx-auto" />
+            <p className="text-sm text-muted-foreground">Đang tải...</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (viewport.isActualMobile && ['helvid', 'hydax'].includes(currentServer)) {
       return (
         <SimpleMobilePlayer 
           videoId={getCurrentVideoId(currentEpisode)}
@@ -236,12 +265,23 @@ const layoutConfig = useMemo(() => {
         onLoad={() => console.log(`Episode ${currentEpisode.id} loaded successfully on ${currentServer}`)}
       />
     );
-  }, [viewport.isMobile, currentServer, currentEpisode, handleServerError]);
+  }, [isHydrated, viewport.isActualMobile, currentServer, currentEpisode, handleServerError]);
 
-  // Switch to mobile server selector for mobile devices
+  // Switch to mobile server selector for actual mobile devices
   const serverSelectorComponent = useMemo(() => {
-    if (viewport.isMobile) {
-      // Only show mobile servers on mobile
+    if (!isHydrated) {
+      // Return a placeholder during hydration
+      return (
+        <div className="w-full bg-muted rounded-lg p-4" suppressHydrationWarning>
+          <div className="text-center">
+            <p className="text-sm text-muted-foreground">Đang tải server...</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (viewport.isActualMobile) {
+      // Only show mobile servers on actual mobile devices
       const mobileServer = ['helvid', 'hydax'].includes(currentServer) 
         ? currentServer as SimpleMobileServerType 
         : 'helvid';
@@ -264,19 +304,19 @@ const layoutConfig = useMemo(() => {
         currentEpisode={currentEpisode}
       />
     );
-  }, [viewport.isMobile, currentServer, currentEpisode, handleServerChange, handleMobileServerChange, handleMobileDownload, handleMobileRawDownload]);
+  }, [isHydrated, viewport.isActualMobile, currentServer, currentEpisode, handleServerChange, handleMobileServerChange, handleMobileDownload, handleMobileRawDownload]);
 
   const episodeStats = useMemo(() => episodeOps.getStats(), [episodeOps]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" suppressHydrationWarning>
       <FloatingSupportWidget />
 
       {layoutConfig.showMobileHeader && (
         <MobileHeader title={animeDetails.title} />
       )}
 
-      <div className={`w-full max-w-7xl mx-auto ${layoutConfig.spacing} ${layoutConfig.containerClass}`}>
+      <div className={`w-full max-w-7xl mx-auto ${layoutConfig.spacing} ${layoutConfig.containerClass}`} suppressHydrationWarning>
         <NotificationHeader />
 
         <div ref={refs.videoRef} id="video-section" data-section="video">

@@ -10,6 +10,8 @@ export interface ViewportState {
   isDesktop: boolean;
   orientation: 'portrait' | 'landscape';
   pixelRatio: number;
+  isTouchDevice: boolean;
+  isActualMobile: boolean;
 }
 
 export interface UseViewportOptions {
@@ -25,6 +27,25 @@ export function useViewport(options: UseViewportOptions = {}) {
     debounceMs = 100,
   } = options;
 
+  // Helper function to detect if device is actually mobile
+  const detectActualMobile = useCallback(() => {
+    if (typeof window === 'undefined') return false;
+    
+    // Check for touch support
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    
+    // Check user agent for mobile indicators
+    const userAgent = navigator.userAgent.toLowerCase();
+    const mobileKeywords = ['mobile', 'android', 'iphone', 'ipad', 'ipod', 'blackberry', 'windows phone'];
+    const isMobileUA = mobileKeywords.some(keyword => userAgent.includes(keyword));
+    
+    // Check for mobile device characteristics
+    const hasSmallScreen = window.screen && (window.screen.width <= 768 || window.screen.height <= 768);
+    
+    // Device is considered actually mobile if it has touch AND (mobile UA OR small screen)
+    return isTouchDevice && (isMobileUA || hasSmallScreen);
+  }, []);
+
   const [viewport, setViewport] = useState<ViewportState>(() => {
     if (typeof window === 'undefined') {
       return {
@@ -35,21 +56,30 @@ export function useViewport(options: UseViewportOptions = {}) {
         isDesktop: true,
         orientation: 'landscape',
         pixelRatio: 1,
+        isTouchDevice: false,
+        isActualMobile: false,
       };
     }
 
     const width = window.innerWidth;
     const height = window.innerHeight;
     const pixelRatio = window.devicePixelRatio || 1;
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    
+    // Initially use simple width-based detection to avoid hydration mismatch
+    // The actual mobile detection will be done in useEffect after hydration
+    const isMobile = width < mobileBreakpoint;
 
     return {
       width,
       height,
-      isMobile: width < mobileBreakpoint,
+      isMobile,
       isTablet: width >= mobileBreakpoint && width < tabletBreakpoint,
       isDesktop: width >= tabletBreakpoint,
       orientation: width > height ? 'landscape' : 'portrait',
       pixelRatio,
+      isTouchDevice,
+      isActualMobile: false, // Will be updated after hydration
     };
   });
 
@@ -61,17 +91,24 @@ export function useViewport(options: UseViewportOptions = {}) {
     const width = window.innerWidth;
     const height = window.innerHeight;
     const pixelRatio = window.devicePixelRatio || 1;
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const isActualMobile = detectActualMobile();
+
+    // For actual mobile devices, always consider them mobile regardless of orientation
+    const isMobile = isActualMobile ? true : width < mobileBreakpoint;
 
     setViewport({
       width,
       height,
-      isMobile: width < mobileBreakpoint,
-      isTablet: width >= mobileBreakpoint && width < tabletBreakpoint,
-      isDesktop: width >= tabletBreakpoint,
+      isMobile,
+      isTablet: !isActualMobile && width >= mobileBreakpoint && width < tabletBreakpoint,
+      isDesktop: !isActualMobile && width >= tabletBreakpoint,
       orientation: width > height ? 'landscape' : 'portrait',
       pixelRatio,
+      isTouchDevice,
+      isActualMobile,
     });
-  }, [mobileBreakpoint, tabletBreakpoint]);
+  }, [mobileBreakpoint, tabletBreakpoint, detectActualMobile]);
 
   const debouncedUpdateViewport = useCallback(() => {
     if (timeoutRef.current) {
@@ -84,7 +121,7 @@ export function useViewport(options: UseViewportOptions = {}) {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Initial update
+    // Initial update with proper mobile detection after hydration
     updateViewport();
 
     // Event listeners
