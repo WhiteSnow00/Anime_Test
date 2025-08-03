@@ -180,6 +180,7 @@ const layoutConfig = useMemo(() => {
           muted={false}
           onError={handleServerError}
           onLoad={() => console.log(`Mobile Episode ${currentEpisode.id} loaded successfully on ${currentServer}`)}
+          onServerChange={handleMobileServerChange}
           className="mt-4"
         />
       );

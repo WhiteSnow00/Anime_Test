@@ -27,6 +27,7 @@ interface MobileVideoPlayerProps {
   controls?: boolean;
   onLoad?: () => void;
   onError?: (error: string) => void;
+  onServerChange?: (server: MobileServerType) => void;
   className?: string;
 }
 
@@ -39,33 +40,36 @@ export function MobileVideoPlayer({
   controls = true,
   onLoad,
   onError,
+  onServerChange,
   className
 }: MobileVideoPlayerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [currentServer, setCurrentServer] = useState<MobileServerType>(server);
 
-  // Simple iframe URL generation
+  // Simple iframe URL generation with current server
   const iframeUrl = useMemo(() => {
     const episodeData = getEpisodeData(videoId);
-    const serverId = episodeData?.servers[server];
+    const serverId = episodeData?.servers[currentServer];
     
     if (!serverId) {
-      console.warn(`No server ID found for ${server} with videoId: ${videoId}`);
+      console.warn(`No server ID found for ${currentServer} with videoId: ${videoId}`);
       return '';
     }
     
     let videoUrl = '';
-    if (server === 'helvid') {
+    if (currentServer === 'helvid') {
       videoUrl = `https://helvid.net/play/index/${serverId}`;
-    } else if (server === 'hydax') {
+    } else if (currentServer === 'hydax') {
       videoUrl = `https://short.icu/${serverId}`;
     }
     
-    console.log(`Mobile player URL for ${server}: ${videoUrl}`);
+    console.log(`Mobile player URL for ${currentServer}: ${videoUrl}`);
     return videoUrl;
-  }, [videoId, server]);
+  }, [videoId, currentServer]);
 
   // Simple mobile dimensions
   const iframeDimensions = useMemo(() => {
@@ -81,21 +85,35 @@ export function MobileVideoPlayer({
 
   // Simple load handler
   const handleIframeLoad = useCallback(() => {
-    console.log(`Mobile iframe loaded: ${server} - ${videoId}`);
+    console.log(`Mobile iframe loaded: ${currentServer} - ${videoId}`);
     setIsLoading(false);
     setLoadError(null);
     setHasLoaded(true);
+    setRetryCount(0);
     onLoad?.();
-  }, [server, videoId, onLoad]);
+  }, [currentServer, videoId, onLoad]);
 
-  // Simple error handler
+  // Enhanced error handler with fallback
   const handleIframeError = useCallback(() => {
-    console.error(`Mobile iframe error: ${server} - ${videoId}`);
+    console.error(`Mobile iframe error: ${currentServer} - ${videoId}`);
     setIsLoading(false);
-    const errorMessage = `Failed to load video: ${server}`;
+    
+    // Auto-fallback from hydax to helvid
+    if (currentServer === 'hydax' && retryCount === 0) {
+      console.log('Hydax failed, falling back to Helvid for mobile');
+      setCurrentServer('helvid');
+      setRetryCount(1);
+      setLoadError(null);
+      setHasLoaded(false);
+      setIsLoading(true);
+      onServerChange?.('helvid');
+      return;
+    }
+    
+    const errorMessage = `Failed to load video: ${currentServer}`;
     setLoadError(errorMessage);
     onError?.(errorMessage);
-  }, [server, videoId, onError]);
+  }, [currentServer, videoId, retryCount, onError, onServerChange]);
 
   // Simple timeout for mobile loading
   useEffect(() => {
@@ -105,25 +123,43 @@ export function MobileVideoPlayer({
     setLoadError(null);
     setHasLoaded(false);
 
-    // Simple 15 second timeout for mobile
+    // Simple 10 second timeout for mobile with fallback
     const timeoutId = setTimeout(() => {
       if (!hasLoaded) {
-        console.warn(`Mobile iframe timeout: ${server} - ${videoId}`);
+        console.warn(`Mobile iframe timeout: ${currentServer} - ${videoId}`);
+        
+        // Auto-fallback from hydax to helvid on timeout
+        if (currentServer === 'hydax' && retryCount === 0) {
+          console.log('Hydax timeout, falling back to Helvid for mobile');
+          setCurrentServer('helvid');
+          setRetryCount(1);
+          setLoadError(null);
+          setHasLoaded(false);
+          onServerChange?.('helvid');
+          return;
+        }
+        
         setIsLoading(false);
-        setLoadError(`Timeout loading ${server} server`);
-        onError?.(`Timeout loading ${server} server`);
+        setLoadError(`Timeout loading ${currentServer} server`);
+        onError?.(`Timeout loading ${currentServer} server`);
       }
-    }, 15000);
+    }, 10000);
 
     return () => clearTimeout(timeoutId);
-  }, [iframeUrl, server, videoId, hasLoaded, onError]);
+  }, [iframeUrl, currentServer, videoId, hasLoaded, retryCount, onError, onServerChange]);
 
   // Reset states when videoId or server changes
   useEffect(() => {
     setIsLoading(true);
     setLoadError(null);
     setHasLoaded(false);
+    setRetryCount(0);
   }, [videoId, server]);
+  
+  // Update current server when prop changes
+  useEffect(() => {
+    setCurrentServer(server);
+  }, [server]);
 
   if (!iframeUrl) {
     return (
@@ -132,7 +168,7 @@ export function MobileVideoPlayer({
           <div className="text-center">
             <AlertCircle className="h-8 w-8 text-destructive mb-2 mx-auto" />
             <p className="text-sm text-muted-foreground">
-              No video source available for {server}
+              No video source available for {currentServer}
             </p>
           </div>
         </div>
@@ -188,7 +224,7 @@ export function MobileVideoPlayer({
         {/* Simple iframe */}
         <iframe
           ref={iframeRef}
-          key={`mobile-${server}-${videoId}`}
+          key={`mobile-${currentServer}-${videoId}-${retryCount}`}
           width={iframeDimensions.width}
           height={iframeDimensions.height}
           src={iframeUrl}
