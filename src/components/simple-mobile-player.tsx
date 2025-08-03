@@ -32,6 +32,7 @@ export function SimpleMobilePlayer({
   className
 }: SimpleMobilePlayerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const hasLoadedRef = useRef(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -66,9 +67,10 @@ export function SimpleMobilePlayer({
     return { width: 400, height: 225 };
   }, []);
 
-  // Simple load handler
+  // Simple load handler with proper state management
   const handleIframeLoad = useCallback(() => {
     console.log(`Simple mobile iframe loaded: ${server} - ${videoId}`);
+    hasLoadedRef.current = true;
     setIsLoading(false);
     setLoadError(null);
   }, [server, videoId]);
@@ -80,25 +82,37 @@ export function SimpleMobilePlayer({
     setLoadError(`Không thể tải video từ server ${server}`);
   }, [server, videoId]);
 
-  // Simple timeout
+  // Simple timeout with proper cleanup
   useEffect(() => {
     if (!iframeUrl) return;
 
+    console.log(`Setting up timeout for ${server} - ${videoId}`);
+    hasLoadedRef.current = false;
     setIsLoading(true);
     setLoadError(null);
 
+    // Track if component is still mounted
+    let isMounted = true;
+    
     const timeoutId = setTimeout(() => {
-      if (isLoading) {
+      // Only trigger timeout if still mounted and not loaded
+      if (isMounted && !hasLoadedRef.current) {
+        console.warn(`Timeout loading ${server} - ${videoId}`);
         setIsLoading(false);
         setLoadError(`Timeout khi tải từ server ${server}`);
       }
-    }, 15000); // 15 second timeout
+    }, 20000); // 20 second timeout for better mobile compatibility
 
-    return () => clearTimeout(timeoutId);
-  }, [iframeUrl, server, isLoading]);
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
+  }, [iframeUrl, server, videoId]);
 
   // Reset when videoId or server changes
   useEffect(() => {
+    console.log(`Mobile player reset: ${server} - ${videoId}`);
+    hasLoadedRef.current = false;
     setIsLoading(true);
     setLoadError(null);
   }, [videoId, server]);
@@ -133,20 +147,43 @@ export function SimpleMobilePlayer({
           </div>
         )}
 
-        {/* Error overlay */}
+        {/* Error overlay with retry button */}
         {loadError && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-destructive/10 z-20">
             <AlertCircle className="h-8 w-8 text-destructive mb-2" />
             <p className="text-xs text-destructive text-center px-4 mb-2">
               {loadError}
             </p>
-            <p className="text-xs text-muted-foreground text-center px-4">
-              Vui lòng thử server khác
-            </p>
+            <div className="flex flex-col items-center gap-2">
+              <button
+                onClick={() => {
+                  // Reset and retry
+                  hasLoadedRef.current = false;
+                  setLoadError(null);
+                  setIsLoading(true);
+                  // Force iframe reload
+                  if (iframeRef.current) {
+                    const currentSrc = iframeRef.current.src;
+                    iframeRef.current.src = '';
+                    setTimeout(() => {
+                      if (iframeRef.current) {
+                        iframeRef.current.src = currentSrc;
+                      }
+                    }, 100);
+                  }
+                }}
+                className="px-3 py-1 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
+              >
+                Thử lại
+              </button>
+              <p className="text-xs text-muted-foreground text-center px-4">
+                Hoặc vui lòng thử server khác
+              </p>
+            </div>
           </div>
         )}
 
-        {/* Simple iframe */}
+        {/* Simple iframe with loading state */}
         <iframe
           ref={iframeRef}
           key={`simple-${server}-${videoId}`}
@@ -163,6 +200,8 @@ export function SimpleMobilePlayer({
           style={{
             border: 'none',
             outline: 'none',
+            opacity: isLoading ? 0 : 1,
+            transition: 'opacity 0.3s ease-in-out',
           }}
           title={`Video player for ${episodeTitle}`}
           aria-label={`Video content for ${episodeTitle}`}
