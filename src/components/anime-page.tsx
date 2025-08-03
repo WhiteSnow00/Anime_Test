@@ -3,6 +3,8 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { animeData, type Episode } from '@/data/anime';
 import { VideoPlayer } from './video-player';
+import { MobileVideoPlayer, type MobileServerType } from './mobile-video-player';
+import { MobileServerSelector } from './mobile-server-selector';
 import { EpisodeSelector } from './episode-selector';
 import { ServerSelector, type ServerType } from './server-selector';
 import { AnimeInfo } from './anime-info';
@@ -35,6 +37,10 @@ const [currentServer, setCurrentServer] = useState<ServerType>('hls');
 
   const handleServerChange = useCallback((server: ServerType) => {
     setCurrentServer(server);
+  }, []);
+
+  const handleMobileServerChange = useCallback((server: MobileServerType) => {
+    setCurrentServer(server as ServerType);
   }, []);
 
 const getCurrentVideoId = useCallback((episode: Episode) => {
@@ -138,7 +144,7 @@ const handleServerError = useCallback((error: string) => {
 
   const { episodes, ...animeDetails } = useMemo(() => animeData, []);
 
-  const layoutConfig = useMemo(() => {
+const layoutConfig = useMemo(() => {
     if (!isHydrated) {
       return {
         containerClass: "px-6 pb-6",
@@ -162,6 +168,62 @@ const handleServerError = useCallback((error: string) => {
     };
   }, [isHydrated, viewport]);
 
+  // Switch to mobile player component for mobile devices
+  const videoPlayerComponent = useMemo(() => {
+    if (viewport.isMobile && ['helvid', 'hydax'].includes(currentServer)) {
+      return (
+        <MobileVideoPlayer 
+          videoId={getCurrentVideoId(currentEpisode)}
+          server={currentServer as MobileServerType}
+          episodeTitle={`Tập ${currentEpisode.id}`}
+          autoPlay={true}
+          muted={false}
+          onError={handleServerError}
+          onLoad={() => console.log(`Mobile Episode ${currentEpisode.id} loaded successfully on ${currentServer}`)}
+          className="mt-4"
+        />
+      );
+    }
+    
+    return (
+      <VideoPlayer 
+        videoId={getCurrentVideoId(currentEpisode)}
+        server={currentServer}
+        episodeTitle={`Tập ${currentEpisode.id}`}
+        autoPlay={true}
+        muted={false}
+        onError={handleServerError}
+        onLoad={() => console.log(`Episode ${currentEpisode.id} loaded successfully on ${currentServer}`)}
+      />
+    );
+  }, [viewport.isMobile, currentServer, currentEpisode, handleServerError]);
+
+  // Switch to mobile server selector for mobile devices
+  const serverSelectorComponent = useMemo(() => {
+    if (viewport.isMobile) {
+      // Only show mobile servers on mobile
+      const mobileServer = ['helvid', 'hydax'].includes(currentServer) 
+        ? currentServer as MobileServerType 
+        : 'helvid';
+      
+      return (
+        <MobileServerSelector
+          currentServer={mobileServer}
+          onServerChange={handleMobileServerChange}
+          currentEpisode={currentEpisode}
+        />
+      );
+    }
+    
+    return (
+      <ServerSelector
+        currentServer={currentServer}
+        onServerChange={handleServerChange}
+        currentEpisode={currentEpisode}
+      />
+    );
+  }, [viewport.isMobile, currentServer, currentEpisode, handleServerChange, handleMobileServerChange]);
+
   const episodeStats = useMemo(() => episodeOps.getStats(), [episodeOps]);
 
   return (
@@ -176,15 +238,7 @@ const handleServerError = useCallback((error: string) => {
         <NotificationHeader />
 
         <div ref={refs.videoRef} id="video-section" data-section="video">
-          <VideoPlayer 
-            videoId={getCurrentVideoId(currentEpisode)} 
-            server={currentServer}
-            episodeTitle={`Tập ${currentEpisode.id}`}
-            autoPlay={true}
-            muted={false}
-            onError={handleServerError}
-            onLoad={() => console.log(`Episode ${currentEpisode.id} loaded successfully on ${currentServer}`)}
-          />
+{videoPlayerComponent}
         </div>
 
         <div className="mb-4">
@@ -197,11 +251,7 @@ const handleServerError = useCallback((error: string) => {
         </div>
 
         <div id="server-section" data-section="server">
-          <ServerSelector
-            currentServer={currentServer}
-            onServerChange={handleServerChange}
-            currentEpisode={currentEpisode}
-          />
+          {serverSelectorComponent}
         </div>
 
         <div ref={refs.episodesRef} id="episodes-section" data-section="episodes">
