@@ -32,11 +32,9 @@ export function SimpleMobilePlayer({
   className
 }: SimpleMobilePlayerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   const hasLoadedRef = useRef(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [showFullscreenTip, setShowFullscreenTip] = useState(false);
 
   // Simple iframe URL generation
   const iframeUrl = useMemo(() => {
@@ -134,60 +132,9 @@ export function SimpleMobilePlayer({
     );
   }
 
-  // Prevent iframe from going fullscreen to avoid crashes
-  useEffect(() => {
-    const iframe = iframeRef.current;
-    if (!iframe) return;
-
-    // Override fullscreen requests from iframe
-    const preventFullscreen = (e: Event) => {
-      console.log('Preventing iframe fullscreen to avoid mobile crash');
-      e.preventDefault();
-      e.stopPropagation();
-      return false;
-    };
-
-    // Try to prevent fullscreen on the iframe
-    try {
-      // Disable fullscreen API on iframe
-      if (iframe.contentWindow) {
-        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-        iframeDoc.addEventListener('fullscreenchange', preventFullscreen, true);
-        iframeDoc.addEventListener('webkitfullscreenchange', preventFullscreen, true);
-      }
-    } catch (e) {
-      // Cross-origin restriction, which is fine
-      console.log('Cross-origin iframe, fullscreen prevention may not work');
-    }
-
-    return () => {
-      try {
-        if (iframe.contentWindow) {
-          const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-          iframeDoc.removeEventListener('fullscreenchange', preventFullscreen, true);
-          iframeDoc.removeEventListener('webkitfullscreenchange', preventFullscreen, true);
-        }
-      } catch (e) {
-        // Ignore cleanup errors
-      }
-    };
-  }, [iframeUrl]);
-
-  // Show fullscreen tip after video loads
-  useEffect(() => {
-    if (hasLoadedRef.current && !showFullscreenTip) {
-      const timer = setTimeout(() => {
-        setShowFullscreenTip(true);
-        // Hide tip after 5 seconds
-        setTimeout(() => setShowFullscreenTip(false), 5000);
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [hasLoadedRef.current]);
-
   return (
     <Card className={cn("w-full overflow-hidden shadow-lg rounded-lg", className)}>
-      <div ref={containerRef} className="aspect-video bg-muted relative">
+      <div className="aspect-video bg-muted relative">
         {/* Loading overlay */}
         {isLoading && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/90 backdrop-blur-sm z-10">
@@ -236,19 +183,7 @@ export function SimpleMobilePlayer({
           </div>
         )}
 
-        {/* Fullscreen tip for mobile users */}
-        {showFullscreenTip && !isLoading && !loadError && (
-          <div className="absolute top-2 left-2 right-2 bg-black/75 text-white px-3 py-2 rounded-lg text-xs animate-fade-in z-30">
-            <p className="flex items-center gap-1">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-              </svg>
-              Xoay ngang điện thoại để xem toàn màn hình
-            </p>
-          </div>
-        )}
-
-        {/* Simple iframe with loading state - fullscreen disabled to prevent crashes */}
+        {/* Simple iframe with loading state */}
         <iframe
           ref={iframeRef}
           key={`simple-${server}-${videoId}`}
@@ -257,7 +192,7 @@ export function SimpleMobilePlayer({
           src={iframeUrl}
           frameBorder="0"
           scrolling="no"
-          allowFullScreen={false}
+          allowFullScreen={true}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           onLoad={handleIframeLoad}
           onError={handleIframeError}
@@ -267,9 +202,7 @@ export function SimpleMobilePlayer({
             outline: 'none',
             opacity: isLoading ? 0 : 1,
             transition: 'opacity 0.3s ease-in-out',
-            pointerEvents: 'auto',
           }}
-          sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-presentation"
           title={`Video player for ${episodeTitle}`}
           aria-label={`Video content for ${episodeTitle}`}
         />
