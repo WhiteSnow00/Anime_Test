@@ -98,15 +98,13 @@ export function MobileVideoPlayer({
     console.error(`Mobile iframe error: ${currentServer} - ${videoId}`);
     setIsLoading(false);
     
-    // Auto-fallback from hydax to helvid
+    // Auto-fallback from hydax to helvid (only once)
     if (currentServer === 'hydax' && retryCount === 0) {
       console.log('Hydax failed, falling back to Helvid for mobile');
-      setCurrentServer('helvid');
       setRetryCount(1);
-      setLoadError(null);
-      setHasLoaded(false);
-      setIsLoading(true);
+      setCurrentServer('helvid');
       onServerChange?.('helvid');
+      // Don't set loading states here to prevent loop
       return;
     }
     
@@ -117,8 +115,12 @@ export function MobileVideoPlayer({
 
   // Simple timeout for mobile loading
   useEffect(() => {
-    if (!iframeUrl) return;
+    if (!iframeUrl) {
+      console.warn(`Mobile player: No iframe URL for ${currentServer}`);
+      return;
+    }
 
+    console.log(`Mobile player: Loading ${currentServer} with URL: ${iframeUrl}`);
     setIsLoading(true);
     setLoadError(null);
     setHasLoaded(false);
@@ -128,14 +130,13 @@ export function MobileVideoPlayer({
       if (!hasLoaded) {
         console.warn(`Mobile iframe timeout: ${currentServer} - ${videoId}`);
         
-        // Auto-fallback from hydax to helvid on timeout
+        // Auto-fallback from hydax to helvid on timeout (only once)
         if (currentServer === 'hydax' && retryCount === 0) {
           console.log('Hydax timeout, falling back to Helvid for mobile');
-          setCurrentServer('helvid');
           setRetryCount(1);
-          setLoadError(null);
-          setHasLoaded(false);
+          setCurrentServer('helvid');
           onServerChange?.('helvid');
+          // Don't manipulate other states to prevent loop
           return;
         }
         
@@ -148,18 +149,25 @@ export function MobileVideoPlayer({
     return () => clearTimeout(timeoutId);
   }, [iframeUrl, currentServer, videoId, hasLoaded, retryCount, onError, onServerChange]);
 
-  // Reset states when videoId or server changes
+  // Reset states when videoId changes
   useEffect(() => {
+    console.log(`Mobile player: Video ID changed to ${videoId}`);
     setIsLoading(true);
     setLoadError(null);
     setHasLoaded(false);
     setRetryCount(0);
-  }, [videoId, server]);
+  }, [videoId]);
   
-  // Update current server when prop changes
+  // Update current server when prop changes (but not during fallback)
   useEffect(() => {
-    setCurrentServer(server);
-  }, [server]);
+    if (server !== currentServer && retryCount === 0) {
+      console.log(`Mobile player: Server prop changed from ${currentServer} to ${server}`);
+      setCurrentServer(server);
+      setIsLoading(true);
+      setLoadError(null);
+      setHasLoaded(false);
+    }
+  }, [server, currentServer, retryCount]);
 
   if (!iframeUrl) {
     return (

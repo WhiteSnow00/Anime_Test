@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { animeData, type Episode } from '@/data/anime';
 import { VideoPlayer } from './video-player';
-import { MobileVideoPlayer, type MobileServerType } from './mobile-video-player';
+import { SimpleMobilePlayer, type SimpleMobileServerType } from './simple-mobile-player';
 import { MobileServerSelector } from './mobile-server-selector';
 import { EpisodeSelector } from './episode-selector';
 import { ServerSelector, type ServerType } from './server-selector';
@@ -39,7 +39,7 @@ const [currentServer, setCurrentServer] = useState<ServerType>('hls');
     setCurrentServer(server);
   }, []);
 
-  const handleMobileServerChange = useCallback((server: MobileServerType) => {
+  const handleMobileServerChange = useCallback((server: SimpleMobileServerType) => {
     setCurrentServer(server as ServerType);
   }, []);
 
@@ -172,15 +172,10 @@ const layoutConfig = useMemo(() => {
   const videoPlayerComponent = useMemo(() => {
     if (viewport.isMobile && ['helvid', 'hydax'].includes(currentServer)) {
       return (
-        <MobileVideoPlayer 
+        <SimpleMobilePlayer 
           videoId={getCurrentVideoId(currentEpisode)}
-          server={currentServer as MobileServerType}
+          server={currentServer as SimpleMobileServerType}
           episodeTitle={`Tập ${currentEpisode.id}`}
-          autoPlay={true}
-          muted={false}
-          onError={handleServerError}
-          onLoad={() => console.log(`Mobile Episode ${currentEpisode.id} loaded successfully on ${currentServer}`)}
-          onServerChange={handleMobileServerChange}
           className="mt-4"
         />
       );
@@ -204,7 +199,7 @@ const layoutConfig = useMemo(() => {
     if (viewport.isMobile) {
       // Only show mobile servers on mobile
       const mobileServer = ['helvid', 'hydax'].includes(currentServer) 
-        ? currentServer as MobileServerType 
+        ? currentServer as SimpleMobileServerType 
         : 'helvid';
       
       return (

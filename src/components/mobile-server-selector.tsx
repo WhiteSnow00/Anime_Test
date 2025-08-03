@@ -6,12 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Play, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { MobileServerType } from './mobile-video-player';
+import type { SimpleMobileServerType } from './simple-mobile-player';
 import type { Episode } from '@/data/anime';
 
 interface MobileServerSelectorProps {
-  currentServer: MobileServerType;
-  onServerChange: (server: MobileServerType) => void;
+  currentServer: SimpleMobileServerType;
+  onServerChange: (server: SimpleMobileServerType) => void;
   currentEpisode: Episode;
   className?: string;
 }
@@ -39,13 +39,13 @@ export function MobileServerSelector({
   currentEpisode,
   className
 }: MobileServerSelectorProps) {
-  const servers: MobileServerType[] = ['helvid', 'hydax'];
+  const servers: SimpleMobileServerType[] = ['helvid', 'hydax'];
 
-  const isServerAvailable = (server: MobileServerType): boolean => {
+  const isServerAvailable = (server: SimpleMobileServerType): boolean => {
     return Boolean(currentEpisode.servers[server]);
   };
 
-  const getServerStatus = (server: MobileServerType): 'active' | 'available' | 'unavailable' => {
+  const getServerStatus = (server: SimpleMobileServerType): 'active' | 'available' | 'unavailable' => {
     if (!isServerAvailable(server)) return 'unavailable';
     return server === currentServer ? 'active' : 'available';
   };
