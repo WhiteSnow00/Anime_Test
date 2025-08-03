@@ -57,15 +57,22 @@ export function SimpleMobilePlayer({
     return videoUrl;
   }, [videoId, server]);
 
-  // Simple mobile dimensions
+  // State to track fullscreen
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Simple mobile dimensions - responsive for fullscreen
   const iframeDimensions = useMemo(() => {
     if (typeof window !== 'undefined') {
+      if (isFullscreen) {
+        // Use viewport dimensions in fullscreen
+        return { width: '100%', height: '100%' };
+      }
       const width = Math.min(window.innerWidth - 16, 800);
       const height = Math.floor(width * 9 / 16);
       return { width, height };
     }
     return { width: 400, height: 225 };
-  }, []);
+  }, [isFullscreen]);
 
   // Simple load handler with proper state management
   const handleIframeLoad = useCallback(() => {
@@ -132,9 +139,38 @@ export function SimpleMobilePlayer({
     );
   }
 
+  // Handle fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const fullscreenElement = document.fullscreenElement || 
+                                (document as any).webkitFullscreenElement ||
+                                (document as any).mozFullScreenElement ||
+                                (document as any).msFullscreenElement;
+      
+      const isNowFullscreen = fullscreenElement === iframeRef.current ||
+                              fullscreenElement?.contains(iframeRef.current);
+      
+      console.log('Fullscreen status changed:', isNowFullscreen);
+      setIsFullscreen(isNowFullscreen);
+    };
+
+    // Add listeners for various fullscreen APIs
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
+  }, []);
+
   return (
-    <Card className={cn("w-full overflow-hidden shadow-lg rounded-lg", className)}>
-      <div className="aspect-video bg-muted relative">
+    <Card className={cn("w-full overflow-hidden shadow-lg rounded-lg", isFullscreen ? "fixed inset-0 z-[9999] rounded-none" : "", className)}>
+      <div className={cn("bg-muted relative", isFullscreen ? "w-full h-full" : "aspect-video")}>
         {/* Loading overlay */}
         {isLoading && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/90 backdrop-blur-sm z-10">
@@ -193,7 +229,7 @@ export function SimpleMobilePlayer({
           frameBorder="0"
           scrolling="no"
           allowFullScreen={true}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
           onLoad={handleIframeLoad}
           onError={handleIframeError}
           className="w-full h-full"
@@ -201,7 +237,7 @@ export function SimpleMobilePlayer({
             border: 'none',
             outline: 'none',
             opacity: isLoading ? 0 : 1,
-            transition: 'opacity 0.3s ease-in-out',
+            transition: isFullscreen ? 'none' : 'opacity 0.3s ease-in-out',
           }}
           title={`Video player for ${episodeTitle}`}
           aria-label={`Video content for ${episodeTitle}`}
