@@ -77,6 +77,8 @@ export async function GET(request: NextRequest) {
     const userAgent = request.headers.get('user-agent') || '';
     const clientSession = request.headers.get('x-client-session');
     const playerToken = request.headers.get('x-player-token');
+    const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+    const isAndroid = /android/i.test(userAgent);
 
     const filePath = join(process.cwd(), 'src', 'm3u8', file);
     
@@ -95,6 +97,27 @@ export async function GET(request: NextRequest) {
       });
       
       fileContent = rewrittenLines.join('\n');
+      
+      // Add mobile-specific optimizations to the playlist
+      if (isMobile) {
+        // Add mobile-optimized headers to the m3u8 content
+        const mobileOptimizations = [
+          '#EXT-X-TARGETDURATION:10',
+          '#EXT-X-MEDIA-SEQUENCE:0',
+          '#EXT-X-PLAYLIST-TYPE:VOD'
+        ];
+        
+        // Insert optimizations after #EXTM3U if not already present
+        if (!fileContent.includes('#EXT-X-TARGETDURATION')) {
+          const lines = fileContent.split('\n');
+          const extm3uIndex = lines.findIndex(line => line.startsWith('#EXTM3U'));
+          if (extm3uIndex !== -1) {
+            lines.splice(extm3uIndex + 1, 0, ...mobileOptimizations);
+            fileContent = lines.join('\n');
+          }
+        }
+      }
+      
       if (obfuscatedFile && token && timestamp) {
         const noiseComments = [
           `# Protected Stream - Session: ${sessionId || 'unknown'}`,
@@ -107,16 +130,20 @@ export async function GET(request: NextRequest) {
       }
             const headers = new Headers({
         'Content-Type': 'application/vnd.apple.mpegurl',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
+        'Cache-Control': isAndroid ? 'public, max-age=300, stale-while-revalidate=900' : (isMobile ? 'public, max-age=600, stale-while-revalidate=1800' : 'no-cache, no-store, must-revalidate'),
+        'Pragma': isMobile ? 'public' : 'no-cache',
+        'Expires': isMobile ? new Date(Date.now() + 600000).toUTCString() : '0',
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
         'Access-Control-Allow-Headers': 'Range, Content-Type, X-Client-Session, X-Player-Token, X-Anti-Track, X-Session-Guard',
         'X-Content-Type-Options': 'nosniff',
         'X-Frame-Options': 'SAMEORIGIN',
         'X-Stream-Protected': 'true',
+        'X-Mobile-Optimized': isMobile ? 'true' : 'false',
+        'X-Android-Optimized': isAndroid ? 'true' : 'false',
         'X-Session-Token': btoa(Date.now().toString() + Math.random().toString()),
+        'Connection': 'keep-alive',
+        'Keep-Alive': 'timeout=30, max=1000',
       });
 
       return new NextResponse(fileContent, {

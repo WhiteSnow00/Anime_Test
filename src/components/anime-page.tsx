@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { animeData, type Episode } from '@/data/anime';
 import { VideoPlayer } from './video-player';
 import { SimpleMobilePlayer, type SimpleMobileServerType } from './simple-mobile-player';
-import { MobileServerSelector } from './mobile-server-selector';
+import { MobileServerSelector, type MobileServerType } from './mobile-server-selector';
 import { EpisodeSelector } from './episode-selector';
 import { ServerSelector, type ServerType } from './server-selector';
 import { AnimeInfo } from './anime-info';
@@ -33,9 +33,10 @@ const [isHydrated, setIsHydrated] = useState(false);
     return () => clearTimeout(timeoutId);
   }, []);
 
-  // Initialize with first available server
+  // Initialize with HLS as preferred server (especially for mobile)
   const getDefaultServer = (): ServerType => {
     const firstEpisode = animeData.episodes[0];
+    // Always prioritize HLS first as it's the best for mobile and general use
     if (firstEpisode.servers.hls) return 'hls';
     if (firstEpisode.servers.helvid) return 'helvid';
     if (firstEpisode.servers.hydax) return 'hydax';
@@ -48,7 +49,7 @@ const [isHydrated, setIsHydrated] = useState(false);
     setCurrentServer(server);
   }, []);
 
-  const handleMobileServerChange = useCallback((server: SimpleMobileServerType) => {
+  const handleMobileServerChange = useCallback((server: MobileServerType) => {
     setCurrentServer(server as ServerType);
   }, []);
 
@@ -130,9 +131,11 @@ const handleServerError = useCallback((error: string) => {
         setCurrentServer("hydax");
       }
     } else {
-      // For actual mobile devices, set to mobile-compatible servers
+      // For actual mobile devices, prefer HLS as the primary server
       const firstEpisode = animeData.episodes[0];
-      if (firstEpisode.servers.helvid) {
+      if (firstEpisode.servers.hls) {
+        setCurrentServer('hls');
+      } else if (firstEpisode.servers.helvid) {
         setCurrentServer("helvid");
       } else if (firstEpisode.servers.hydax) {
         setCurrentServer("hydax");
@@ -154,8 +157,10 @@ const handleServerError = useCallback((error: string) => {
         
         // Set server based on device type and availability  
         if (viewport.isActualMobile) {
-          // For actual mobile devices, prefer mobile-compatible servers
-          if (episode.servers.helvid) {
+          // For actual mobile devices, prefer HLS as the primary server
+          if (episode.servers.hls) {
+            setCurrentServer('hls');
+          } else if (episode.servers.helvid) {
             setCurrentServer('helvid');
           } else if (episode.servers.hydax) {
             setCurrentServer('hydax');
@@ -243,7 +248,23 @@ const layoutConfig = useMemo(() => {
       );
     }
 
-    if (viewport.isActualMobile && ['helvid', 'hydax'].includes(currentServer)) {
+    if (viewport.isActualMobile && ['hls', 'helvid', 'hydax'].includes(currentServer)) {
+      // For mobile HLS, use JWPlayer for better performance and features
+      if (currentServer === 'hls') {
+        return (
+          <VideoPlayer 
+            videoId={getCurrentVideoId(currentEpisode)}
+            server={currentServer}
+            episodeTitle={`Tập ${currentEpisode.id}`}
+            autoPlay={true}
+            muted={false}
+            onError={handleServerError}
+            onLoad={() => console.log(`Mobile HLS Episode ${currentEpisode.id} loaded successfully on JWPlayer`)}
+          />
+        );
+      }
+      
+      // For mobile helvid/hydax, continue using SimpleMobilePlayer
       return (
         <SimpleMobilePlayer 
           videoId={getCurrentVideoId(currentEpisode)}
@@ -281,10 +302,10 @@ const layoutConfig = useMemo(() => {
     }
 
     if (viewport.isActualMobile) {
-      // Only show mobile servers on actual mobile devices
-      const mobileServer = ['helvid', 'hydax'].includes(currentServer) 
-        ? currentServer as SimpleMobileServerType 
-        : 'helvid';
+      // Show all servers including HLS on actual mobile devices
+      const mobileServer = ['hls', 'helvid', 'hydax'].includes(currentServer) 
+        ? currentServer as MobileServerType 
+        : 'hls'; // Default to HLS for mobile
       
       return (
         <MobileServerSelector
@@ -324,7 +345,7 @@ const layoutConfig = useMemo(() => {
         </div>
 
         <div className="mb-4">
-          <Alert className="mx-3 sm:mx-0 border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
+          <Alert className="sm:mx-0 border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
             <Info className="h-4 w-4 text-amber-600 dark:text-amber-400" />
             <AlertDescription className="text-xs sm:text-sm text-amber-800 dark:text-amber-200 vietnamese-text leading-relaxed ml-1">
               Các bạn xem anime trên điện thoại vui lòng sử dụng chế độ máy tính của trình duyệt(nếu có) hoặc tải video về máy để tránh lỗi phát sinh. 

@@ -40,6 +40,12 @@ export function JWPlayerComponent({
     return hasTouch && (mobileRegex.test(userAgent.toLowerCase()) || isSmallScreen);
   };
 
+  const isAndroidDevice = () => {
+    if (typeof window === 'undefined') return false;
+    const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+    return /android/i.test(userAgent.toLowerCase());
+  };
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const isMobile = isMobileDevice();
@@ -619,9 +625,228 @@ export function JWPlayerComponent({
       clearInterval(decoyInterval);
     };
     } else {
-      console.log('Mobile device detected - protection features disabled for performance');
+      console.log('Mobile device detected - applying mobile-specific security measures');
+      
+      // Mobile-specific security measures
+      const setupMobileSecurity = () => {
+        // Enhanced dev tools detection for mobile
+        let mobileDevtools = { open: false, lastCheck: Date.now() };
+        
+        const checkMobileDevTools = () => {
+          const now = Date.now();
+          
+          // Check for console abuse on mobile
+          if (typeof window.console !== 'undefined') {
+            const threshold = 50; // Lower threshold for mobile
+            if (window.outerHeight - window.innerHeight > threshold || 
+                window.outerWidth - window.innerWidth > threshold) {
+              if (!mobileDevtools.open) {
+                mobileDevtools.open = true;
+                console.clear();
+                console.log('%cMobile Dev Tools Detected! 📱🔒', 'color: red; font-size: 16px; font-weight: bold;');
+                console.log('%cStream protection activated for mobile device', 'color: orange; font-size: 12px;');
+                
+                // Clear console periodically on mobile
+                const consoleClearTimer = setInterval(() => {
+                  console.clear();
+                  console.log('%c🔒 Protected Mobile Stream', 'color: red; font-size: 14px;');
+                }, 2000);
+                
+                // Stop clearing after 30 seconds
+                setTimeout(() => clearInterval(consoleClearTimer), 30000);
+              }
+            } else {
+              mobileDevtools.open = false;
+            }
+          }
+          
+          // Additional mobile security: Check for suspicious timing
+          if (now - mobileDevtools.lastCheck > 5000) {
+            console.clear();
+            console.log('%c📱 Mobile Security Active', 'color: blue; font-size: 12px;');
+          }
+          mobileDevtools.lastCheck = now;
+        };
+        
+        // Check more frequently on mobile
+        const mobileSecurityTimer = setInterval(checkMobileDevTools, 1500);
+        
+        // Mobile console protection
+        const originalMobileLog = console.log;
+        const originalMobileError = console.error;
+        const originalMobileWarn = console.warn;
+        
+        // Override console methods for mobile
+        console.log = (...args: any[]) => {
+          const filteredArgs = args.filter(arg => {
+            if (typeof arg === 'string') {
+              return !arg.includes('HLS') && !arg.includes('jwplayer') && !arg.includes('stream');
+            }
+            return true;
+          });
+          
+          if (filteredArgs.length > 0) {
+            originalMobileLog.apply(console, ['[MOBILE]', ...filteredArgs]);
+          }
+        };
+        
+        console.error = (...args: any[]) => {
+          const filteredArgs = args.filter(arg => {
+            if (typeof arg === 'string') {
+              return !arg.includes('stream') && !arg.includes('video') && !arg.includes('m3u8');
+            }
+            return true;
+          });
+          
+          if (filteredArgs.length > 0) {
+            originalMobileError.apply(console, ['[MOBILE ERROR]', ...filteredArgs]);
+          }
+        };
+        
+        console.warn = (...args: any[]) => {
+          originalMobileWarn.apply(console, ['[MOBILE WARN]', ...args]);
+        };
+        
+        // Mobile-specific DOM protection
+        const protectMobileDOM = () => {
+          const videoElements = document.querySelectorAll('video');
+          videoElements.forEach(video => {
+            if (video && video instanceof HTMLVideoElement) {
+              // Prevent mobile debugging of video element
+              Object.defineProperty(video, 'src', {
+                get: () => 'protected://mobile-stream',
+                set: () => {},
+                configurable: false
+              });
+              
+              // Add mobile-specific event listeners
+              video.addEventListener('loadstart', () => {
+                console.clear();
+                console.log('%c📱 Mobile Stream Loading...', 'color: green; font-size: 12px;');
+              });
+            }
+          });
+        };
+        
+        // Apply mobile DOM protection after a delay
+        setTimeout(protectMobileDOM, 2000);
+        
+        // Cleanup function for mobile security
+        return () => {
+          clearInterval(mobileSecurityTimer);
+          console.log = originalMobileLog;
+          console.error = originalMobileError;
+          console.warn = originalMobileWarn;
+        };
+      };
+      
+      // Initialize mobile security
+      const mobileSecurityCleanup = setupMobileSecurity();
+      
+      // Return cleanup function
+      return mobileSecurityCleanup;
     }
   }, []); 
+
+  // Enhanced mobile security measures
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const isMobile = isMobileDevice();
+    if (isMobile) {
+      // Mobile-specific global security measures
+      const setupGlobalMobileSecurity = () => {
+        // Disable common mobile debugging shortcuts
+        const preventMobileInspect = (e: KeyboardEvent) => {
+          // Prevent F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U on mobile browsers that support it
+          if (e.key === 'F12' || 
+              (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J')) ||
+              (e.ctrlKey && e.key === 'U')) {
+            e.preventDefault();
+            console.clear();
+            console.log('%c🚫 Mobile Inspector Blocked', 'color: red; font-size: 14px;');
+            return false;
+          }
+        };
+        
+        // Add mobile right-click protection for video elements
+        const preventMobileContextMenu = (e: Event) => {
+          const target = e.target as HTMLElement;
+          if (target.tagName === 'VIDEO' || target.closest('#kana-jwplayer')) {
+            e.preventDefault();
+            console.clear();
+            console.log('%c📱 Mobile Context Menu Blocked', 'color: orange; font-size: 12px;');
+            return false;
+          }
+        };
+        
+        // Mobile text selection prevention for sensitive areas
+        const preventMobileSelection = (e: Event) => {
+          const target = e.target as HTMLElement;
+          if (target.tagName === 'VIDEO' || target.closest('#kana-jwplayer')) {
+            e.preventDefault();
+            return false;
+          }
+        };
+        
+        // Add event listeners
+        document.addEventListener('keydown', preventMobileInspect, true);
+        document.addEventListener('contextmenu', preventMobileContextMenu, true);
+        document.addEventListener('selectstart', preventMobileSelection, true);
+        
+        // Mobile console spam protection
+        let consoleSpamCount = 0;
+        const originalConsoleLog = console.log;
+        
+        const protectedMobileConsole = (...args: any[]) => {
+          consoleSpamCount++;
+          if (consoleSpamCount > 10) {
+            console.clear();
+            console.log('%c🔒 Mobile Console Protected - Too Many Logs', 'color: red; font-size: 12px;');
+            consoleSpamCount = 0;
+            return;
+          }
+          originalConsoleLog.apply(console, args);
+        };
+        
+        // Reset spam counter periodically
+        const resetSpamCounter = setInterval(() => {
+          consoleSpamCount = 0;
+        }, 5000);
+        
+        // Mobile visibility change detection (switching apps/tabs)
+        const handleMobileVisibilityChange = () => {
+          if (document.hidden) {
+            console.clear();
+            console.log('%c📱 Mobile App Switched - Security Active', 'color: blue; font-size: 12px;');
+          }
+        };
+        
+        document.addEventListener('visibilitychange', handleMobileVisibilityChange);
+        
+        // Cleanup function
+        return () => {
+          document.removeEventListener('keydown', preventMobileInspect, true);
+          document.removeEventListener('contextmenu', preventMobileContextMenu, true);
+          document.removeEventListener('selectstart', preventMobileSelection, true);
+          document.removeEventListener('visibilitychange', handleMobileVisibilityChange);
+          clearInterval(resetSpamCounter);
+          console.log = originalConsoleLog;
+        };
+      };
+      
+      const globalSecurityCleanup = setupGlobalMobileSecurity();
+      
+      // Initial mobile security message
+      setTimeout(() => {
+        console.clear();
+        console.log('%c📱 Mobile Security Initialized', 'color: green; font-size: 14px; font-weight: bold;');
+        console.log('%cStream protection active for mobile device', 'color: blue; font-size: 12px;');
+      }, 1000);
+      
+      return globalSecurityCleanup;
+    }
+  }, []);
 
   const getVideoUrl = useCallback(() => {
     if (server === 'hls') {
@@ -745,6 +970,13 @@ export function JWPlayerComponent({
       
       console.log('Initializing JWPlayer with URL:', videoUrl);
       console.log('Video ID:', videoId, 'Server:', server);
+      
+      if (server === 'hls' && isMobileDevice()) {
+        console.log('Using JWPlayer for HLS on mobile device with optimized settings');
+        if (isAndroidDevice()) {
+          console.log('Android device detected - applying Android-specific HLS fixes for error 224003');
+        }
+      }
 
       if (playerInstanceRef.current) {
         try {
@@ -805,55 +1037,95 @@ export function JWPlayerComponent({
           const video = document.createElement('video');
           return video.canPlayType('application/vnd.apple.mpegurl') !== '';
         })();
+        
+        const isMobile = isMobileDevice();
+        const isAndroid = isAndroidDevice();
+        
+        // Android-specific HLS configuration to fix error 224003
+        const hlsConfig = {
+          enableWorker: false, 
+          lowLatencyMode: false,
+          backBufferLength: 10,
+          maxBufferLength: 20,
+          maxMaxBufferLength: 40,
+          maxBufferSize: 10 * 1000 * 1000,
+          maxBufferHole: 0.5,
+          highBufferWatchdogPeriod: 3,
+          nudgeOffset: 0.1,
+          nudgeMaxRetry: 3,
+          maxSeekHole: 2,
+          seekHoleNudgeDuration: 0.1,
+          maxFragLookUpTolerance: 0.25,
+          liveSyncDurationCount: 3,
+          liveMaxLatencyDurationCount: 6,
+          enableSoftwareAES: false,
+          // Mobile-optimized timeouts - longer for mobile, default for desktop
+          manifestLoadingTimeOut: isMobile ? 30000 : 10000,
+          manifestLoadingMaxRetry: isMobile ? 5 : 3,
+          manifestLoadingRetryDelay: isMobile ? 1500 : 1000,
+          fragmentLoadingTimeOut: isMobile ? 30000 : 20000,
+          fragmentLoadingMaxRetry: isMobile ? 8 : 6,
+          fragmentLoadingRetryDelay: isMobile ? 1000 : 1000,
+          startFragPrefetch: isMobile ? true : false,
+          testBandwidth: isMobile ? false : false,
+          progressive: isMobile ? true : false, 
+          abrEwmaFastLive: 3.0,
+          abrEwmaSlowLive: 9.0,
+          abrEwmaFastVoD: 3.0,
+          abrEwmaSlowVoD: 9.0,
+          maxStarvationDelay: 4,
+          maxLoadingDelay: 4,
+          startLevel: -1,
+          capLevelToPlayerSize: isMobile ? true : false,
+        };
+
+        // Android-specific overrides to fix error 224003
+        if (isAndroid) {
+          Object.assign(hlsConfig, {
+            enableWorker: false, // Disable workers on Android
+            lowLatencyMode: false,
+            backBufferLength: 5, // Reduce buffer for Android
+            maxBufferLength: 15, // Reduce buffer for Android
+            maxMaxBufferLength: 30, // Reduce buffer for Android
+            manifestLoadingTimeOut: 45000, // Even longer timeout for Android
+            fragmentLoadingTimeOut: 45000, // Even longer timeout for Android
+            manifestLoadingMaxRetry: 8, // More retries for Android
+            fragmentLoadingMaxRetry: 10, // More retries for Android
+            manifestLoadingRetryDelay: 2000, // Longer delay for Android
+            fragmentLoadingRetryDelay: 1500, // Longer delay for Android
+            enableSoftwareAES: true, // Force software AES on Android
+            progressive: true, // Force progressive on Android
+            startFragPrefetch: false, // Disable prefetch on Android to avoid conflicts
+            capLevelToPlayerSize: true, // Cap level on Android
+            testBandwidth: false, // Disable bandwidth test on Android
+            startLevel: 0, // Start with lowest quality on Android
+          });
+        }
+
         playerConfig = {
           ...playerConfig,
           file: videoUrl,
           type: "hls",
-          hlsjsdefault: !isNativeHLSSupported,
-          enableNativeHls: isNativeHLSSupported,
+          // Force HLS.js on Android to avoid native HLS issues
+          hlsjsdefault: isAndroid ? true : !isNativeHLSSupported,
+          enableNativeHls: isAndroid ? false : isNativeHLSSupported,
           safarihlsjs: false,
           title: `Hoa Thơm Kiêu hãnh ${videoId}`,
           hlshtml5: {
-            enableWorker: false, 
-            lowLatencyMode: false,
-            backBufferLength: 10,
-            maxBufferLength: 20,
-            maxMaxBufferLength: 40,
-            maxBufferSize: 10 * 1000 * 1000,
-            maxBufferHole: 0.5,
-            highBufferWatchdogPeriod: 3,
-            nudgeOffset: 0.1,
-            nudgeMaxRetry: 3,
-            maxSeekHole: 2,
-            seekHoleNudgeDuration: 0.1,
-            maxFragLookUpTolerance: 0.25,
-            liveSyncDurationCount: 3,
-            liveMaxLatencyDurationCount: 6,
-            enableSoftwareAES: false,
-            manifestLoadingTimeOut: 10000,
-            manifestLoadingMaxRetry: 3,
-            manifestLoadingRetryDelay: 1000,
-            fragmentLoadingTimeOut: 20000,
-            fragmentLoadingMaxRetry: 6,
-            fragmentLoadingRetryDelay: 1000,
-            startFragPrefetch: false,
-            testBandwidth: false,
-            progressive: false, 
-            abrEwmaFastLive: 3.0,
-            abrEwmaSlowLive: 9.0,
-            abrEwmaFastVoD: 3.0,
-            abrEwmaSlowVoD: 9.0,
-            maxStarvationDelay: 4,
-            maxLoadingDelay: 4,
-            startLevel: -1,
-            capLevelToPlayerSize: false,
-            xhrSetup: function(xhr, url) {
+            ...hlsConfig,
+            xhrSetup: function(xhr: any, url: any) {
               xhr.setRequestHeader('Accept', '*/*');
               xhr.withCredentials = false;
-                if (url.includes('tiktokcdn.com')) {
+              // Android-specific headers
+              if (isAndroid) {
+                xhr.setRequestHeader('Cache-Control', 'no-cache');
+                xhr.setRequestHeader('Pragma', 'no-cache');
+                xhr.setRequestHeader('User-Agent', navigator.userAgent);
+              }
+              if (url.includes('tiktokcdn.com')) {
                 return;
               }
-                if (url.startsWith('/api/') || url.startsWith(window.location.origin)) {
+              if (url.startsWith('/api/') || url.startsWith(window.location.origin)) {
                 xhr.setRequestHeader('Cache-Control', 'no-cache');
                 xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
               }
@@ -1092,7 +1364,12 @@ export function JWPlayerComponent({
         let errorMessage = `Failed to load video: hls - ${videoId} (JWPlayer error: ${e.message || e.code || 'Unknown error'})`;
         let shouldRetry = false;
         
-        if (e.code === 232011 || e.code === '232011') {
+        // Android-specific error 224003 handling
+        if (e.code === 224003 || e.code === '224003') {
+          console.error('Android error 224003 detected - HLS playback failure');
+          errorMessage = `Failed to load video: hls - ${videoId} (Android HLS error 224003 - trying fallback)`;
+          shouldRetry = true; // Attempt retry for Android 224003
+        } else if (e.code === 232011 || e.code === '232011') {
           errorMessage = `Failed to load video: hls - ${videoId} (HLS network error - cannot load segments)`;
           shouldRetry = false;
         } else if (e.code === 232404 || e.code === '232404') {
@@ -1119,15 +1396,26 @@ export function JWPlayerComponent({
         setError(errorMessage);
         
         if (shouldRetry) {
+          const retryDelay = (e.code === 224003 || e.code === '224003') ? 3000 : 2000; // Longer delay for Android 224003
           setTimeout(() => {
             try {
-              player.load();
+              console.log('Attempting to retry video load...');
+              if (e.code === 224003 || e.code === '224003') {
+                // For Android 224003, try reloading with fresh configuration
+                console.log('Retrying Android 224003 error with fresh player setup');
+                player.stop();
+                setTimeout(() => {
+                  player.load();
+                }, 500);
+              } else {
+                player.load();
+              }
               setError(null);
             } catch (retryError) {
               console.error('Retry failed:', retryError);
               setError('Không thể kết nối lại. Vui lòng thử lại sau.');
             }
-          }, 2000);
+          }, retryDelay);
         }
         setIsLoading(false);
         onError?.(errorMessage);
