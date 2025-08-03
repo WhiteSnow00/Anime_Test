@@ -4,9 +4,19 @@ import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react'
 import { Card } from '@/components/ui/card';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getEpisodeData } from '@/data/anime';
+import { animeData } from '@/data/anime';
 
 export type MobileServerType = 'helvid' | 'hydax';
+
+// Helper function to get episode data by videoId or episode number
+const getEpisodeData = (videoId: string) => {
+  return animeData.episodes.find(ep => 
+    ep.videoId === videoId || 
+    ep.id.toString().padStart(2, '0') === videoId ||
+    ep.servers.helvid === videoId ||
+    ep.servers.hydax === videoId
+  );
+};
 
 interface MobileVideoPlayerProps {
   videoId: string;

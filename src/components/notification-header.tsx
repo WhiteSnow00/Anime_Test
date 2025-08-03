@@ -183,7 +183,7 @@ export function NotificationHeader({ className }: NotificationHeaderProps) {
                       <p className="text-sm sm:text-base text-foreground vietnamese-text leading-relaxed">
                         Bản Dịch Sẽ Có Mặt Tại Web Vào Tầm{' '}
                         <span className="font-bold text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/30 px-2 py-0.5 rounded-md whitespace-nowrap">
-                          12h Sáng Chủ Nhật
+                          Thứ 4 - Thứ 6
                         </span>
                       </p>
                     </div>
