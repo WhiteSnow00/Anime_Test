@@ -100,5 +100,17 @@ export const animeData: Anime = {
       downloadUrl: 'https://drive.google.com/file/d/1EnWQNbCZvtDkB8vdvBwSsclJ4jgsjzj5/view?usp=sharing',
       rawDownloadUrl: 'https://drive.google.com/file/d/1n5j15eQR2umkpIW48yYz0Y5Wkm0uWNqw/view?usp=sharing'
     },
+    { 
+      id: 5, 
+      title: 'Episode 5', 
+      videoId: '05',
+      servers: {
+        hls: '',
+        helvid: 'ec6ea16c9c5e',
+        hydax: 'nc905xM7j'
+      },
+      downloadUrl: 'https://drive.google.com/file/d/1EnWQNbCZvtDkB8vdvBwSsclJ4jgsjzj5/view?usp=sharing',
+      rawDownloadUrl: 'https://drive.google.com/file/d/1n5j15eQR2umkpIW48yYz0Y5Wkm0uWNqw/view?usp=sharing'
+    },
   ],
 };

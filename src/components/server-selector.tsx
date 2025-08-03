@@ -115,6 +115,11 @@ function ServerSelectorComponent({
             const isValidServer = episodeValidation ? episodeValidation[server] : true;
             const reliability = getServerReliabilityScore(server);
             
+            // Hide HLS server if the current episode doesn't have HLS server data
+            if (server === 'hls' && currentEpisode && !currentEpisode.servers.hls) {
+              return null;
+            }
+            
             // Hide helvid server if the current episode doesn't have helvid server data
             if (server === 'helvid' && currentEpisode && !currentEpisode.servers.helvid) {
               return null;

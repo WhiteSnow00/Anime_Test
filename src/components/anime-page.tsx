@@ -14,7 +14,7 @@ import { CommentSection } from './comment-section';
 import { NotificationHeader } from './notification-header';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Heart, Info } from 'lucide-react';
-import { clearEpisodePosition } from '@/lib/download-utils';
+import { clearEpisodePosition, triggerDownload, openGoogleDriveLink } from '@/lib/download-utils';
 import { useScrollNavigation } from '@/hooks/use-scroll-navigation';
 import { useViewport } from '@/hooks/use-viewport';
 import { useAnimeState } from '@/hooks/use-anime-state';
@@ -33,7 +33,16 @@ const [isHydrated, setIsHydrated] = useState(false);
     return () => clearTimeout(timeoutId);
   }, []);
 
-const [currentServer, setCurrentServer] = useState<ServerType>('hls');
+  // Initialize with first available server
+  const getDefaultServer = (): ServerType => {
+    const firstEpisode = animeData.episodes[0];
+    if (firstEpisode.servers.hls) return 'hls';
+    if (firstEpisode.servers.helvid) return 'helvid';
+    if (firstEpisode.servers.hydax) return 'hydax';
+    return 'hls'; // Fallback
+  };
+
+  const [currentServer, setCurrentServer] = useState<ServerType>(getDefaultServer());
 
   const handleServerChange = useCallback((server: ServerType) => {
     setCurrentServer(server);
@@ -49,12 +58,32 @@ const getCurrentVideoId = useCallback((episode: Episode) => {
     if (currentVideoId) {
       return currentVideoId;
     }
-    return episode.servers.hls || '';
+    // Return first available server video ID
+    if (episode.servers.hls) return episode.servers.hls;
+    if (episode.servers.helvid) return episode.servers.helvid;
+    if (episode.servers.hydax) return episode.servers.hydax;
+    return '';
   }, [currentServer]);
 
 const { state, actions, computed } = useAnimeState(animeData);
   const currentEpisode = state.currentEpisode || animeData.episodes[0];
   const currentSection = state.currentSection;
+
+  const handleMobileDownload = useCallback((url: string, filename: string) => {
+    if (url.includes('drive.google.com')) {
+      openGoogleDriveLink(url, filename, false, currentEpisode.id);
+    } else {
+      triggerDownload(url, filename);
+    }
+  }, [currentEpisode]);
+
+  const handleMobileRawDownload = useCallback((url: string, filename: string) => {
+    if (url.includes('drive.google.com')) {
+      openGoogleDriveLink(url, filename, true, currentEpisode.id);
+    } else {
+      triggerDownload(url, filename);
+    }
+  }, [currentEpisode]);
 
 const handleServerError = useCallback((error: string) => {
     console.error('Server error:', error);
@@ -91,7 +120,13 @@ const handleServerError = useCallback((error: string) => {
 
   useEffect(() => {
     if (!viewport?.isDesktop) {
-      setCurrentServer("helvid");
+      // For mobile, set to helvid if available, otherwise hydax
+      const firstEpisode = animeData.episodes[0];
+      if (firstEpisode.servers.helvid) {
+        setCurrentServer("helvid");
+      } else if (firstEpisode.servers.hydax) {
+        setCurrentServer("hydax");
+      }
     }
   }, []);
 
@@ -106,13 +141,22 @@ const handleServerError = useCallback((error: string) => {
       (episode: Episode) => {
         actions.setEpisode(episode);
         scrollActions.scrollToTop();
-        setCurrentServer(viewport.isDesktop ? "hls" : "helvid");
-        console.log(`Episode changed to ${episode.id}, resetting server to HLS`);
+        
+        // Set server based on availability
+        if (viewport.isDesktop && episode.servers.hls) {
+          setCurrentServer('hls');
+        } else if (episode.servers.helvid) {
+          setCurrentServer('helvid');
+        } else if (episode.servers.hydax) {
+          setCurrentServer('hydax');
+        }
+        
+        console.log(`Episode changed to ${episode.id}, server set based on availability`);
         
         return episode;
       }
     ),
-    [actions.setEpisode, scrollActions.scrollToTop]
+    [actions.setEpisode, scrollActions.scrollToTop, viewport]
   );
 
   const handleNavigate = useCallback((section: string) => {
@@ -207,6 +251,8 @@ const layoutConfig = useMemo(() => {
           currentServer={mobileServer}
           onServerChange={handleMobileServerChange}
           currentEpisode={currentEpisode}
+          onDownload={handleMobileDownload}
+          onRawDownload={handleMobileRawDownload}
         />
       );
     }
@@ -218,7 +264,7 @@ const layoutConfig = useMemo(() => {
         currentEpisode={currentEpisode}
       />
     );
-  }, [viewport.isMobile, currentServer, currentEpisode, handleServerChange, handleMobileServerChange]);
+  }, [viewport.isMobile, currentServer, currentEpisode, handleServerChange, handleMobileServerChange, handleMobileDownload, handleMobileRawDownload]);
 
   const episodeStats = useMemo(() => episodeOps.getStats(), [episodeOps]);
 
@@ -241,7 +287,7 @@ const layoutConfig = useMemo(() => {
           <Alert className="mx-3 sm:mx-0 border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
             <Info className="h-4 w-4 text-amber-600 dark:text-amber-400" />
             <AlertDescription className="text-xs sm:text-sm text-amber-800 dark:text-amber-200 vietnamese-text leading-relaxed ml-1">
-              Các bạn xem anime trên điện thoại vui lòng sử dụng chế độ máy tính của trình duyệt(nếu có) hoặc xoay ngang màn hình rồi bật toán màn hình để tránh lỗi phát sinh. 
+              Các bạn xem anime trên điện thoại vui lòng sử dụng chế độ máy tính của trình duyệt(nếu có) hoặc tải video về máy để tránh lỗi phát sinh. 
             </AlertDescription>
           </Alert>
         </div>

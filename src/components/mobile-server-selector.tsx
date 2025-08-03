@@ -1,10 +1,10 @@
 "use client";
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Play, AlertCircle } from 'lucide-react';
+import { Play, AlertCircle, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { SimpleMobileServerType } from './simple-mobile-player';
 import type { Episode } from '@/data/anime';
@@ -14,6 +14,8 @@ interface MobileServerSelectorProps {
   onServerChange: (server: SimpleMobileServerType) => void;
   currentEpisode: Episode;
   className?: string;
+  onDownload: (url: string, filename: string) => void;
+  onRawDownload: (url: string, filename: string) => void;
 }
 
 const MOBILE_SERVER_CONFIG = {
@@ -37,9 +39,21 @@ export function MobileServerSelector({
   currentServer,
   onServerChange,
   currentEpisode,
-  className
+  className,
+  onDownload,
+  onRawDownload
 }: MobileServerSelectorProps) {
   const servers: SimpleMobileServerType[] = ['helvid', 'hydax'];
+
+  const handleDownload = useCallback(() => {
+    if (!currentEpisode?.downloadUrl) return;
+    onDownload(currentEpisode.downloadUrl, `Tập ${currentEpisode.id}`);
+  }, [currentEpisode, onDownload]);
+
+  const handleRawDownload = useCallback(() => {
+    if (!currentEpisode?.rawDownloadUrl) return;
+    onRawDownload(currentEpisode.rawDownloadUrl, `Tập ${currentEpisode.id} RAW`);
+  }, [currentEpisode, onRawDownload]);
 
   const isServerAvailable = (server: SimpleMobileServerType): boolean => {
     return Boolean(currentEpisode.servers[server]);
@@ -112,7 +126,30 @@ export function MobileServerSelector({
             );
           })}
         </div>
-        
+
+        {currentEpisode?.downloadUrl && (
+          <Button
+            variant="outline"
+            className="w-full mt-3 flex items-center gap-2 bg-purple-500 text-white hover:bg-purple-600 border-purple-500"
+            onClick={handleDownload}
+            aria-label="Tải về anime sub"
+          >
+            <Download className="h-4 w-4" />
+            <span>Tải về (Sub)</span>
+          </Button>
+        )}
+        {currentEpisode?.rawDownloadUrl && (
+          <Button
+            variant="outline"
+            className="w-full mt-2 flex items-center gap-2 bg-gray-500 text-white hover:bg-gray-600 border-gray-500"
+            onClick={handleRawDownload}
+            aria-label="Tải về anime raw"
+          >
+            <Download className="h-4 w-4" />
+            <span>Tải về (RAW)</span>
+          </Button>
+        )}
+
         <div className="mt-3 text-xs text-muted-foreground text-center">
           <p>Chỉ dành cho thiết bị di động. Sử dụng PC để có thêm tùy chọn server.</p>
         </div>
