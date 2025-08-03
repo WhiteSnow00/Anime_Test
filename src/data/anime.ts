@@ -109,8 +109,8 @@ export const animeData: Anime = {
         helvid: 'ec6ea16c9c5e',
         hydax: 'nc905xM7j'
       },
-      downloadUrl: 'https://drive.google.com/file/d/1EnWQNbCZvtDkB8vdvBwSsclJ4jgsjzj5/view?usp=sharing',
-      rawDownloadUrl: 'https://drive.google.com/file/d/1n5j15eQR2umkpIW48yYz0Y5Wkm0uWNqw/view?usp=sharing'
+      downloadUrl: '',
+      rawDownloadUrl: 'https://drive.google.com/file/d/13KCpzY2jDfPxtGqE87ZuaJxL-XupXzwu/view?usp=sharing'
     },
   ],
 };
