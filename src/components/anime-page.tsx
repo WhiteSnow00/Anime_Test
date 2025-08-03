@@ -1,247 +1,227 @@
 "use client";
 
-import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
-import { animeData, type Episode } from '@/data/anime';
-import { VideoPlayer } from './video-player';
-import { EpisodeSelector } from './episode-selector';
-import { ServerSelector, type ServerType } from './server-selector';
-import { AnimeInfo } from './anime-info';
-import { MobileHeader } from './mobile-header';
-import { MobileBottomNav } from './mobile-bottom-nav';
-import { CommentSection } from './comment-section';
-import { NotificationHeader } from './notification-header';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Heart, Info } from 'lucide-react';
-import { clearEpisodePosition } from '@/lib/download-utils';
-import { useScrollNavigation } from '@/hooks/use-scroll-navigation';
-import { useViewport } from '@/hooks/use-viewport';
-import { useAnimeState } from '@/hooks/use-anime-state';
-import { utils, fp } from '@/lib/advanced-utils';
-import { withPerformanceOptimization, withErrorBoundary } from '@/lib/higher-order-components';
-import { FloatingSupportWidget } from './floating-support-widget';
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { animeData, type Episode } from "@/data/anime";
+import { cn } from "@/lib/utils";
+import { Download, Heart, Info, Server, Tv } from "lucide-react";
+import { useLayoutEffect, useState } from "react";
+import { FloatingSupportWidget } from "./floating-support-widget";
+import { NotificationHeader } from "./notification-header";
+import JWPlayerNew from "./player/JWPlayerNew";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { CommentSection } from "./comment-section";
+import { AnimeInfo } from "./anime-info";
+import { MobileHeader } from "./mobile-header";
 
-function AnimePageComponent() {
-const [isHydrated, setIsHydrated] = useState(false);
-  
-  useEffect(() => {
-    setIsHydrated(true);
-    const timeoutId = setTimeout(() => {
-      clearEpisodePosition();
-    }, 1000);
-    return () => clearTimeout(timeoutId);
-  }, []);
-
-const [currentServer, setCurrentServer] = useState<ServerType>('hls');
-
-  const handleServerChange = useCallback((server: ServerType) => {
-    setCurrentServer(server);
-  }, []);
-
-const getCurrentVideoId = useCallback((episode: Episode) => {
-    const serverKey = currentServer as keyof typeof episode.servers;
-    const currentVideoId = episode.servers[serverKey];
-    if (currentVideoId) {
-      return currentVideoId;
-    }
-    return episode.servers.hls || '';
-  }, [currentServer]);
-
-const { state, actions, computed } = useAnimeState(animeData);
-  const currentEpisode = state.currentEpisode || animeData.episodes[0];
-  const currentSection = state.currentSection;
-
-const handleServerError = useCallback((error: string) => {
-    console.error('Server error:', error);
-    if (!error.includes('Failed to load video:')) {
-      return;
-    }
-    if (currentServer === 'hls' && currentEpisode) {
-      if (error.includes('hls') && (error.includes('404') || error.includes('network'))) {
-        const helvidId = currentEpisode.servers.helvid;
-        if (helvidId) {
-          console.log('HLS server failed with critical error, falling back to Helvid');
-          setCurrentServer('helvid');
-          return;
-        }
-      }
-    }
-    if (currentServer === 'helvid' || currentServer === 'hydax') {
-      console.log(`${currentServer} failed - user should manually switch back to HLS main server`);
-      return;
-    }
-    console.error('Server error for episode:', currentEpisode?.id, error);
-  }, [currentServer, currentEpisode]);
-
-  const { refs, actions: scrollActions } = useScrollNavigation({
-    behavior: 'smooth',
-    offset: 80,
-  });
-
-  const viewport = useViewport({
-    mobileBreakpoint: 768,
-    tabletBreakpoint: 1024,
-    debounceMs: 150,
-  });
-
-  useEffect(() => {
-    if (!viewport?.isDesktop) {
-      setCurrentServer("helvid");
-    }
-  }, []);
-
-  const episodeOps = useMemo(
-    () => utils.createEpisodeOperations(animeData.episodes),
-    [animeData.episodes]
+export default function AnimePage() {
+  const [playerType, setPlayerType] = useState<"iframe" | "jwplayer" | null>(
+    "jwplayer"
   );
 
-  const handleSelectEpisode = useCallback(
-    fp.compose(
-      utils.performance.measure,
-      (episode: Episode) => {
-        actions.setEpisode(episode);
-        scrollActions.scrollToTop();
-        setCurrentServer(viewport.isDesktop ? "hls" : "helvid");
-        console.log(`Episode changed to ${episode.id}, resetting server to HLS`);
-        
-        return episode;
-      }
-    ),
-    [actions.setEpisode, scrollActions.scrollToTop]
+  const [episodeNumber, setEpisodeNumber] = useState<number>(1);
+
+  const [videoUrl, setVideoUrl] = useState<null | string>(
+    animeData.episodes[0].servers[0].videoUrl as string
   );
 
-  const handleNavigate = useCallback((section: string) => {
-    actions.setSection(section);
-    scrollActions.scrollToSection(section);
-  }, [actions.setSection, scrollActions.scrollToSection]);
+  const handleSelectEpisode = (episodeNumber: Episode["id"]) => {
+    setEpisodeNumber(episodeNumber);
+    setVideoUrl(
+      animeData.episodes[episodeNumber - 1].servers[0].videoUrl as string
+    );
+  };
 
-  const handlePreviousEpisode = useCallback(() => {
-    const currentEpisode = state.currentEpisode;
-    if (!currentEpisode || !computed.canGoPrevious) return;
-
-    const previousEpisode = episodeOps.getCircularPrevious(currentEpisode.id);
-    if (previousEpisode && utils.validation.isValidEpisode(previousEpisode)) {
-      handleSelectEpisode(previousEpisode);
-      setTimeout(() => scrollActions.scrollToSection('video'), 100);
+  useLayoutEffect(() => {
+    if (videoUrl?.includes("/m3u8/")) {
+      setPlayerType("jwplayer");
+    } else {
+      setPlayerType("iframe");
     }
-  }, [state.currentEpisode, computed.canGoPrevious, episodeOps, handleSelectEpisode, scrollActions]);
-
-  const handleNextEpisode = useCallback(() => {
-    const currentEpisode = state.currentEpisode;
-    if (!currentEpisode || !computed.canGoNext) return;
-
-    const nextEpisode = episodeOps.getCircularNext(currentEpisode.id);
-    if (nextEpisode && utils.validation.isValidEpisode(nextEpisode)) {
-      handleSelectEpisode(nextEpisode);
-      setTimeout(() => scrollActions.scrollToSection('video'), 100);
-    }
-  }, [state.currentEpisode, computed.canGoNext, episodeOps, handleSelectEpisode, scrollActions]);
-
-  const { episodes, ...animeDetails } = useMemo(() => animeData, []);
-
-  const layoutConfig = useMemo(() => {
-    if (!isHydrated) {
-      return {
-        containerClass: "px-6 pb-6",
-        spacing: "space-y-6",
-        showDesktopFooter: true,
-        showMobileHeader: false,
-      };
-    }
-    
-    const { isMobile, isTablet, isDesktop } = viewport;
-    
-    return {
-      containerClass: isMobile
-        ? "px-2 sm:px-4 pb-32"
-        : isTablet
-        ? "px-4 lg:px-6 pb-20"
-        : "px-6 pb-6",
-      spacing: isMobile ? "space-y-4" : "space-y-6",
-      showDesktopFooter: isDesktop,
-      showMobileHeader: isMobile,
-    };
-  }, [isHydrated, viewport]);
-
-  const episodeStats = useMemo(() => episodeOps.getStats(), [episodeOps]);
+  }, [videoUrl]);
 
   return (
     <div className="min-h-screen bg-background">
       <FloatingSupportWidget />
 
-      {layoutConfig.showMobileHeader && (
-        <MobileHeader title={animeDetails.title} />
-      )}
+      <MobileHeader title={animeData.title} />
 
-      <div className={`w-full max-w-7xl mx-auto ${layoutConfig.spacing} ${layoutConfig.containerClass}`}>
+      <div className={`w-full max-w-7xl mx-auto`}>
         <NotificationHeader />
 
-        <div ref={refs.videoRef} id="video-section" data-section="video">
-          <VideoPlayer 
-            videoId={getCurrentVideoId(currentEpisode)} 
-            server={currentServer}
-            episodeTitle={`Tập ${currentEpisode.id}`}
-            autoPlay={true}
-            muted={false}
-            onError={handleServerError}
-            onLoad={() => console.log(`Episode ${currentEpisode.id} loaded successfully on ${currentServer}`)}
-          />
+        <div className="max-w-[1280px] aspect-video mx-auto w-full">
+          {playerType === "iframe" ? (
+            <iframe
+              src={videoUrl as string}
+              width="100%"
+              height="100%"
+              allowFullScreen
+            />
+          ) : (
+            <JWPlayerNew videoUrl={videoUrl as string} />
+          )}
         </div>
 
         <div className="mb-4">
           <Alert className="mx-3 sm:mx-0 border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
             <Info className="h-4 w-4 text-amber-600 dark:text-amber-400" />
             <AlertDescription className="text-xs sm:text-sm text-amber-800 dark:text-amber-200 vietnamese-text leading-relaxed ml-1">
-              Web vừa cập nhật server video mới, nếu gặp lỗi gì xin hãy comment hoặc thông báo trên Discord. Xem trên PC để có trải nghiệm tốt nhất. 
+              Web vừa cập nhật server video mới, nếu gặp lỗi gì xin hãy comment
+              hoặc thông báo trên Discord. Xem trên PC để có trải nghiệm tốt
+              nhất.
             </AlertDescription>
           </Alert>
         </div>
 
-        <div id="server-section" data-section="server">
-          <ServerSelector
-            currentServer={currentServer}
-            onServerChange={handleServerChange}
-            currentEpisode={currentEpisode}
-          />
+        <Card className={cn("w-full shadow-lg rounded-lg")}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 font-headline vietnamese-text">
+              <Server className="w-5 h-5 text-primary" />
+              <span>Máy Chủ</span>
+            </CardTitle>
+          </CardHeader>
+
+          <CardContent>
+            <div className="flex gap-2 sm:gap-3 flex-wrap">
+              {/* Select Server */}
+              {animeData.episodes[episodeNumber - 1].servers.map((server) => (
+                <Button
+                  onClick={() => setVideoUrl(server.videoUrl)}
+                  key={server.videoUrl}
+                  className={cn(
+                    "flex items-center gap-2 font-medium transition-all duration-200",
+                    "hover:scale-105 active:scale-95 touch-manipulation",
+                    "focus:ring-2 focus:ring-primary focus:ring-offset-2",
+                    "text-xs sm:text-sm",
+                    "px-3 py-2 sm:px-4 sm:py-2"
+                  )}
+                >
+                  <div className="flex flex-col items-start">
+                    <span className="text-xs sm:text-sm font-semibold">
+                      {server.name}
+                    </span>
+                    <span className="text-xs opacity-75 hidden sm:block">
+                      {server.note}
+                    </span>
+                  </div>
+                </Button>
+              ))}
+
+              {/* Download Button */}
+              <Button
+                variant="outline"
+                className={cn(
+                  "flex items-center gap-2 font-medium transition-all duration-200",
+                  "hover:scale-105 active:scale-95 touch-manipulation",
+                  "focus:ring-2 focus:ring-primary focus:ring-offset-2",
+                  "text-xs sm:text-sm",
+                  "px-3 py-2 sm:px-4 sm:py-2",
+                  "bg-purple-500 text-white hover:bg-purple-600 border-purple-500"
+                )}
+                aria-label="Mở link Google Drive để tải về"
+              >
+                <Download className="w-3 h-3 sm:w-4 sm:h-4" />
+                <div className="flex flex-col items-start">
+                  <span className="text-xs sm:text-sm font-semibold">
+                    Tải về
+                  </span>
+                  <span className="text-xs opacity-75 hidden sm:block">
+                    Google Drive
+                  </span>
+                </div>
+              </Button>
+
+              {/* Raw Download Button */}
+              <Button
+                variant="outline"
+                className={cn(
+                  "flex items-center gap-2 font-medium transition-all duration-200",
+                  "hover:scale-105 active:scale-95 touch-manipulation",
+                  "focus:ring-2 focus:ring-primary focus:ring-offset-2",
+                  "text-xs sm:text-sm",
+                  "px-3 py-2 sm:px-4 sm:py-2",
+                  "bg-gray-500 text-white hover:bg-gray-600 border-gray-500"
+                )}
+                aria-label="Tải phim raw (không phụ đề)"
+              >
+                <Download className="w-3 h-3 sm:w-4 sm:h-4" />
+                <div className="flex flex-col items-start">
+                  <span className="text-xs sm:text-sm font-semibold">RAW</span>
+                  <span className="text-xs opacity-75 hidden sm:block">
+                    Không Sub
+                  </span>
+                </div>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div>
+          <Card className={cn("w-full shadow-lg rounded-lg")}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 font-headline vietnamese-text">
+                <Tv className="w-6 h-6 text-primary" />
+                <span>Tập</span>
+              </CardTitle>
+            </CardHeader>
+
+            <CardContent>
+              {/* Episode grid */}
+              <div
+                className={cn(
+                  "grid gap-2 grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 2xl:grid-cols-15"
+                )}
+              >
+                {animeData.episodes.map((episodeNumber) => (
+                  <Button
+                    key={episodeNumber.id}
+                    onClick={() => handleSelectEpisode(episodeNumber.id)}
+                    className={cn(
+                      "font-medium relative overflow-hidden",
+                      "transform transition-all duration-200",
+                      "hover:scale-105 active:scale-95",
+                      "touch-manipulation",
+                      "focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                    )}
+                    // aria-label={`Select episode ${episode.id}`}
+                  >
+                    <span className="font-semibold">{episodeNumber.id}</span>
+                  </Button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        <div ref={refs.episodesRef} id="episodes-section" data-section="episodes">
-          <EpisodeSelector
-            episodes={episodes}
-            currentEpisode={currentEpisode}
-            onSelectEpisode={handleSelectEpisode}
-          />
+        <div id="info-section" data-section="info">
+          <AnimeInfo anime={animeData} />
         </div>
 
-        <div ref={refs.infoRef} id="info-section" data-section="info">
-          <AnimeInfo anime={animeDetails} />
-        </div>
-
-        <div ref={refs.commentRef} id="comment-section" data-section="comment" className="mt-6 comment-section-mobile">
-          <CommentSection currentEpisodeId={currentEpisode.id} />
+        <div
+          // ref={refs.commentRef}
+          id="comment-section"
+          data-section="comment"
+          className="mt-6 comment-section-mobile"
+        >
+          <CommentSection currentEpisodeId={episodeNumber} />
         </div>
       </div>
 
-      {layoutConfig.showDesktopFooter && (
-        <footer className="w-full max-w-7xl mx-auto mt-8 py-4 text-center text-muted-foreground text-sm">
-          <p>
-            Made by Kana <Heart className="inline w-4 h-4 text-primary fill-current" />
-          </p>
-        </footer>
-      )}
+      <footer className="w-full max-w-7xl mx-auto mt-8 py-4 text-center text-muted-foreground text-sm">
+        <p>
+          Made by Kana
+          <Heart className="inline w-4 h-4 text-primary fill-current" />
+        </p>
+      </footer>
 
-      <MobileBottomNav
+      {/* <MobileBottomNav
         currentSection={currentSection}
         onNavigate={handleNavigate}
         onPreviousEpisode={handlePreviousEpisode}
         onNextEpisode={handleNextEpisode}
         canGoBack={computed.canGoPrevious}
         canGoNext={computed.canGoNext}
-      />
+      /> */}
     </div>
   );
 }
-
-const OptimizedAnimePage = withPerformanceOptimization(AnimePageComponent);
-const AnimePage = withErrorBoundary(OptimizedAnimePage);
-
-export default AnimePage;

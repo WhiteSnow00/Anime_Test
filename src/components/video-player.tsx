@@ -1,54 +1,50 @@
 "use client";
 
-import React, { memo, useCallback, useMemo, useRef, useEffect, useState } from 'react';
-import { Card } from '@/components/ui/card';
-import { useViewport } from '@/hooks/use-viewport';
-import { useVideoTransition } from '@/hooks/use-video-transition';
-import { withPerformanceOptimization, withErrorBoundary } from '@/lib/higher-order-components';
-import { performanceUtils } from '@/lib/advanced-utils';
-import { Loader2, AlertCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { JWPlayerComponent } from './jwplayer';
-import { 
-  recordServerError, 
-  getErrorMessage,
-  getNextFallbackServer,
-  createIframeErrorDetector
-} from '@/lib/video-server-utils';
-import { animeData } from '@/data/anime';
+import { Card } from "@/components/ui/card";
+import { animeData } from "@/data/anime";
+import { useVideoTransition } from "@/hooks/use-video-transition";
+import { useViewport } from "@/hooks/use-viewport";
+import {
+  withErrorBoundary,
+  withPerformanceOptimization,
+} from "@/lib/higher-order-components";
+import { cn } from "@/lib/utils";
+import { AlertCircle, Loader2 } from "lucide-react";
+import { memo, useCallback, useRef, useState } from "react";
 
-export type ServerType = 'hls' | 'helvid' | 'hydax';
+export type ServerType = "hls" | "helvid" | "hydax";
 
 // Helper function to get episode data by videoId or episode number
-const getEpisodeData = (videoId: string) => {
-  return animeData.episodes.find(ep => 
-    ep.videoId === videoId || 
-    ep.id.toString().padStart(2, '0') === videoId ||
-    ep.servers.helvid === videoId ||
-    ep.servers.hydax === videoId
-  );
-};
+// const getEpisodeData = (videoId: string) => {
+//   return animeData.episodes.find(
+//     (ep) =>
+//       ep.videoId === videoId ||
+//       ep.id.toString().padStart(2, "0") === videoId ||
+//       ep.servers.helvid === videoId ||
+//       ep.servers.hydax === videoId
+//   );
+// };
 
 // Utility functions for debouncing and throttling
-const debounce = (func: Function, delay: number) => {
-  let timeoutId: NodeJS.Timeout;
-  return (...args: any[]) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => func.apply(null, args), delay);
-  };
-};
+// const debounce = (func: Function, delay: number) => {
+//   let timeoutId: NodeJS.Timeout;
+//   return (...args: any[]) => {
+//     clearTimeout(timeoutId);
+//     timeoutId = setTimeout(() => func.apply(null, args), delay);
+//   };
+// };
 
-const throttle = (func: Function, delay: number) => {
-  let lastCall = 0;
-  return (...args: any[]) => {
-    const now = new Date().getTime();
-    if (now - lastCall < delay) {
-      return;
-    }
-    lastCall = now;
-    return func(...args);
-  };
-};
+// const throttle = (func: Function, delay: number) => {
+//   let lastCall = 0;
+//   return (...args: any[]) => {
+//     const now = new Date().getTime();
+//     if (now - lastCall < delay) {
+//       return;
+//     }
+//     lastCall = now;
+//     return func(...args);
+//   };
+// };
 
 interface VideoPlayerProps {
   videoId: string;
@@ -62,16 +58,16 @@ interface VideoPlayerProps {
   className?: string;
 }
 
-function VideoPlayerComponent({ 
+function VideoPlayerComponent({
   videoId,
-  server = 'hls',
+  server = "hls",
   autoPlay = false,
   muted = false,
   controls = true,
   onLoad,
   onError,
-  episodeTitle = 'Episode',
-  className 
+  episodeTitle = "Episode",
+  className,
 }: VideoPlayerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const viewport = useViewport();
@@ -83,20 +79,20 @@ function VideoPlayerComponent({
   const serverPropRef = useRef<ServerType>(server);
   const isInternalServerChange = useRef<boolean>(false);
 
-  const getHLSVideoId = useCallback((inputVideoId: string) => {
-    if (inputVideoId.includes('.m3u8')) {
-      return inputVideoId;
-    }
-    
-    const episodeData = getEpisodeData(inputVideoId);
-    if (episodeData?.servers.hls) {
-      console.log(`Found HLS for ${inputVideoId}: ${episodeData.servers.hls}`);
-      return episodeData.servers.hls;
-    }
-    
-    console.warn(`Could not determine HLS filename for videoId: ${inputVideoId}, defaulting to first episode`);
-    return animeData.episodes[0]?.servers.hls || 'Tập1.m3u8';
-  }, []);
+  // const getHLSVideoId = useCallback((inputVideoId: string) => {
+  //   if (inputVideoId.includes('.m3u8')) {
+  //     return inputVideoId;
+  //   }
+
+  //   const episodeData = getEpisodeData(inputVideoId);
+  //   if (episodeData?.servers.hls) {
+  //     console.log(`Found HLS for ${inputVideoId}: ${episodeData.servers.hls}`);
+  //     return episodeData.servers.hls;
+  //   }
+
+  //   console.warn(`Could not determine HLS filename for videoId: ${inputVideoId}, defaulting to first episode`);
+  //   return animeData.episodes[0]?.servers.hls || 'Tập1.m3u8';
+  // }, []);
 
   const {
     state: transitionState,
@@ -110,222 +106,222 @@ function VideoPlayerComponent({
     preloadNext: true,
   });
 
-  useEffect(() => {
-    if (server !== serverPropRef.current && !isInternalServerChange.current) {
-      console.log(`VideoPlayer: Switching server from ${currentServer} to ${server}`);
-      serverPropRef.current = server;
-      
-      setLoadError(null);
-      setTriedServers([]);
-      setRetryCount(0);
-      
-      if (server === 'hls' && (currentServer === 'helvid' || currentServer === 'hydax')) {
-        transitionActions.startTransition(videoId);
-        setTimeout(() => {
-          setCurrentServer(server);
-          setTimeout(() => transitionActions.completeTransition(), 100);
-        }, 150);
-      } else {
-        setCurrentServer(server);
-      }
-    }
-    isInternalServerChange.current = false;
-  }, [server, currentServer, transitionActions]);
+  // useEffect(() => {
+  //   if (server !== serverPropRef.current && !isInternalServerChange.current) {
+  //     console.log(`VideoPlayer: Switching server from ${currentServer} to ${server}`);
+  //     serverPropRef.current = server;
 
-  useEffect(() => {
-    setIsHydrated(true);
-  }, []);
+  //     setLoadError(null);
+  //     setTriedServers([]);
+  //     setRetryCount(0);
 
-  const iframeUrl = useMemo(() => {
-    if (currentServer === 'hls') return '';
-    
-    const currentVideoId = transitionComputed.currentVideoId || videoId;
-    const episodeData = getEpisodeData(currentVideoId);
-    const serverId = episodeData?.servers[currentServer];
-    
-    let videoUrl = '';
-    if (currentServer === 'helvid' && serverId) {
-      videoUrl = `https://helvid.net/play/index/${serverId}`;
-    } else if (currentServer === 'hydax' && serverId) {
-      videoUrl = `https://short.icu/${serverId}`;
-    }
-    
-    console.log(`Generated iframe URL for ${currentServer}: ${videoUrl}`);
-    return videoUrl;
-  }, [transitionComputed.currentVideoId, currentServer, videoId]);
+  //     if (server === 'hls' && (currentServer === 'helvid' || currentServer === 'hydax')) {
+  //       transitionActions.startTransition(videoId);
+  //       setTimeout(() => {
+  //         setCurrentServer(server);
+  //         setTimeout(() => transitionActions.completeTransition(), 100);
+  //       }, 150);
+  //     } else {
+  //       setCurrentServer(server);
+  //     }
+  //   }
+  //   isInternalServerChange.current = false;
+  // }, [server, currentServer, transitionActions]);
+
+  // useEffect(() => {
+  //   setIsHydrated(true);
+  // }, []);
+
+  // const iframeUrl = useMemo(() => {
+  //   if (currentServer === 'hls') return '';
+
+  //   const currentVideoId = transitionComputed.currentVideoId || videoId;
+  //   const episodeData = getEpisodeData(currentVideoId);
+  //   const serverId = episodeData?.servers[currentServer];
+
+  //   let videoUrl = '';
+  //   if (currentServer === 'helvid' && serverId) {
+  //     videoUrl = `https://helvid.net/play/index/${serverId}`;
+  //   } else if (currentServer === 'hydax' && serverId) {
+  //     videoUrl = `https://short.icu/${serverId}`;
+  //   }
+
+  //   console.log(`Generated iframe URL for ${currentServer}: ${videoUrl}`);
+  //   return videoUrl;
+  // }, [transitionComputed.currentVideoId, currentServer, videoId]);
 
   // Advanced iframe load handler with transition state management
-  const handleIframeLoad = useCallback(
-    debounce(() => {
-      if (iframeRef.current) {
-        setLoadError(null);
-        onLoad?.();
-        if (transitionState.isTransitioning) {
-          setTimeout(() => transitionActions.completeTransition(), 100);
-        }
-      }
-    }, 200),
-    [transitionComputed.currentVideoId, transitionState.isTransitioning, transitionActions, onLoad]
-  );
+  // const handleIframeLoad = useCallback(
+  //   debounce(() => {
+  //     if (iframeRef.current) {
+  //       setLoadError(null);
+  //       onLoad?.();
+  //       if (transitionState.isTransitioning) {
+  //         setTimeout(() => transitionActions.completeTransition(), 100);
+  //       }
+  //     }
+  //   }, 200),
+  //   [transitionComputed.currentVideoId, transitionState.isTransitioning, transitionActions, onLoad]
+  // );
 
-  const handleIframeError = useCallback(
-    throttle((error: string) => {
-      console.error(`Video player error: ${error}`);
-      
-      setLoadError(error);
-      onError?.(error);
-      transitionActions.resetTransition();
-    }, 1000),
-    [onError, transitionActions]
-  );
+  // const handleIframeError = useCallback(
+  //   throttle((error: string) => {
+  //     console.error(`Video player error: ${error}`);
 
-  const iframeDimensions = useMemo(() => {
-    if (isHydrated && viewport.width > 0) {
-      const { width, isMobile } = viewport;
-      
-      if (isMobile) {
-        return {
-          width: Math.min(width - 32, 800),
-          height: Math.floor((width - 32) * 9 / 16),
-        };
-      }
-    }
-    return {
-      width: 1920,
-      height: 1080,
-    };
-  }, [isHydrated, viewport]);
+  //     setLoadError(error);
+  //     onError?.(error);
+  //     transitionActions.resetTransition();
+  //   }, 1000),
+  //   [onError, transitionActions]
+  // );
 
-  useEffect(() => {
-    if (!iframeRef.current) return;
+  // const iframeDimensions = useMemo(() => {
+  //   if (isHydrated && viewport.width > 0) {
+  //     const { width, isMobile } = viewport;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            // Player is visible, can perform optimizations
-          } else {
-            // Player is not visible, can pause or reduce quality
-          }
-        });
-      },
-      { threshold: 0.5 }
-    );
+  //     if (isMobile) {
+  //       return {
+  //         width: Math.min(width - 32, 800),
+  //         height: Math.floor((width - 32) * 9 / 16),
+  //       };
+  //     }
+  //   }
+  //   return {
+  //     width: 1920,
+  //     height: 1080,
+  //   };
+  // }, [isHydrated, viewport]);
 
-    observer.observe(iframeRef.current);
+  // useEffect(() => {
+  //   if (!iframeRef.current) return;
 
-    return () => observer.disconnect();
-  }, []);
-  
-  useEffect(() => {
-    if (loadError && loadError.includes('Failed to load video:')) {
-      const errorDetails = {
-        server: currentServer,
-        error: loadError,
-        timestamp: Date.now(),
-        episodeId: parseInt(videoId),
-        retryCount: retryCount,
-      };
+  //   const observer = new IntersectionObserver(
+  //     (entries) => {
+  //       entries.forEach((entry) => {
+  //         if (entry.isIntersecting) {
+  //           // Player is visible, can perform optimizations
+  //         } else {
+  //           // Player is not visible, can pause or reduce quality
+  //         }
+  //       });
+  //     },
+  //     { threshold: 0.5 }
+  //   );
 
-      recordServerError(errorDetails);
+  //   observer.observe(iframeRef.current);
 
-      const userErrorMessage = getErrorMessage(errorDetails);
-      console.log('Video load error:', userErrorMessage);
+  //   return () => observer.disconnect();
+  // }, []);
 
-      const timeoutId = setTimeout(async () => {
-        const nextServer = getNextFallbackServer(currentServer, triedServers);
-        if (nextServer) {
-          console.log(`Switching from ${currentServer} to ${nextServer} due to error`);
-          const newTriedServers = [...triedServers, currentServer];
-          setTriedServers(newTriedServers);
-          isInternalServerChange.current = true;
-          setCurrentServer(nextServer);
-          setLoadError(null);
-          setRetryCount(retryCount + 1);
-        } else {
-          console.error('No available servers left to try.');
-        }
-      }, 2000);
-      
-      return () => clearTimeout(timeoutId);
-    }
-  }, [loadError, currentServer, triedServers, videoId, retryCount]);
-  
-  // Consolidated effect for handling server and video ID changes
-  useEffect(() => {
-    setTriedServers([]);
-    setRetryCount(0);
-    setLoadError(null);
-    if (server !== currentServer) {
-      console.log(`Episode/Server changed: Resetting server to ${server}`);
-      setCurrentServer(server);
-      serverPropRef.current = server;
-    }
-  }, [videoId, server, currentServer]);
+  // useEffect(() => {
+  //   if (loadError && loadError.includes('Failed to load video:')) {
+  //     const errorDetails = {
+  //       server: currentServer,
+  //       error: loadError,
+  //       timestamp: Date.now(),
+  //       episodeId: parseInt(videoId),
+  //       retryCount: retryCount,
+  //     };
 
-  const performanceProfiler = useMemo(
-    () => performanceUtils.createProfiler('VideoPlayer'),
-    []
-  );
+  //     recordServerError(errorDetails);
 
-  useEffect(() => {
-    const start = performanceProfiler.start();
-    
-    return () => {
-      performanceProfiler.end(start);
-    };
-  }, [performanceProfiler, videoId, transitionState.transitionPhase]);
+  //     const userErrorMessage = getErrorMessage(errorDetails);
+  //     console.log('Video load error:', userErrorMessage);
 
-  useEffect(() => {
-    if (currentServer !== 'hls' && iframeRef.current && iframeUrl) {
-      const cleanup = createIframeErrorDetector(
-        iframeRef.current,
-        currentServer,
-        videoId,
-        handleIframeError
-      );
-      
-      return cleanup;
-    }
-  }, [currentServer, iframeUrl, videoId, handleIframeError]);
+  //     const timeoutId = setTimeout(async () => {
+  //       const nextServer = getNextFallbackServer(currentServer, triedServers);
+  //       if (nextServer) {
+  //         console.log(`Switching from ${currentServer} to ${nextServer} due to error`);
+  //         const newTriedServers = [...triedServers, currentServer];
+  //         setTriedServers(newTriedServers);
+  //         isInternalServerChange.current = true;
+  //         setCurrentServer(nextServer);
+  //         setLoadError(null);
+  //         setRetryCount(retryCount + 1);
+  //       } else {
+  //         console.error('No available servers left to try.');
+  //       }
+  //     }, 2000);
 
-  const iframeProps = useMemo(() => {
-    if (currentServer === 'hls' || !iframeUrl) return {};
-    
-    return {
-      ref: iframeRef,
-      width: iframeDimensions.width,
-      height: iframeDimensions.height,
-      src: iframeUrl,
-      frameBorder: "0",
-      scrolling: "no" as const,
-      allowFullScreen: true,
-      allow: "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share",
-      onLoad: handleIframeLoad,
-      onError: () => handleIframeError(`Failed to load video: ${currentServer} - ${videoId}`),
-      className: "w-full h-full touch-manipulation",
-      style: {
-        border: 'none',
-        outline: 'none',
-        ...transitionStyles.getTransitionStyles(),
-      },
-      title: `Video player for ${episodeTitle}`,
-      'aria-label': `Video content for ${episodeTitle}`,
-    };
-  }, [
-    currentServer,
-    videoId,
-    episodeTitle,
-    iframeDimensions,
-    iframeUrl,
-    handleIframeLoad,
-    handleIframeError,
-    transitionStyles,
-  ]);
+  //     return () => clearTimeout(timeoutId);
+  //   }
+  // }, [loadError, currentServer, triedServers, videoId, retryCount]);
+
+  // // Consolidated effect for handling server and video ID changes
+  // useEffect(() => {
+  //   setTriedServers([]);
+  //   setRetryCount(0);
+  //   setLoadError(null);
+  //   if (server !== currentServer) {
+  //     console.log(`Episode/Server changed: Resetting server to ${server}`);
+  //     setCurrentServer(server);
+  //     serverPropRef.current = server;
+  //   }
+  // }, [videoId, server, currentServer]);
+
+  // const performanceProfiler = useMemo(
+  //   () => performanceUtils.createProfiler('VideoPlayer'),
+  //   []
+  // );
+
+  // useEffect(() => {
+  //   const start = performanceProfiler.start();
+
+  //   return () => {
+  //     performanceProfiler.end(start);
+  //   };
+  // }, [performanceProfiler, videoId, transitionState.transitionPhase]);
+
+  // useEffect(() => {
+  //   if (currentServer !== 'hls' && iframeRef.current && iframeUrl) {
+  //     const cleanup = createIframeErrorDetector(
+  //       iframeRef.current,
+  //       currentServer,
+  //       videoId,
+  //       handleIframeError
+  //     );
+
+  //     return cleanup;
+  //   }
+  // }, [currentServer, iframeUrl, videoId, handleIframeError]);
+
+  // const iframeProps = useMemo(() => {
+  //   if (currentServer === 'hls' || !iframeUrl) return {};
+
+  //   return {
+  //     ref: iframeRef,
+  //     width: iframeDimensions.width,
+  //     height: iframeDimensions.height,
+  //     src: iframeUrl,
+  //     frameBorder: "0",
+  //     scrolling: "no" as const,
+  //     allowFullScreen: true,
+  //     allow: "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share",
+  //     onLoad: handleIframeLoad,
+  //     onError: () => handleIframeError(`Failed to load video: ${currentServer} - ${videoId}`),
+  //     className: "w-full h-full touch-manipulation",
+  //     style: {
+  //       border: 'none',
+  //       outline: 'none',
+  //       ...transitionStyles.getTransitionStyles(),
+  //     },
+  //     title: `Video player for ${episodeTitle}`,
+  //     'aria-label': `Video content for ${episodeTitle}`,
+  //   };
+  // }, [
+  //   currentServer,
+  //   videoId,
+  //   episodeTitle,
+  //   iframeDimensions,
+  //   iframeUrl,
+  //   handleIframeLoad,
+  //   handleIframeError,
+  //   transitionStyles,
+  // ]);
 
   const LoadingOverlay = memo(() => {
     const overlayProps = transitionStyles.getLoadingOverlayProps();
-    
+
     if (!overlayProps.isVisible && !transitionComputed.shouldShowLoader) {
       return null;
     }
@@ -333,7 +329,7 @@ function VideoPlayerComponent({
     const isMobileDevice = viewport.isMobile;
 
     return (
-      <div 
+      <div
         className={cn(
           "absolute inset-0 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm z-10",
           isMobileDevice && "backdrop-blur-none bg-background/90"
@@ -343,26 +339,34 @@ function VideoPlayerComponent({
           transition: overlayProps.transition,
         }}
       >
-        <div className={cn(
-          "flex flex-col items-center space-y-3",
-          isMobileDevice ? "space-y-2" : "space-y-3"
-        )}>
-          <Loader2 className={cn(
-            "animate-spin text-primary",
-            isMobileDevice ? "h-6 w-6" : "h-8 w-8"
-          )} />
-          <div className={cn(
-            "text-muted-foreground text-center px-2",
-            isMobileDevice ? "text-xs" : "text-sm"
-          )}>
+        <div
+          className={cn(
+            "flex flex-col items-center space-y-3",
+            isMobileDevice ? "space-y-2" : "space-y-3"
+          )}
+        >
+          <Loader2
+            className={cn(
+              "animate-spin text-primary",
+              isMobileDevice ? "h-6 w-6" : "h-8 w-8"
+            )}
+          />
+          <div
+            className={cn(
+              "text-muted-foreground text-center px-2",
+              isMobileDevice ? "text-xs" : "text-sm"
+            )}
+          >
             Đang tải {episodeTitle}...
           </div>
-          {transitionState.transitionPhase !== 'idle' && (
-            <div className={cn(
-              "bg-muted rounded-full overflow-hidden",
-              isMobileDevice ? "w-16 h-0.5" : "w-24 h-1"
-            )}>
-              <div 
+          {transitionState.transitionPhase !== "idle" && (
+            <div
+              className={cn(
+                "bg-muted rounded-full overflow-hidden",
+                isMobileDevice ? "w-16 h-0.5" : "w-24 h-1"
+              )}
+            >
+              <div
                 className="h-full bg-primary transition-all duration-300 ease-out"
                 style={{ width: `${transitionComputed.transitionProgress}%` }}
               />
@@ -373,28 +377,37 @@ function VideoPlayerComponent({
     );
   });
 
-  LoadingOverlay.displayName = 'LoadingOverlay';
+  LoadingOverlay.displayName = "LoadingOverlay";
 
   return (
-    <Card className={cn("w-full overflow-hidden shadow-lg rounded-lg transition-all duration-300", className)}>
-      <div 
+    <Card
+      className={cn(
+        "w-full overflow-hidden shadow-lg rounded-lg transition-all duration-300",
+        className
+      )}
+    >
+      <div
         className={cn(
           "aspect-video bg-muted relative",
           transitionStyles.getContainerClasses()
         )}
       >
         <LoadingOverlay />
-        
+
         {loadError && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-destructive/10 z-20">
-            <AlertCircle className={cn(
-              "text-destructive mb-2",
-              viewport.isMobile ? "h-8 w-8" : "h-12 w-12"
-            )} />
-            <p className={cn(
-              "text-destructive text-center px-4",
-              viewport.isMobile ? "text-xs" : "text-sm"
-            )}>
+            <AlertCircle
+              className={cn(
+                "text-destructive mb-2",
+                viewport.isMobile ? "h-8 w-8" : "h-12 w-12"
+              )}
+            />
+            <p
+              className={cn(
+                "text-destructive text-center px-4",
+                viewport.isMobile ? "text-xs" : "text-sm"
+              )}
+            >
               {viewport.isMobile ? "Lỗi tải video" : "Failed to load video"}
             </p>
             <button
@@ -411,8 +424,8 @@ function VideoPlayerComponent({
             </button>
           </div>
         )}
-        
-        {currentServer === 'hls' ? (
+
+        {/* {currentServer === 'hls' ? (
           <JWPlayerComponent
             key={`${currentServer}-${transitionComputed.currentVideoId}`}
             videoId={getHLSVideoId(transitionComputed.currentVideoId || videoId)}
@@ -432,7 +445,7 @@ function VideoPlayerComponent({
               suppressHydrationWarning={true}
             />
           )
-        )}
+        )} */}
       </div>
     </Card>
   );

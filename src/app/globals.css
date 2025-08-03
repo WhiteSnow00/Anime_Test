@@ -5,35 +5,45 @@
 
 @layer base {
   :root {
-    --background: 6 100% 94%; /* misty rose */
-    --foreground: 349 71% 23%; /* dark pink/brown */
+    --background: 6 100% 94%;
+    /* misty rose */
+    --foreground: 349 71% 23%;
+    /* dark pink/brown */
 
-    --card: 0 0% 100%; /* white */
+    --card: 0 0% 100%;
+    /* white */
     --card-foreground: 349 71% 23%;
 
     --popover: 0 0% 100%;
     --popover-foreground: 349 71% 23%;
 
-    --primary: 351 100% 86%; /* light pink */
+    --primary: 351 100% 86%;
+    /* light pink */
     --primary-foreground: 349 71% 23%;
 
-    --secondary: 351 100% 92%; /* lighter pink */
+    --secondary: 351 100% 92%;
+    /* lighter pink */
     --secondary-foreground: 349 71% 23%;
 
     --muted: 351 100% 92%;
-    --muted-foreground: 351 40% 50%; /* muted pink */
+    --muted-foreground: 351 40% 50%;
+    /* muted pink */
 
-    --accent: 240 67% 94%; /* lavender */
-    --accent-foreground: 240 30% 25%; /* dark lavender */
+    --accent: 240 67% 94%;
+    /* lavender */
+    --accent-foreground: 240 30% 25%;
+    /* dark lavender */
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 351 100% 88%; /* slightly darker pink border */
+    --border: 351 100% 88%;
+    /* slightly darker pink border */
     --input: 351 100% 90%;
     --ring: 351 100% 75%;
 
-    --radius: 0.8rem; /* more rounded corners for kawaii feel */
+    --radius: 0.8rem;
+    /* more rounded corners for kawaii feel */
   }
 
   .dark {
@@ -71,6 +81,7 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground font-body;
     font-feature-settings: "liga" 1, "calt" 1;
@@ -78,15 +89,20 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  
+
   /* Enhanced Vietnamese text rendering */
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: 'Noto Sans', 'Open Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
     font-feature-settings: "liga" 1, "calt" 1;
     font-synthesis: weight style;
     text-rendering: optimizeLegibility;
   }
-  
+
   /* Specific Vietnamese text optimization */
   .vietnamese-text {
     font-family: 'Noto Sans', 'Open Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
@@ -95,4 +111,10 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+}
+
+/* Ẩn button lùi 10s mặc định */
+.jw-icon-rewind,
+.jw-icon-pip {
+  display: none !important;
 }
