@@ -105,7 +105,7 @@ export const animeData: Anime = {
       title: 'Episode 5', 
       videoId: '05',
       servers: {
-        hls: 'Tập5.m3u8',
+        hls: '',
         helvid: 'ec6ea16c9c5e',
         hydax: 'nc905xM7j'
       },
