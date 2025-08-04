@@ -53,7 +53,16 @@ export function MobileServerSelector({
   onDownload,
   onRawDownload
 }: MobileServerSelectorProps) {
-  const servers: MobileServerType[] = ['hls', 'helvid', 'hydax'];
+  const allServers: MobileServerType[] = ['hls', 'helvid', 'hydax'];
+
+  const isServerAvailable = (server: MobileServerType): boolean => {
+    return Boolean(currentEpisode.servers[server as keyof typeof currentEpisode.servers]);
+  };
+
+  // Filter servers to only show available ones
+  const availableServers = allServers.filter(server => 
+    isServerAvailable(server)
+  );
 
   const handleDownload = useCallback(() => {
     if (!currentEpisode?.downloadUrl) return;
@@ -65,12 +74,7 @@ export function MobileServerSelector({
     onRawDownload(currentEpisode.rawDownloadUrl, `Tập ${currentEpisode.id} RAW`);
   }, [currentEpisode, onRawDownload]);
 
-  const isServerAvailable = (server: MobileServerType): boolean => {
-    return Boolean(currentEpisode.servers[server as keyof typeof currentEpisode.servers]);
-  };
-
-  const getServerStatus = (server: MobileServerType): 'active' | 'available' | 'unavailable' => {
-    if (!isServerAvailable(server)) return 'unavailable';
+  const getServerStatus = (server: MobileServerType): 'active' | 'available' => {
     return server === currentServer ? 'active' : 'available';
   };
 
@@ -83,59 +87,50 @@ export function MobileServerSelector({
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-0" suppressHydrationWarning>
-        <div className="grid grid-cols-3 gap-2">
-          {servers.map((server) => {
-            const config = MOBILE_SERVER_CONFIG[server];
-            const status = getServerStatus(server);
-            const Icon = config.icon;
-            
-            return (
-              <Button
-                key={server}
-                variant={status === 'active' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => {
-                  if (status !== 'unavailable') {
+        {availableServers.length === 0 ? (
+          <div className="text-center py-4">
+            <AlertCircle className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">
+              Không có server khả dụng cho tập này
+            </p>
+          </div>
+        ) : (
+          <div className={cn(
+            "grid gap-2",
+            availableServers.length === 1 ? "grid-cols-1" :
+            availableServers.length === 2 ? "grid-cols-2" : "grid-cols-3"
+          )}>
+            {availableServers.map((server) => {
+              const config = MOBILE_SERVER_CONFIG[server];
+              const status = getServerStatus(server);
+              const Icon = config.icon;
+              
+              return (
+                <Button
+                  key={server}
+                  variant={status === 'active' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => {
                     onServerChange(server);
-                  }
-                }}
-                disabled={status === 'unavailable'}
-                className={cn(
-                  "h-auto p-1 flex flex-col items-center justify-center gap-1 transition-all duration-200 min-h-[3rem]",
-                  status === 'active' && "ring-2 ring-primary",
-                  status === 'unavailable' && "opacity-50 cursor-not-allowed"
-                )}
-              >
-                <div className="flex items-center gap-1.5 w-full justify-center">
-                  <div className={cn(
-                    "w-1.5 h-1.5 rounded-full flex-shrink-0",
-                    status === 'active' ? "bg-green-400" :
-                    status === 'available' ? "bg-blue-400" : "bg-red-400"
-                  )} />
-                  <Icon className="h-3 w-3 flex-shrink-0" />
-                  <span className="text-xs font-semibold text-center leading-tight">{config.name}</span>
-                </div>
-                
-                {/* {status === 'active' && (
-                  <div className="w-full text-center">
-                    <Badge variant="secondary" className="text-xs py-0.5 px-1.5 h-auto text-[10px] leading-none">
-                      Đang dùng
-                    </Badge>
+                  }}
+                  className={cn(
+                    "h-auto p-1 flex flex-col items-center justify-center gap-1 transition-all duration-200 min-h-[3rem]",
+                    status === 'active' && "ring-2 ring-primary"
+                  )}
+                >
+                  <div className="flex items-center gap-1.5 w-full justify-center">
+                    <div className={cn(
+                      "w-1.5 h-1.5 rounded-full flex-shrink-0",
+                      status === 'active' ? "bg-green-400" : "bg-blue-400"
+                    )} />
+                    <Icon className="h-3 w-3 flex-shrink-0" />
+                    <span className="text-xs font-semibold text-center leading-tight">{config.name}</span>
                   </div>
-                )} */}
-                
-                {status === 'unavailable' && (
-                  <div className="w-full text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      <AlertCircle className="h-2.5 w-2.5 text-destructive flex-shrink-0" />
-                      <span className="text-[10px] text-destructive leading-tight">Lỗi</span>
-                    </div>
-                  </div>
-                )}
-              </Button>
-            );
-          })}
-        </div>
+                </Button>
+              );
+            })}
+          </div>
+        )}
 
         {currentEpisode?.downloadUrl && (
           <Button
