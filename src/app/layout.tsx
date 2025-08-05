@@ -2,27 +2,35 @@ import type {Metadata, Viewport} from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 
+const getBaseUrl = () => {
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  if (process.env.VERCEL && process.env.NODE_ENV === 'production') {
+    return 'https://anime-kana.vercel.app';
+  }
+  if (process.env.NODE_ENV === 'production') {
+    return 'https://ayaya-kana.id.vn';
+  }
+  return 'http://localhost:9002';
+};
+
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.VERCEL_URL 
-      ? `https://${process.env.VERCEL_URL}` 
-      : process.env.NODE_ENV === 'production'
-      ? 'https://ayaya-kana.id.vn' 
-      : 'http://localhost:9002' //replace proxy url(ngrok, etc.)
-  ),
+  metadataBase: new URL(getBaseUrl()),
   title: 'Hoa Thơm Kiêu Hãnh',
   description: 'Web coi anime thay gdrive!',
   openGraph: {
     title: 'Hoa Thơm Kiêu Hãnh',
     description: 'Web coi anime thay gdrive!',
-    url: 'http://ayaya-kana.id.vn/',
+    url: `${getBaseUrl()}/`,
     siteName: 'Ayaya Webpage',
     images: [
       {
-        url: '/images/thumb.jpg',
+        url: `${getBaseUrl()}/images/thumb.jpg`,
         width: 1536,
         height: 1099,
         alt: 'Web coi anime thay gdrive!',
+        type: 'image/jpeg',
       },
     ],
     locale: 'vi_VN',
@@ -32,7 +40,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Hoa Thơm Kiêu Hãnh',
     description: 'Web coi anime thay gdrive!',
-    images: ['/images/thumb.jpg'],
+    images: [`${getBaseUrl()}/images/thumb.jpg`],
   },
 };
 
