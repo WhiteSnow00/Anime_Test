@@ -10,13 +10,41 @@ import { Loader2, User, Lock, Mail, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { checkPasswordStrength, getStrengthColor, getStrengthBgColor, getStrengthLabel } from '@/lib/password-strength';
 import { Progress } from '@/components/ui/progress';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+const slideVariants = {
+  enter: (direction: number) => {
+    return {
+      x: direction > 0 ? 300 : -300,
+      opacity: 0
+    };
+  },
+  center: {
+    zIndex: 1,
+    x: 0,
+    opacity: 1
+  },
+  exit: (direction: number) => {
+    return {
+      zIndex: 0,
+      x: direction < 0 ? 300 : -300,
+      opacity: 0
+    };
+  }
+};
+
+const swipeConfidenceThreshold = 10000;
+const swipePower = (offset: number, velocity: number) => {
+  return Math.abs(offset) * velocity;
+};
+
 export function AuthModal({ isOpen, onClose }: AuthModalProps) {
+  const [[page, direction], setPage] = useState([0, 0]);
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -35,13 +63,17 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   // Reset form when modal is closed or mode changes
   useEffect(() => {
     if (!isOpen) {
-      setUsername('');
-      setPassword('');
-      setConfirmPassword('');
-      setEmail('');
-      setError('');
-      setPasswordStrength(checkPasswordStrength(''));
-      setMode('login');
+      // Add a delay to reset mode after modal closes to prevent flash
+      const timer = setTimeout(() => {
+        setUsername('');
+        setPassword('');
+        setConfirmPassword('');
+        setEmail('');
+        setError('');
+        setPasswordStrength(checkPasswordStrength(''));
+        setMode('login');
+      }, 200);
+      return () => clearTimeout(timer);
     }
   }, [isOpen]);
   
@@ -85,6 +117,8 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   };
 
   const switchMode = () => {
+    const newDirection = mode === 'login' ? 1 : -1;
+    setPage([page + newDirection, newDirection]);
     setMode(mode === 'login' ? 'register' : 'login');
     setError('');
     setPassword('');
@@ -108,6 +142,21 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
           </DialogTitle>
         </DialogHeader>
 
+        <div className="relative overflow-hidden px-1">
+          <AnimatePresence initial={false} custom={direction} mode="wait">
+            <motion.div
+              key={mode}
+              custom={direction}
+              variants={slideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{
+                x: { type: "spring", stiffness: 500, damping: 35 },
+                opacity: { duration: 0.15 }
+              }}
+              className="w-full"
+            >
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           <div className="space-y-2">
             <Label htmlFor="username">Tên đăng nhập</Label>
@@ -247,6 +296,9 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
             </button>
           </div>
         </form>
+            </motion.div>
+          </AnimatePresence>
+        </div>
       </DialogContent>
     </Dialog>
   );

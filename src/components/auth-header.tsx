@@ -37,7 +37,7 @@ export function AuthHeader() {
 
   return (
     <>
-      <div className="fixed top-4 left-4 z-50">
+      <div className="fixed top-4 right-1 z-50">
         {isLoggedIn && user ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
