@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, User, Lock, Mail, AlertCircle } from 'lucide-react';
+import { Loader2, User, Lock, Mail, AlertCircle, X, Check } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { checkPasswordStrength, getStrengthColor, getStrengthBgColor, getStrengthLabel } from '@/lib/password-strength';
 import { Progress } from '@/components/ui/progress';
@@ -126,11 +126,22 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     setPasswordStrength(checkPasswordStrength(''));
   };
   
+  const [passwordMatch, setPasswordMatch] = useState(true);
+  const confirmPasswordRef = useRef<NodeJS.Timeout | null>(null);
+
   const handlePasswordChange = (value: string) => {
     setPassword(value);
     if (mode === 'register') {
       setPasswordStrength(checkPasswordStrength(value));
     }
+  };
+
+  const handleConfirmPasswordChange = (value: string) => {
+    setConfirmPassword(value);
+    if (confirmPasswordRef.current) clearTimeout(confirmPasswordRef.current);
+    confirmPasswordRef.current = setTimeout(() => {
+      setPasswordMatch(value === password);
+    }, 500);
   };
 
   return (
@@ -233,12 +244,18 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                     type="password"
                     placeholder="Nhập lại mật khẩu..."
                     value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="pl-10"
-                    required
-                    disabled={isSubmitting}
-                    autoComplete="new-password"
-                  />
+                    onChange={(e) => handleConfirmPasswordChange(e.target.value)}
+                className="pl-10 pr-10"
+                required
+                disabled={isSubmitting}
+                autoComplete="new-password"
+              />
+              {!passwordMatch && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
+                  <X className="text-destructive" />
+                  <span className="text-xs text-muted-foreground">Mật khẩu không khớp</span>
+                </div>
+              )}
                 </div>
               </div>
 
@@ -271,7 +288,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
           <Button
             type="submit"
             className="w-full"
-            disabled={isSubmitting}
+            disabled={isSubmitting || (mode === 'register' && !passwordMatch)}
           >
             {isSubmitting ? (
               <>
