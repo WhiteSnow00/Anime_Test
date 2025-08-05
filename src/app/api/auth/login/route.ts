@@ -34,7 +34,8 @@ export async function POST(request: NextRequest) {
       user: {
         id: user._id,
         username: user.username,
-        email: user.email
+        email: user.email,
+        displayName: user.displayName
       },
       token
     });

@@ -49,13 +49,21 @@ export async function POST(request: NextRequest) {
 
     // Check if user is authenticated
     let userId: string | undefined;
+    let displayName: string | undefined;
     const token = request.cookies.get('auth-token')?.value;
     
     if (token) {
       try {
         const decoded = verifyToken(token);
         userId = decoded.userId;
-        console.log(`[COMMENTS-POST] Authenticated user comment: userId=${userId}`);
+        
+        // Get user details to fetch displayName
+        const user = await SimpleMongoDBService.getUserById(userId);
+        if (user && user.displayName) {
+          displayName = user.displayName;
+        }
+        
+        console.log(`[COMMENTS-POST] Authenticated user comment: userId=${userId}, displayName=${displayName}`);
       } catch (error) {
         console.log('[COMMENTS-POST] Invalid token, proceeding as guest comment');
       }
@@ -68,6 +76,7 @@ export async function POST(request: NextRequest) {
 
     const savedComment = await SimpleMongoDBService.addComment({
       userName,
+      displayName,
       content,
       timestamp: new Date(),
       isApproved: true, 

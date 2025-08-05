@@ -21,6 +21,7 @@ function validateEnvironment() {
 export interface Comment {
   _id?: string;
   userName: string;
+  displayName?: string;
   content: string;
   timestamp: Date;
   isApproved: boolean;
@@ -58,6 +59,7 @@ let UserModel: any = null;
 if (isServer) {
   const commentSchema = new mongoose.Schema({
     userName: { type: String, required: true, maxlength: 100 },
+    displayName: { type: String, maxlength: 100 },
     content: { type: String, required: true, maxlength: 1000 },
     timestamp: { type: Date, default: Date.now },
     isApproved: { type: Boolean, default: true },
@@ -417,6 +419,7 @@ export class SimpleMongoDBService {
         return comments.map((comment: any) => ({
           _id: comment._id?.toString(),
           userName: comment.userName,
+          displayName: comment.displayName,
           content: comment.content,
           timestamp: comment.timestamp,
           isApproved: comment.isApproved,
@@ -443,6 +446,7 @@ export class SimpleMongoDBService {
         return {
           _id: savedComment._id.toString(),
           userName: savedComment.userName,
+          displayName: savedComment.displayName,
           content: savedComment.content,
           timestamp: savedComment.timestamp,
           isApproved: savedComment.isApproved,
@@ -590,6 +594,7 @@ export class SimpleMongoDBService {
         comments: comments.map((comment: any) => ({
           _id: comment._id?.toString(),
           userName: comment.userName,
+          displayName: comment.displayName,
           content: comment.content,
           timestamp: comment.timestamp,
           isApproved: comment.isApproved,
@@ -704,6 +709,7 @@ export class SimpleMongoDBService {
         username: user.username,
         passwordHash: user.passwordHash,
         email: user.email,
+        displayName: user.displayName,
         createdAt: user.createdAt,
         lastLogin: new Date(),
         isActive: user.isActive
@@ -734,6 +740,7 @@ export class SimpleMongoDBService {
         username: user.username,
         passwordHash: user.passwordHash,
         email: user.email,
+        displayName: user.displayName,
         createdAt: user.createdAt,
         lastLogin: user.lastLogin,
         isActive: user.isActive

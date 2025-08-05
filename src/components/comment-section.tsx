@@ -113,7 +113,7 @@ export function CommentSection({ currentEpisodeId, className }: CommentSectionPr
         {isLoggedIn && user ? (
           <div className="flex items-center gap-2 p-3 bg-primary/10 rounded-lg">
             <Shield className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium">Bình luận với tên: <span className="text-primary">{user.username}</span></span>
+            <span className="text-sm font-medium">Bình luận với tên: <span className="text-primary">{user.displayName || user.username}</span></span>
           </div>
         ) : (
           <div className="space-y-2">
@@ -299,7 +299,7 @@ export function CommentSection({ currentEpisodeId, className }: CommentSectionPr
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-2">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm comment-username vietnamese-text">{comment.userName}</span>
+                          <span className="font-medium text-sm comment-username vietnamese-text">{comment.displayName || comment.userName}</span>
                           {comment.userId && (
                             <Badge variant="secondary" className="text-xs py-0 px-1.5 h-5">
                               <Shield className="h-3 w-3 mr-1" />
