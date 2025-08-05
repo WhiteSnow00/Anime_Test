@@ -3,11 +3,19 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}` 
+      : process.env.NODE_ENV === 'production'
+      ? 'https://ayaya-kana.id.vn' 
+      : 'http://localhost:9002' //replace proxy url(ngrok, etc.)
+  ),
   title: 'Hoa Thơm Kiêu Hãnh',
   description: 'Web coi anime thay gdrive!',
   openGraph: {
     title: 'Hoa Thơm Kiêu Hãnh',
     description: 'Web coi anime thay gdrive!',
+    url: 'http://ayaya-kana.id.vn/',
     siteName: 'Ayaya Webpage',
     images: [
       {
