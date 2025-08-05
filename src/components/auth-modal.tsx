@@ -95,6 +95,14 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   
   const confirmPasswordRef = useRef<NodeJS.Timeout | null>(null);
   const usernameCheckRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Check if user is on mobile device to prevent auto-focus
+  const isMobileDevice = () => {
+    if (typeof window === 'undefined') return false;
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+           (window.innerWidth <= 768) ||
+           ('ontouchstart' in window);
+  };
 
   useEffect(() => {
     if (!isOpen) {
@@ -313,6 +321,14 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                       disabled={isSubmitting}
                       autoComplete="username"
                       maxLength={20}
+                      autoFocus={!isMobileDevice()}
+                      inputMode={isMobileDevice() ? "none" : "text"}
+                      readOnly={isMobileDevice()}
+                      onFocus={(e) => {
+                        if (isMobileDevice()) {
+                          e.target.removeAttribute('readonly');
+                        }
+                      }}
                     />
                     {mode === 'register' && username && (
                       <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
