@@ -52,6 +52,9 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
+import { AuthProvider } from '@/contexts/auth-context';
+import { AuthHeader } from '@/components/auth-header';
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -68,10 +71,13 @@ export default function RootLayout({
         <meta name="twitter:image" content={`${getBaseUrl()}/images/thumb.jpg`} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700;800&display=swap&subset=latin,vietnamese" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans:wght@400;500;600;700;800&display=swap&subset=latin,vietnamese" rel="stylesheet" />
       </head>
       <body className="font-body antialiased" suppressHydrationWarning>
-        {children}
+        <AuthProvider>
+          <AuthHeader />
+          {children}
+        </AuthProvider>
         <Toaster />
       </body>
     </html>

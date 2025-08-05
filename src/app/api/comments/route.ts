@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SimpleMongoDBService } from '@/lib/simple-mongodb-service';
+import { verifyToken } from '@/lib/auth-utils';
 
 export async function GET() {
   try {
@@ -46,6 +47,20 @@ export async function POST(request: NextRequest) {
 
     console.log(`[COMMENTS-POST] Data received: user=${userName}, content length=${content?.length}, episode=${episodeViewing}`);
 
+    // Check if user is authenticated
+    let userId: string | undefined;
+    const token = request.cookies.get('auth-token')?.value;
+    
+    if (token) {
+      try {
+        const decoded = verifyToken(token);
+        userId = decoded.userId;
+        console.log(`[COMMENTS-POST] Authenticated user comment: userId=${userId}`);
+      } catch (error) {
+        console.log('[COMMENTS-POST] Invalid token, proceeding as guest comment');
+      }
+    }
+
     const userAgent = request.headers.get('user-agent') || '';
     const forwardedFor = request.headers.get('x-forwarded-for');
     const realIp = request.headers.get('x-real-ip');
@@ -58,7 +73,8 @@ export async function POST(request: NextRequest) {
       isApproved: true, 
       userAgent,
       ipAddress,
-      episodeViewing
+      episodeViewing,
+      userId
     });
 
     console.log(`[COMMENTS-POST] New comment added to MongoDB: ${savedComment._id}`);

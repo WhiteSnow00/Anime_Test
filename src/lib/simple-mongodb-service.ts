@@ -27,6 +27,7 @@ export interface Comment {
   userAgent: string;
   ipAddress: string;
   episodeViewing?: number;
+  userId?: string; 
 }
 
 export interface Admin {
@@ -39,8 +40,19 @@ export interface Admin {
   isActive: boolean;
 }
 
+export interface User {
+  _id?: string;
+  username: string;
+  passwordHash: string;
+  email?: string;
+  createdAt: Date;
+  lastLogin?: Date;
+  isActive: boolean;
+}
+
 let CommentModel: any = null;
 let AdminModel: any = null;
+let UserModel: any = null;
 
 if (isServer) {
   const commentSchema = new mongoose.Schema({
@@ -50,7 +62,8 @@ if (isServer) {
     isApproved: { type: Boolean, default: true },
     userAgent: { type: String },
     ipAddress: { type: String, maxlength: 45 },
-    episodeViewing: { type: Number }
+    episodeViewing: { type: Number },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false }
   }, {
     collection: 'comments'
   });
@@ -66,12 +79,27 @@ if (isServer) {
     collection: 'admins'
   });
 
+  const userSchema = new mongoose.Schema({
+    username: { type: String, required: true, unique: true, maxlength: 50, trim: true },
+    passwordHash: { type: String, required: true },
+    email: { type: String, maxlength: 255, sparse: true },
+    createdAt: { type: Date, default: Date.now },
+    lastLogin: { type: Date },
+    isActive: { type: Boolean, default: true }
+  }, {
+    collection: 'users'
+  });
+
   commentSchema.index({ timestamp: -1 });
   commentSchema.index({ isApproved: 1 });
   commentSchema.index({ episodeViewing: 1 });
+  commentSchema.index({ userId: 1 });
+  userSchema.index({ username: 1 });
+  userSchema.index({ email: 1 });
 
   CommentModel = mongoose.models.Comment || mongoose.model('Comment', commentSchema);
   AdminModel = mongoose.models.Admin || mongoose.model('Admin', adminSchema);
+  UserModel = mongoose.models.User || mongoose.model('User', userSchema);
 }
 
 export class SimpleMongoDBService {
@@ -394,7 +422,8 @@ export class SimpleMongoDBService {
           isApproved: comment.isApproved,
           userAgent: comment.userAgent,
           ipAddress: comment.ipAddress,
-          episodeViewing: comment.episodeViewing
+          episodeViewing: comment.episodeViewing,
+          userId: comment.userId?.toString()
         }));
       },
       'getComments'
@@ -419,7 +448,8 @@ export class SimpleMongoDBService {
           isApproved: savedComment.isApproved,
           userAgent: savedComment.userAgent,
           ipAddress: savedComment.ipAddress,
-          episodeViewing: savedComment.episodeViewing
+          episodeViewing: savedComment.episodeViewing,
+          userId: savedComment.userId?.toString()
         };
       },
       'addComment'
@@ -565,7 +595,8 @@ export class SimpleMongoDBService {
           isApproved: comment.isApproved,
           userAgent: comment.userAgent,
           ipAddress: comment.ipAddress,
-          episodeViewing: comment.episodeViewing
+          episodeViewing: comment.episodeViewing,
+          userId: comment.userId?.toString()
         })),
         stats
       };
@@ -597,6 +628,134 @@ export class SimpleMongoDBService {
       
     } catch (error) {
       console.error('Migration failed:', error);
+      throw error;
+    }
+  }
+
+  // User Authentication Methods
+  static async createUser(username: string, password: string, email?: string): Promise<User | null> {
+    if (!isServer || !UserModel) return null;
+    
+    try {
+      await this.connect();
+      
+      const existingUser = await UserModel.findOne({ 
+        username: username.toLowerCase().trim() 
+      });
+      
+      if (existingUser) {
+        throw new Error('Username already exists');
+      }
+      
+      const passwordHash = await bcrypt.hash(password, 12);
+      
+      const newUser = await UserModel.create({
+        username: username.toLowerCase().trim(),
+        passwordHash,
+        email: email?.toLowerCase().trim(),
+        isActive: true
+      });
+      
+      return {
+        _id: newUser._id.toString(),
+        username: newUser.username,
+        passwordHash: newUser.passwordHash,
+        email: newUser.email,
+        createdAt: newUser.createdAt,
+        lastLogin: newUser.lastLogin,
+        isActive: newUser.isActive
+      };
+    } catch (error) {
+      console.error('Failed to create user:', error);
+      throw error;
+    }
+  }
+  
+  static async validateUser(username: string, password: string): Promise<User | null> {
+    if (!isServer || !UserModel) return null;
+    
+    try {
+      await this.connect();
+      
+      const user = await UserModel.findOne({ 
+        username: username.toLowerCase().trim(),
+        isActive: true 
+      });
+      
+      if (!user) {
+        return null;
+      }
+      
+      const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+      if (!isValidPassword) {
+        return null;
+      }
+      
+      // Update last login
+      await UserModel.updateOne(
+        { _id: user._id },
+        { lastLogin: new Date() }
+      );
+      
+      return {
+        _id: user._id.toString(),
+        username: user.username,
+        passwordHash: user.passwordHash,
+        email: user.email,
+        createdAt: user.createdAt,
+        lastLogin: new Date(),
+        isActive: user.isActive
+      };
+    } catch (error) {
+      console.error('Failed to validate user:', error);
+      throw error;
+    }
+  }
+  
+  static async getUserById(userId: string): Promise<User | null> {
+    if (!isServer || !UserModel) return null;
+    
+    try {
+      await this.connect();
+      
+      const user = await UserModel.findOne({ 
+        _id: userId,
+        isActive: true 
+      });
+      
+      if (!user) {
+        return null;
+      }
+      
+      return {
+        _id: user._id.toString(),
+        username: user.username,
+        passwordHash: user.passwordHash,
+        email: user.email,
+        createdAt: user.createdAt,
+        lastLogin: user.lastLogin,
+        isActive: user.isActive
+      };
+    } catch (error) {
+      console.error('Failed to get user by ID:', error);
+      throw error;
+    }
+  }
+  
+  static async updateUserLastLogin(userId: string): Promise<boolean> {
+    if (!isServer || !UserModel) return false;
+    
+    try {
+      await this.connect();
+      
+      const result = await UserModel.updateOne(
+        { _id: userId },
+        { lastLogin: new Date() }
+      );
+      
+      return result.modifiedCount > 0;
+    } catch (error) {
+      console.error('Failed to update user last login:', error);
       throw error;
     }
   }

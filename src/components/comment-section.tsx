@@ -10,8 +10,9 @@ import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useComments } from '@/hooks/use-comments';
 import { CommentService } from '@/lib/comment-service';
-import { MessageCircle, User, Clock, Send, Loader2, Smile, ChevronDown, Play, ChevronLeft, ChevronRight } from 'lucide-react';
+import { MessageCircle, User, Clock, Send, Loader2, Smile, ChevronDown, Play, ChevronLeft, ChevronRight, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/auth-context';
 
 interface CommentSectionProps {
   currentEpisodeId?: number;
@@ -20,6 +21,7 @@ interface CommentSectionProps {
 
 export function CommentSection({ currentEpisodeId, className }: CommentSectionProps) {
   const { comments, isLoading, isSubmitting, addComment } = useComments();
+  const { isLoggedIn, user } = useAuth();
   const [formData, setFormData] = useState({
     userName: '',
     content: '',
@@ -51,7 +53,14 @@ export function CommentSection({ currentEpisodeId, className }: CommentSectionPr
     setErrors([]);
     setShowSuccess(false);
 
-    const result = await addComment(formData);
+    // Use logged-in username if available
+    const commentData = {
+      ...formData,
+      userName: isLoggedIn && user ? user.username : formData.userName,
+      episodeViewing: currentEpisodeId
+    };
+
+    const result = await addComment(commentData);
     
     if (result.success) {
       setFormData({ userName: '', content: '', episodeViewing: currentEpisodeId });
@@ -100,25 +109,34 @@ export function CommentSection({ currentEpisodeId, className }: CommentSectionPr
       {/* Comment Form */}
       <div className="comment-form-container">
         <form onSubmit={handleSubmit} className="space-y-4 mb-6">
-        {/* Name Input - Full width on mobile */}
-        <div className="space-y-2">
-          <label htmlFor="userName" className="text-sm font-medium block">
-            Tên của bạn *
-          </label>
-          <div className="relative">
-            <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              id="userName"
-              type="text"
-              placeholder="Nhập tên hiển thị..."
-              value={formData.userName}
-              onChange={(e) => handleInputChange('userName', e.target.value)}
-              className="pl-10 h-11 text-base mobile-input"
-              maxLength={50}
-              disabled={isSubmitting}
-            />
+        {/* Show username if logged in, otherwise show name input */}
+        {isLoggedIn && user ? (
+          <div className="flex items-center gap-2 p-3 bg-primary/10 rounded-lg">
+            <Shield className="h-4 w-4 text-primary" />
+            <span className="text-sm font-medium">Bình luận với tên: <span className="text-primary">{user.username}</span></span>
           </div>
-        </div>        {/* Content Input */}
+        ) : (
+          <div className="space-y-2">
+            <label htmlFor="userName" className="text-sm font-medium block">
+              Tên của bạn *
+            </label>
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="userName"
+                type="text"
+                placeholder="Nhập tên hiển thị..."
+                value={formData.userName}
+                onChange={(e) => handleInputChange('userName', e.target.value)}
+                className="pl-10 h-11 text-base mobile-input"
+                maxLength={50}
+                disabled={isSubmitting}
+                required
+              />
+            </div>
+          </div>
+        )}
+        {/* Content Input */}
         <div className="space-y-2">
           <label htmlFor="content" className="text-sm font-medium block">
             Nội dung bình luận *
@@ -192,7 +210,7 @@ export function CommentSection({ currentEpisodeId, className }: CommentSectionPr
         <div className="pt-2">
           <Button
             type="submit"
-            disabled={isSubmitting || !formData.userName.trim() || !formData.content.trim()}
+            disabled={isSubmitting || (!isLoggedIn && !formData.userName.trim()) || !formData.content.trim()}
             className="w-full sm:w-auto min-h-[48px] text-base font-medium"
             size="lg"
           >
@@ -267,13 +285,28 @@ export function CommentSection({ currentEpisodeId, className }: CommentSectionPr
               {currentComments.map((comment) => (
                 <Card key={comment._id || `comment-${comment.userName}-${comment.timestamp}`} className="p-3 sm:p-4 bg-muted/30 comment-item">
                   <div className="flex items-start gap-2 sm:gap-3">
-                    <div className="w-7 h-7 sm:w-8 sm:h-8 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
-                      <User className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+                    <div className={cn(
+                      "w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center flex-shrink-0",
+                      comment.userId ? "bg-primary/20" : "bg-primary/10"
+                    )}>
+                      {comment.userId ? (
+                        <Shield className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+                      ) : (
+                        <User className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+                      )}
                     </div>
                     
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-2">
-                        <span className="font-medium text-sm comment-username vietnamese-text">{comment.userName}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm comment-username vietnamese-text">{comment.userName}</span>
+                          {comment.userId && (
+                            <Badge variant="secondary" className="text-xs py-0 px-1.5 h-5">
+                              <Shield className="h-3 w-3 mr-1" />
+                              Thành viên
+                            </Badge>
+                          )}
+                        </div>
                         <div className="flex items-center gap-2 flex-wrap">
                           {comment.episodeViewing && (
                             <Badge variant="outline" className="text-xs flex items-center gap-1">
