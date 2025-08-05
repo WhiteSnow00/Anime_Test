@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { LogIn, User, LogOut } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { AuthModal } from './auth-modal';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,20 +21,24 @@ export function AuthHeader() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const pathname = usePathname();
 
-  // Don't show auth header on admin routes
-  if (pathname?.includes('/comment') || pathname?.includes('/admin')) {
-    return null;
-  }
+    // Don't show auth header on admin routes
+    if (pathname?.includes('/comment') || pathname?.includes('/admin')) {
+      return null;
+    }
 
-  if (isLoading) {
-    return (
-      <div className="fixed top-4 right-4 z-50">
-        <Button variant="ghost" size="sm" disabled>
-          <User className="h-4 w-4" />
-        </Button>
-      </div>
-    );
-  }
+    if (isLoading) {
+      return (
+        <div className="fixed top-4 right-1 z-50">
+          <Button variant="ghost" size="sm" disabled>
+            <User className="h-4 w-4" />
+          </Button>
+        </div>
+      );
+    }
+
+    const handleCloseModal = () => {
+      setShowAuthModal(false);
+    };
 
   return (
     <>
@@ -56,21 +61,32 @@ export function AuthHeader() {
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setShowAuthModal(true)}
-            className="shadow-md"
-          >
-            <LogIn className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">Đăng nhập</span>
-          </Button>
+!showAuthModal && (
+            <AnimatePresence>
+              <motion.div
+                initial={{ opacity: 0, x: 50 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 50 }}
+                transition={{ duration: 0.3 }}
+              >
+                <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setShowAuthModal(true)}
+              className="shadow-md"
+            >
+              <LogIn className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Đăng nhập</span>
+</Button>
+              </motion.div>
+            </AnimatePresence>
+          )
         )}
       </div>
 
       <AuthModal
         isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
+        onClose={handleCloseModal}
       />
     </>
   );
