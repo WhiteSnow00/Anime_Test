@@ -343,7 +343,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                   </div>
                   {mode === 'register' && (
                     <p className="text-xs text-muted-foreground">
-                      3-20 ký tự, chỉ dùng chữ cái, số, @, #, $, _ và -
+                      3-20 ký tự, chỉ dùng chữ cái, số, @, #, $, _ và - (không phân biệt hoa thường)
                     </p>
                   )}
                 </div>

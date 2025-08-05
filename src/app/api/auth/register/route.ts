@@ -23,9 +23,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+    if (!/^[a-zA-Z0-9@#$_-]+$/.test(username)) {
       return NextResponse.json(
-        { success: false, error: 'Username can only contain letters, numbers, and underscores' },
+        { success: false, error: 'Username can only contain letters, numbers, @, #, $, underscore and hyphen' },
         { status: 400 }
       );
     }

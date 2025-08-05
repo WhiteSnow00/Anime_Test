@@ -522,7 +522,7 @@ export class SimpleMongoDBService {
     try {
       await this.connect();
       const admin = await AdminModel.findOne({ 
-        username: username.toLowerCase(),
+        username: username,
         isActive: true 
       });
       
@@ -645,7 +645,7 @@ export class SimpleMongoDBService {
       await this.connect();
       
       const existingUser = await UserModel.findOne({ 
-        username: username.toLowerCase().trim() 
+        username: username.trim() 
       });
       
       if (existingUser) {
@@ -655,7 +655,7 @@ export class SimpleMongoDBService {
       const passwordHash = await bcrypt.hash(password, 12);
       
       const newUser = await UserModel.create({
-        username: username.toLowerCase().trim(),
+        username: username.trim(),
         passwordHash,
         email: email?.toLowerCase().trim(),
         displayName: displayName?.trim(),
@@ -685,7 +685,7 @@ export class SimpleMongoDBService {
       await this.connect();
       
       const user = await UserModel.findOne({ 
-        username: username.toLowerCase().trim(),
+        username: username.trim(),
         isActive: true 
       });
       
@@ -758,7 +758,7 @@ export class SimpleMongoDBService {
       await this.connect();
       
       const user = await UserModel.findOne({ 
-        username: username.toLowerCase().trim() 
+        username: username.trim() 
       });
       
       return !!user;
