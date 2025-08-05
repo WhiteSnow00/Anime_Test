@@ -3,13 +3,11 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 
 export const metadata: Metadata = {
-  metadataBase: new URL('http://ayaya-kana.id.vn/'),
   title: 'Hoa Thơm Kiêu Hãnh',
   description: 'Web coi anime thay gdrive!',
   openGraph: {
     title: 'Hoa Thơm Kiêu Hãnh',
     description: 'Web coi anime thay gdrive!',
-    url: 'http://ayaya-kana.id.vn/',
     siteName: 'Ayaya Webpage',
     images: [
       {
