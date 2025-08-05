@@ -27,7 +27,7 @@ export function AuthHeader() {
 
   if (isLoading) {
     return (
-      <div className="fixed top-4 left-4 z-50">
+      <div className="fixed top-4 right-4 z-50">
         <Button variant="ghost" size="sm" disabled>
           <User className="h-4 w-4" />
         </Button>

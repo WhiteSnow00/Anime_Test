@@ -51,9 +51,9 @@ export function JWPlayerComponent({
     const isMobile = isMobileDevice();
     if (!isMobile) {
       let customContextMenu: HTMLElement | null = null;
-      const showCustomContextMenu = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'VIDEO' || target.closest('#kana-jwplayer')) {
+    const showCustomContextMenu = (e: MouseEvent) => {
+      const target = e.target;
+      if (target instanceof Element && (target.tagName === 'VIDEO' || target.closest('#kana-jwplayer'))) {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
@@ -105,8 +105,8 @@ export function JWPlayerComponent({
     };
 
     const blockContextMenu = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'VIDEO' || target.closest('#kana-jwplayer')) {
+      const target = e.target;
+      if (target instanceof Element && (target.tagName === 'VIDEO' || target.closest('#kana-jwplayer'))) {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
@@ -204,23 +204,23 @@ export function JWPlayerComponent({
     };
 
     const preventSelection = (e: Event) => {
-      const target = e.target as HTMLElement;
-      if (target.closest('#kana-jwplayer')) {
+      const target = e.target;
+      if (target instanceof Element && target.closest('#kana-jwplayer')) {
         e.preventDefault();
         return false;
       }
     };
     const preventDrag = (e: DragEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'VIDEO' || target.closest('#kana-jwplayer')) {
+      const target = e.target;
+      if (target instanceof Element && (target.tagName === 'VIDEO' || target.closest('#kana-jwplayer'))) {
         e.preventDefault();
         return false;
       }
     };
 
     const blockKeyboardShortcuts = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.closest('#kana-jwplayer')) {
+      const target = e.target;
+      if (target instanceof Element && target.closest('#kana-jwplayer')) {
         if (e.key === 'F12' || 
             (e.ctrlKey && e.shiftKey && e.key === 'I') ||
             (e.ctrlKey && e.key === 'u') ||

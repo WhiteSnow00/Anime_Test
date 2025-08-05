@@ -742,6 +742,23 @@ export class SimpleMongoDBService {
     }
   }
   
+  static async checkUsernameExists(username: string): Promise<boolean> {
+    if (!isServer || !UserModel) return false;
+    
+    try {
+      await this.connect();
+      
+      const user = await UserModel.findOne({ 
+        username: username.toLowerCase().trim() 
+      });
+      
+      return !!user;
+    } catch (error) {
+      console.error('Failed to check username exists:', error);
+      throw error;
+    }
+  }
+  
   static async updateUserLastLogin(userId: string): Promise<boolean> {
     if (!isServer || !UserModel) return false;
     

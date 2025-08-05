@@ -127,7 +127,11 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   };
   
   const [passwordMatch, setPasswordMatch] = useState(true);
+  const [showPasswordMismatch, setShowPasswordMismatch] = useState(false);
   const confirmPasswordRef = useRef<NodeJS.Timeout | null>(null);
+  const [usernameAvailable, setUsernameAvailable] = useState(true);
+  const [checkingUsername, setCheckingUsername] = useState(false);
+  const usernameCheckRef = useRef<NodeJS.Timeout | null>(null);
 
   const handlePasswordChange = (value: string) => {
     setPassword(value);
@@ -141,7 +145,27 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     if (confirmPasswordRef.current) clearTimeout(confirmPasswordRef.current);
     confirmPasswordRef.current = setTimeout(() => {
       setPasswordMatch(value === password);
-    }, 500);
+      setShowPasswordMismatch(value !== password);
+    }, 0);
+  };
+
+  const checkUsernameAvailability = async (username: string) => {
+    if (!username || mode !== 'register') return;
+    
+    try {
+      const response = await fetch(`/api/auth/check-username?username=${encodeURIComponent(username)}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setUsernameAvailable(data.available);
+      }
+    } catch (error) {
+      console.error('Failed to check username availability:', error);
+      // On error, assume username is available to not block registration
+      setUsernameAvailable(true);
+    } finally {
+      setCheckingUsername(false);
+    }
   };
 
   return (
@@ -178,12 +202,40 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                 type="text"
                 placeholder="Nhập tên đăng nhập..."
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="pl-10"
+                onChange={(e) => {
+                  setUsername(e.target.value);
+                  if (mode === 'register') {
+                    if (usernameCheckRef.current) clearTimeout(usernameCheckRef.current);
+                    setCheckingUsername(true);
+                    usernameCheckRef.current = setTimeout(() => {
+                      checkUsernameAvailability(e.target.value);
+                    }, 500);
+                  }
+                }}
+                onBlur={() => {
+                  if (mode === 'register' && username) {
+                    checkUsernameAvailability(username);
+                  }
+                }}
+                className="pl-10 pr-10"
                 required
                 disabled={isSubmitting}
                 autoComplete="username"
               />
+              {mode === 'register' && username && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  {checkingUsername ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  ) : usernameAvailable ? (
+                    <Check className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <X className="h-4 w-4 text-destructive" />
+                      <span className="text-xs text-destructive">Đã tồn tại</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -244,13 +296,19 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                     type="password"
                     placeholder="Nhập lại mật khẩu..."
                     value={confirmPassword}
-                    onChange={(e) => handleConfirmPasswordChange(e.target.value)}
+                onChange={(e) => handleConfirmPasswordChange(e.target.value)}
+                onBlur={() => {
+                  if (confirmPassword) {
+                    setPasswordMatch(confirmPassword === password);
+                    setShowPasswordMismatch(confirmPassword !== password);
+                  }
+                }}
                 className="pl-10 pr-10"
                 required
                 disabled={isSubmitting}
                 autoComplete="new-password"
               />
-              {!passwordMatch && (
+              {showPasswordMismatch && confirmPassword && (
                 <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
                   <X className="text-destructive" />
                   <span className="text-xs text-muted-foreground">Mật khẩu không khớp</span>
@@ -288,7 +346,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
           <Button
             type="submit"
             className="w-full"
-            disabled={isSubmitting || (mode === 'register' && !passwordMatch)}
+            disabled={isSubmitting || (mode === 'register' && (!passwordMatch || !usernameAvailable))}
           >
             {isSubmitting ? (
               <>
