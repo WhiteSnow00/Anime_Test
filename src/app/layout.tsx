@@ -3,16 +3,16 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 
 const getBaseUrl = () => {
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`;
-  }
-  if (process.env.VERCEL && process.env.NODE_ENV === 'production') {
+  // For Vercel deployments, use the Vercel app URL directly
+  if (process.env.VERCEL) {
     return 'https://anime-kana.vercel.app';
   }
+  // Custom production domain
   if (process.env.NODE_ENV === 'production') {
     return 'https://ayaya-kana.id.vn';
   }
-  return 'http://localhost:9002';
+  // Local development
+  return 'https://93d61f85463e.ngrok-free.app';
 };
 
 export const metadata: Metadata = {
@@ -27,9 +27,9 @@ export const metadata: Metadata = {
     images: [
       {
         url: `${getBaseUrl()}/images/thumb.jpg`,
-        width: 1536,
-        height: 1099,
-        alt: 'Web coi anime thay gdrive!',
+        width: 1200,
+        height: 630,
+        alt: 'Hoa Thơm Kiêu Hãnh - Web coi anime thay gdrive!',
         type: 'image/jpeg',
       },
     ],
@@ -41,6 +41,7 @@ export const metadata: Metadata = {
     title: 'Hoa Thơm Kiêu Hãnh',
     description: 'Web coi anime thay gdrive!',
     images: [`${getBaseUrl()}/images/thumb.jpg`],
+    creator: '@ayaya_webpage',
   },
 };
 
@@ -59,6 +60,12 @@ export default function RootLayout({
   return (
     <html lang="vi" className="dark">
       <head>
+        <meta property="og:image" content={`${getBaseUrl()}/images/thumb.jpg`} />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:type" content="image/jpeg" />
+        <meta property="og:logo" content={`${getBaseUrl()}/images/kaoruhana.jpg`} />
+        <meta name="twitter:image" content={`${getBaseUrl()}/images/thumb.jpg`} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700;800&display=swap&subset=latin,vietnamese" rel="stylesheet" />
