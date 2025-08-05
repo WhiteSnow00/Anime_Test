@@ -5,7 +5,7 @@ import { generateToken } from '@/lib/auth-utils';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { username, password, confirmPassword, email } = body;
+    const { username, password, confirmPassword, email, displayName } = body;
 
     // Validate input
     if (!username || !password) {
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create user
-    const user = await SimpleMongoDBService.createUser(username, password, email);
+    const user = await SimpleMongoDBService.createUser(username, password, email, displayName);
     
     if (!user) {
       return NextResponse.json(
@@ -72,7 +72,8 @@ export async function POST(request: NextRequest) {
       user: {
         id: user._id,
         username: user.username,
-        email: user.email
+        email: user.email,
+        displayName: user.displayName
       },
       token
     });

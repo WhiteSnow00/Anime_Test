@@ -45,6 +45,7 @@ export interface User {
   username: string;
   passwordHash: string;
   email?: string;
+  displayName?: string;
   createdAt: Date;
   lastLogin?: Date;
   isActive: boolean;
@@ -82,7 +83,8 @@ if (isServer) {
   const userSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true, maxlength: 50, trim: true },
     passwordHash: { type: String, required: true },
-    email: { type: String, maxlength: 255, sparse: true },
+    email: { type: String, maxlength: 255, sparse: true, unique: true },
+    displayName: { type: String, maxlength: 100, trim: true },
     createdAt: { type: Date, default: Date.now },
     lastLogin: { type: Date },
     isActive: { type: Boolean, default: true }
@@ -94,8 +96,6 @@ if (isServer) {
   commentSchema.index({ isApproved: 1 });
   commentSchema.index({ episodeViewing: 1 });
   commentSchema.index({ userId: 1 });
-  userSchema.index({ username: 1 });
-  userSchema.index({ email: 1 });
 
   CommentModel = mongoose.models.Comment || mongoose.model('Comment', commentSchema);
   AdminModel = mongoose.models.Admin || mongoose.model('Admin', adminSchema);
@@ -633,7 +633,7 @@ export class SimpleMongoDBService {
   }
 
   // User Authentication Methods
-  static async createUser(username: string, password: string, email?: string): Promise<User | null> {
+  static async createUser(username: string, password: string, email?: string, displayName?: string): Promise<User | null> {
     if (!isServer || !UserModel) return null;
     
     try {
@@ -653,6 +653,7 @@ export class SimpleMongoDBService {
         username: username.toLowerCase().trim(),
         passwordHash,
         email: email?.toLowerCase().trim(),
+        displayName: displayName?.trim(),
         isActive: true
       });
       
@@ -661,6 +662,7 @@ export class SimpleMongoDBService {
         username: newUser.username,
         passwordHash: newUser.passwordHash,
         email: newUser.email,
+        displayName: newUser.displayName,
         createdAt: newUser.createdAt,
         lastLogin: newUser.lastLogin,
         isActive: newUser.isActive
