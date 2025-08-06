@@ -122,7 +122,7 @@ export function JWPlayerComponent({
       }
     };
 
-    let devtools = { open: false, orientation: null };
+    const devtools = { open: false, orientation: null };
     const threshold = 160;
 
     const checkDevTools = () => {
@@ -151,6 +151,12 @@ export function JWPlayerComponent({
 
     console.log = (...args: any[]) => {
       const message = args.join(' ');
+      
+      // Allow auth-related logs to pass through
+      if (message.includes('logout') || message.includes('login') || message.includes('auth')) {
+        return originalLog.apply(console, args);
+      }
+      
       if (message.includes('m3u8') || message.includes('blob:') || message.includes('stream')) {
         const filteredArgs = args.map(arg => 
           typeof arg === 'string' ? arg.replace(/blob:[^"\s]+/g, 'blob:***').replace(/https?:\/\/[^\s"]+/g, 'https://***') : arg
@@ -163,6 +169,11 @@ export function JWPlayerComponent({
 
     console.error = (...args: any[]) => {
       const message = args.join(' ');
+      
+      // Allow auth-related errors to pass through normally
+      if (message.includes('logout') || message.includes('login') || message.includes('auth') || message.includes('session')) {
+        return originalError.apply(console, args);
+      }
       
       if (message.includes('JWPlayer error:') && args.length >= 2) {
         const errorObj = args[1];
@@ -581,6 +592,12 @@ export function JWPlayerComponent({
       headers.set('X-Anti-Track', btoa(Date.now().toString()));
       headers.set('X-Session-Guard', Math.random().toString(36));
       
+      // Allow auth-related requests to pass through without interference
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      if (url.includes('/api/auth/') || url.includes('logout') || url.includes('login')) {
+        return originalFetch(input, init);
+      }
+      
       const modifiedInit = {
         ...init,
         headers: headers
@@ -630,7 +647,7 @@ export function JWPlayerComponent({
       // Mobile-specific security measures
       const setupMobileSecurity = () => {
         // Enhanced dev tools detection for mobile
-        let mobileDevtools = { open: false, lastCheck: Date.now() };
+        const mobileDevtools = { open: false, lastCheck: Date.now() };
         
         const checkMobileDevTools = () => {
           const now = Date.now();
@@ -712,18 +729,45 @@ export function JWPlayerComponent({
           const videoElements = document.querySelectorAll('video');
           videoElements.forEach(video => {
             if (video && video instanceof HTMLVideoElement) {
-              // Prevent mobile debugging of video element
-              Object.defineProperty(video, 'src', {
-                get: () => 'protected://mobile-stream',
-                set: () => {},
-                configurable: false
-              });
+              try {
+                // Check if the property is configurable before attempting to define it
+                const srcDescriptor = Object.getOwnPropertyDescriptor(video, 'src');
+                
+                // Only redefine if not already configured or if configurable
+                if (!srcDescriptor || srcDescriptor.configurable !== false) {
+                  Object.defineProperty(video, 'src', {
+                    get: () => 'protected://mobile-stream',
+                    set: (value) => {
+                      // Allow setting blob URLs for actual playback
+                      if (typeof value === 'string' && value.startsWith('blob:')) {
+                        try {
+                          Object.defineProperty(video, '_realSrc', {
+                            value: value,
+                            writable: true,
+                            configurable: true
+                          });
+                        } catch (e) {
+                          // Fallback if unable to set _realSrc
+                        }
+                      }
+                    },
+                    configurable: true
+                  });
+                }
+              } catch (error) {
+                // Skip this video element if property definition fails
+                console.debug('Could not protect video src property:', error);
+              }
               
-              // Add mobile-specific event listeners
-              video.addEventListener('loadstart', () => {
-                console.clear();
-                console.log('%c📱 Mobile Stream Loading...', 'color: green; font-size: 12px;');
-              });
+              // Add mobile-specific event listeners with error handling
+              try {
+                video.addEventListener('loadstart', () => {
+                  console.clear();
+                  console.log('%c📱 Mobile Stream Loading...', 'color: green; font-size: 12px;');
+                });
+              } catch (error) {
+                console.debug('Could not add loadstart listener:', error);
+              }
             }
           });
         };

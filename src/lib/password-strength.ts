@@ -35,7 +35,7 @@ function calculateEntropy(p: string): number {
   if (charSpace === 0) return 0;
   
   // Basic entropy
-  let entropy = p.length * Math.log2(charSpace);
+  const entropy = p.length * Math.log2(charSpace);
   
   const checkStr = p.slice(0, 50);
   const charCount = new Map<string, number>();

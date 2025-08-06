@@ -365,6 +365,7 @@ export function getServerReliabilityScore(server: ServerType): number {
 
 export function getBestAvailableServer(
   episode: {
+    id: number;
     servers: {
       hls?: string;
       helvid: string;

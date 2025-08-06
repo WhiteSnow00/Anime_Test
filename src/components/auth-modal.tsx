@@ -98,11 +98,38 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   
   // Check if user is on mobile device to prevent auto-focus
   const isMobileDevice = () => {
-    if (typeof window === 'undefined') return false;
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-           (window.innerWidth <= 768) ||
-           ('ontouchstart' in window);
+    if (typeof window === 'undefined') return true; // Default to assuming mobile in SSR context
+    
+    // iOS specific detection
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    
+    // Android and other mobile devices
+    const isMobileUserAgent = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    // Check for touch capability
+    const hasTouchCapability = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    
+    // Check screen size (consider tablets as mobile for autofocus purposes)
+    const smallScreen = window.innerWidth <= 1024; // Increased from 768 to be safer
+    
+    // For iOS, always prevent autofocus regardless of screen size
+    if (isIOS) return true;
+    
+    // For other devices, check multiple conditions
+    return isMobileUserAgent || (hasTouchCapability && smallScreen);
   };
+  
+  // Get a stable value for mobile detection to prevent hydration mismatch
+  const [isMobile, setIsMobile] = useState(true); // Default to true to prevent autofocus
+  
+  useEffect(() => {
+    // Use a small delay to ensure window is fully loaded
+    const timer = setTimeout(() => {
+      setIsMobile(isMobileDevice());
+    }, 150); // Slightly longer delay for iOS
+    
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (!isOpen) {
@@ -321,14 +348,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                       disabled={isSubmitting}
                       autoComplete="username"
                       maxLength={20}
-                      autoFocus={!isMobileDevice()}
-                      inputMode={isMobileDevice() ? "none" : "text"}
-                      readOnly={isMobileDevice()}
-                      onFocus={(e) => {
-                        if (isMobileDevice()) {
-                          e.target.removeAttribute('readonly');
-                        }
-                      }}
+                      {...(!isMobile && { autoFocus: true })}
                     />
                     {mode === 'register' && username && (
                       <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
@@ -509,7 +529,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                 <Button
                   type="submit"
                   className="w-full"
-                  disabled={isSubmitting || (mode === 'register' && (!passwordMatch || !usernameAvailable || (username && !isValidUsername(username))))}
+                  disabled={isSubmitting || (mode === 'register' && (!passwordMatch || !usernameAvailable || (username.length > 0 && !isValidUsername(username))))}
                 >
                   {isSubmitting ? (
                     <>

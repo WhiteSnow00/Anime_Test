@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { LogIn, User, LogOut } from 'lucide-react';
@@ -19,7 +19,54 @@ import {
 export function AuthHeader() {
   const { isLoggedIn, user, logout, isLoading } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const pathname = usePathname();
+
+  // Check if user is on mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      if (typeof window === 'undefined') return true; // Default to mobile in SSR context
+      
+      // iOS specific detection
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      
+      // Android and other mobile devices
+      const isMobileUserAgent = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      
+      // Check for touch capability
+      const hasTouchCapability = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      
+      // Check screen size (hide on tablets and smaller screens)
+      const smallScreen = window.innerWidth <= 1024;
+      
+      // For iOS, always hide regardless of screen size
+      if (isIOS) return true;
+      
+      // For other devices, check multiple conditions
+      return isMobileUserAgent || (hasTouchCapability && smallScreen);
+    };
+    
+    // Use a small delay to ensure window is fully loaded
+    const timer = setTimeout(() => {
+      setIsMobile(checkMobile());
+    }, 100);
+    
+    const handleResize = () => {
+      setIsMobile(checkMobile());
+    };
+    
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
+  // Hide component on mobile devices
+  if (isMobile) {
+    return null;
+  }
 
     // Don't show auth header on admin routes
     if (pathname?.includes('/comment') || pathname?.includes('/admin')) {
