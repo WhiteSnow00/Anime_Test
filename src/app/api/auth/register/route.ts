@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
     // Validate input
     if (!username || !password) {
       return NextResponse.json(
-        { success: false, error: 'Username and password are required' },
+        { success: false, error: 'Cần điền tên đăng nhập và mật khẩu' },
         { status: 400 }
       );
     }
@@ -18,14 +18,14 @@ export async function POST(request: NextRequest) {
     // Validate username format
     if (username.length < 3 || username.length > 20) {
       return NextResponse.json(
-        { success: false, error: 'Username must be between 3 and 20 characters' },
+        { success: false, error: 'Tên đăng nhập phải từ 3 đến 20 ký tự' },
         { status: 400 }
       );
     }
 
     if (!/^[a-zA-Z0-9@#$_-]+$/.test(username)) {
       return NextResponse.json(
-        { success: false, error: 'Username can only contain letters, numbers, @, #, $, underscore and hyphen' },
+        { success: false, error: 'Tên đăng nhập chỉ có thể chứa chữ cái, số, @, #, $, dấu gạch dưới và dấu gạch ngang' },
         { status: 400 }
       );
     }
@@ -33,14 +33,14 @@ export async function POST(request: NextRequest) {
     // Validate password
     if (password.length < 6) {
       return NextResponse.json(
-        { success: false, error: 'Password must be at least 6 characters long' },
+        { success: false, error: 'Mật khẩu phải có ít nhất 6 ký tự' },
         { status: 400 }
       );
     }
 
     if (password !== confirmPassword) {
       return NextResponse.json(
-        { success: false, error: 'Passwords do not match' },
+        { success: false, error: 'Mật khẩu không khớp' },
         { status: 400 }
       );
     }
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     // Validate email if provided
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json(
-        { success: false, error: 'Invalid email format' },
+        { success: false, error: 'Định dạng email không hợp lệ' },
         { status: 400 }
       );
     }
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     
     if (!user) {
       return NextResponse.json(
-        { success: false, error: 'Failed to create user' },
+        { success: false, error: 'Đăng ký thất bại' },
         { status: 500 }
       );
     }
