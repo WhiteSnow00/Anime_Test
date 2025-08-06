@@ -95,6 +95,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   
   const confirmPasswordRef = useRef<NodeJS.Timeout | null>(null);
   const usernameCheckRef = useRef<NodeJS.Timeout | null>(null);
+  const explicitCloseRef = useRef<boolean>(false);
   
   // Check if user is on mobile device to prevent auto-focus
   const isMobileDevice = () => {
@@ -143,6 +144,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         setError('');
         setPasswordStrength(checkPasswordStrength(''));
         setMode('login');
+        explicitCloseRef.current = false; // Reset the explicit close flag
       }, 200);
       return () => clearTimeout(timer);
     }
@@ -282,7 +284,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
       }
 
       if (result.success) {
-        onClose();
+        handleExplicitClose();
       } else {
         setError(result.error || 'Đã xảy ra lỗi');
       }
@@ -303,9 +305,35 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     setPasswordStrength(checkPasswordStrength(''));
   };
 
+  // Track if close was triggered by explicit action (not backdrop)
+  // Handle modal close - prevent backdrop close on mobile
+  const handleModalOpenChange = (open: boolean) => {
+    if (!open) {
+      if (!isMobile || explicitCloseRef.current) {
+        // Allow close on desktop (any trigger) or mobile (explicit action only)
+        explicitCloseRef.current = false; // Reset for next time
+        onClose();
+      }
+    }
+  };
+
+  // Function to explicitly close modal (bypasses mobile backdrop restriction)
+  const handleExplicitClose = () => {
+    explicitCloseRef.current = true;
+    onClose();
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleModalOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
+        {/* Custom close button for mobile that bypasses backdrop restriction */}
+        <button
+          onClick={handleExplicitClose}
+          className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground z-10"
+          aria-label="Close"
+        >
+          <X className="h-4 w-4" />
+        </button>
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-center">
             {mode === 'login' ? 'Đăng nhập' : 'Tạo tài khoản'}
