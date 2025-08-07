@@ -25,33 +25,15 @@ export function AuthHeader() {
   // Check if user is on mobile device
   useEffect(() => {
     const checkMobile = () => {
-      if (typeof window === "undefined") return true; // Default to mobile in SSR context
-
-      // iOS specific detection
+      if (typeof window === 'undefined') return true; 
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-
-      // Android and other mobile devices
-      const isMobileUserAgent =
-        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-          navigator.userAgent
-        );
-
-      // Check for touch capability
-      const hasTouchCapability =
-        "ontouchstart" in window || navigator.maxTouchPoints > 0;
-
-      // Check screen size (hide on tablets and smaller screens)
+      const isMobileUserAgent = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const hasTouchCapability = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
       const smallScreen = window.innerWidth <= 1024;
-
-      // For iOS, always hide regardless of screen size
       if (isIOS) return true;
-
-      // For other devices, check multiple conditions
       return isMobileUserAgent || (hasTouchCapability && smallScreen);
     };
-
-    // Use a small delay to ensure window is fully loaded
-    const timer = setTimeout(() => {
+      const timer = setTimeout(() => {
       setIsMobile(checkMobile());
     }, 100);
 
@@ -66,16 +48,12 @@ export function AuthHeader() {
       window.removeEventListener("resize", handleResize);
     };
   }, []);
-
-  // Hide component on mobile devices
   if (isMobile) {
     return null;
   }
-
-  // Only show auth header on home page "/"
-  if (pathname !== "/") {
-    return null;
-  }
+    if (pathname?.includes('/comment') || pathname?.includes('/admin')) {
+      return null;
+    }
 
   if (isLoading) {
     return (

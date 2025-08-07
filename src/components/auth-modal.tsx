@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, User, Lock, Mail, AlertCircle, X, Check, UserCircle } from 'lucide-react';
+import { Loader2, User, Lock, Mail, AlertCircle, X, Check, UserCircle, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { checkPasswordStrength, getStrengthColor, getStrengthBgColor, getStrengthLabel } from '@/lib/password-strength';
 import { Progress } from '@/components/ui/progress';
@@ -36,36 +36,24 @@ const slideVariants = {
 };
 
 const hasVietnameseCharacters = (text: string): boolean => {
-  // Check for Vietnamese-specific Unicode ranges:
-  // - Latin Extended-A: U+0100-U+017F (includes ă, đ, ơ, ư)
-  // - Latin Extended-B: U+0180-U+024F 
-  // - Combining Diacritical Marks: U+0300-U+036F (includes Vietnamese tone marks)
-  // - Latin Extended Additional: U+1E00-U+1EFF (includes Vietnamese precomposed characters)
   const vietnamesePattern = /[\u0100-\u017F\u0180-\u024F\u0300-\u036F\u1E00-\u1EFF]/;
-  
-  // Also check for normalized form - Vietnamese often uses combining characters
   const normalizedText = text.normalize('NFD');
-  
   return vietnamesePattern.test(text) || vietnamesePattern.test(normalizedText);
 };
 
 const isValidUsername = (text: string): boolean => {
-  // Check length first
   if (text.length < 3 || text.length > 20) {
     return false;
   }
   
-  // Check basic pattern - must start with letter or number, then can have letters, numbers, and special characters
   if (!/^[a-zA-Z0-9][a-zA-Z0-9@#$_-]*$/.test(text)) {
     return false;
   }
   
-  // Then check for Vietnamese characters
   return !hasVietnameseCharacters(text);
 };
 
 const isValidPassword = (text: string): boolean => {
-  // Allow any characters except Vietnamese
   return text.length > 0 && !hasVietnameseCharacters(text);
 };
 
@@ -92,42 +80,32 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const [showPasswordMismatch, setShowPasswordMismatch] = useState(false);
   const [usernameAvailable, setUsernameAvailable] = useState(true);
   const [checkingUsername, setCheckingUsername] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [rememberPassword, setRememberPassword] = useState(false);
   
   const confirmPasswordRef = useRef<NodeJS.Timeout | null>(null);
   const usernameCheckRef = useRef<NodeJS.Timeout | null>(null);
   const explicitCloseRef = useRef<boolean>(false);
   
-  // Check if user is on mobile device to prevent auto-focus
   const isMobileDevice = () => {
-    if (typeof window === 'undefined') return true; // Default to assuming mobile in SSR context
+    if (typeof window === 'undefined') return true;
     
-    // iOS specific detection
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    
-    // Android and other mobile devices
     const isMobileUserAgent = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
-    // Check for touch capability
     const hasTouchCapability = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const smallScreen = window.innerWidth <= 1024;
     
-    // Check screen size (consider tablets as mobile for autofocus purposes)
-    const smallScreen = window.innerWidth <= 1024; // Increased from 768 to be safer
-    
-    // For iOS, always prevent autofocus regardless of screen size
     if (isIOS) return true;
-    
-    // For other devices, check multiple conditions
     return isMobileUserAgent || (hasTouchCapability && smallScreen);
   };
   
-  // Get a stable value for mobile detection to prevent hydration mismatch
-  const [isMobile, setIsMobile] = useState(true); // Default to true to prevent autofocus
+  const [isMobile, setIsMobile] = useState(true);
   
   useEffect(() => {
-    // Use a small delay to ensure window is fully loaded
     const timer = setTimeout(() => {
       setIsMobile(isMobileDevice());
-    }, 150); // Slightly longer delay for iOS
+    }, 150);
     
     return () => clearTimeout(timer);
   }, []);
@@ -135,8 +113,10 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   useEffect(() => {
     if (!isOpen) {
       const timer = setTimeout(() => {
-        setUsername('');
-        setPassword('');
+        if (!rememberPassword) {
+          setUsername('');
+          setPassword('');
+        }
         setConfirmPassword('');
         setEmail('');
         setDisplayName('');
@@ -144,18 +124,30 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         setError('');
         setPasswordStrength(checkPasswordStrength(''));
         setMode('login');
-        explicitCloseRef.current = false; // Reset the explicit close flag
+        setShowPassword(false);
+        setShowConfirmPassword(false);
       }, 200);
       return () => clearTimeout(timer);
+    } else {
+      if (mode === 'login') {
+        const savedUsername = localStorage.getItem('savedUsername');
+        const savedPassword = localStorage.getItem('savedPassword');
+        const savedRemember = localStorage.getItem('rememberPassword') === 'true';
+        
+        if (savedRemember && savedUsername && savedPassword) {
+          setUsername(savedUsername);
+          setPassword(savedPassword);
+          setRememberPassword(true);
+        }
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, rememberPassword]);
   
   useEffect(() => {
     setError('');
   }, [mode]);
 
   const checkUsernameAvailability = async (username: string) => {
-    // Don't check if username is invalid
     if (!username || mode !== 'register' || !isValidUsername(username)) {
       setCheckingUsername(false);
       return;
@@ -177,13 +169,11 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   };
 
   const handleUsernameChange = (value: string) => {
-    // Allow Unicode input but check for Vietnamese characters later during validation
     setUsername(value);
     
     if (mode === 'register' && value) {
       if (usernameCheckRef.current) clearTimeout(usernameCheckRef.current);
       
-      // Only set checking to true if username might be valid
       if (value.length >= 3) {
         setCheckingUsername(true);
         usernameCheckRef.current = setTimeout(() => {
@@ -191,7 +181,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         }, 500);
       } else {
         setCheckingUsername(false);
-        setUsernameAvailable(true); // Reset to default
+        setUsernameAvailable(true);
       }
     } else {
       setCheckingUsername(false);
@@ -200,7 +190,6 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   };
 
   const handlePasswordChange = (value: string) => {
-    // Allow Unicode input but check for Vietnamese characters later during validation
     setPassword(value);
     if (mode === 'register') {
       setPasswordStrength(checkPasswordStrength(value));
@@ -284,7 +273,16 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
       }
 
       if (result.success) {
-        handleExplicitClose();
+        if (mode === 'login' && rememberPassword) {
+          localStorage.setItem('savedUsername', username);
+          localStorage.setItem('savedPassword', password);
+          localStorage.setItem('rememberPassword', 'true');
+        } else if (mode === 'login' && !rememberPassword) {
+          localStorage.removeItem('savedUsername');
+          localStorage.removeItem('savedPassword');
+          localStorage.removeItem('rememberPassword');
+        }
+        onClose();
       } else {
         setError(result.error || 'Đã xảy ra lỗi');
       }
@@ -457,17 +455,52 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                     <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       id="password"
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       placeholder="Nhập mật khẩu..."
                       value={password}
                       onChange={(e) => handlePasswordChange(e.target.value)}
-                      className="pl-10"
+                      className="pl-10 pr-16"
                       required
                       disabled={isSubmitting}
                       autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      tabIndex={-1}
+                    >
+                      {showPassword ? (
+                        <span className="flex items-center gap-1">
+                          <EyeOff className="h-4 w-4" />
+                          <span>Ẩn</span>
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1">
+                          <Eye className="h-4 w-4" />
+                          <span>Hiện</span>
+                        </span>
+                      )}
+                    </button>
                   </div>
                 </div>
+
+                {mode === 'login' && (
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="rememberPassword"
+                      checked={rememberPassword}
+                      onCheckedChange={(checked) => setRememberPassword(!!checked)}
+                      disabled={isSubmitting}
+                    />
+                    <Label 
+                      htmlFor="rememberPassword" 
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    >
+                      Lưu mật khẩu
+                    </Label>
+                  </div>
+                )}
 
                 {mode === 'register' && (
                   <>
@@ -504,7 +537,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                         <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
                           id="confirmPassword"
-                          type="password"
+                          type={showConfirmPassword ? "text" : "password"}
                           placeholder="Nhập lại mật khẩu..."
                           value={confirmPassword}
                           onChange={(e) => handleConfirmPasswordChange(e.target.value)}
@@ -514,17 +547,37 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                               setShowPasswordMismatch(confirmPassword !== password);
                             }
                           }}
-                          className="pl-10 pr-10"
+                          className="pl-10 pr-24"
                           required
                           disabled={isSubmitting}
                           autoComplete="new-password"
                         />
-                        {showPasswordMismatch && confirmPassword && (
-                          <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
-                            <X className="h-4 w-4 text-destructive" />
-                            <span className="text-xs text-destructive">Không khớp</span>
-                          </div>
-                        )}
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
+                          {showPasswordMismatch && confirmPassword && (
+                            <>
+                              <X className="h-4 w-4 text-destructive" />
+                              <span className="text-xs text-destructive">Không khớp</span>
+                            </>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            className="text-xs text-muted-foreground hover:text-foreground transition-colors ml-1"
+                            tabIndex={-1}
+                          >
+                            {showConfirmPassword ? (
+                              <span className="flex items-center gap-1">
+                                <EyeOff className="h-4 w-4" />
+                                <span>Ẩn</span>
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1">
+                                <Eye className="h-4 w-4" />
+                                <span>Hiện</span>
+                              </span>
+                            )}
+                          </button>
+                        </div>
                       </div>
                     </div>
 
