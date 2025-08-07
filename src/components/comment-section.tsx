@@ -13,6 +13,7 @@ import { CommentService } from '@/lib/comment-service';
 import { MessageCircle, User, Clock, Send, Loader2, Smile, ChevronDown, Play, ChevronLeft, ChevronRight, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/auth-context';
+import { CommentItem } from '@/components/comment-item';
 
 interface CommentSectionProps {
   currentEpisodeId?: number;
@@ -30,18 +31,13 @@ export function CommentSection({ currentEpisodeId, className }: CommentSectionPr
   const [errors, setErrors] = useState<string[]>([]);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showEmojiHelper, setShowEmojiHelper] = useState(false);
-  
-  // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const commentsPerPage = 12;
-  
-  // Calculate pagination
   const totalPages = Math.ceil(comments.length / commentsPerPage);
   const startIndex = (currentPage - 1) * commentsPerPage;
   const endIndex = startIndex + commentsPerPage;
   const currentComments = comments.slice(startIndex, endIndex);
   
-  // Reset to page 1 when comments change and current page is invalid
   useEffect(() => {
     if (currentPage > totalPages && totalPages > 0) {
       setCurrentPage(1);
@@ -53,7 +49,6 @@ export function CommentSection({ currentEpisodeId, className }: CommentSectionPr
     setErrors([]);
     setShowSuccess(false);
 
-    // Use logged-in username if available
     const commentData = {
       ...formData,
       userName: isLoggedIn && user ? user.username : formData.userName,
@@ -72,22 +67,18 @@ export function CommentSection({ currentEpisodeId, className }: CommentSectionPr
   };
 
   const handleInputChange = (field: 'userName' | 'content', value: string) => {
-    // Process emojis for content field
     const processedValue = field === 'content' ? CommentService.processEmojis(value) : value;
     
     setFormData(prev => ({ 
       ...prev, 
       [field]: processedValue,
-      episodeViewing: currentEpisodeId // Update episode tracking
+      episodeViewing: currentEpisodeId 
     }));
-    
-    // Clear errors when user starts typing
     if (errors.length > 0) {
       setErrors([]);
     }
   };
 
-  // Insert emoji into content
   const insertEmoji = (emoji: string) => {
     setFormData(prev => ({
       ...prev,
@@ -283,50 +274,18 @@ export function CommentSection({ currentEpisodeId, className }: CommentSectionPr
           <>
             <div className="space-y-3 sm:space-y-4">
               {currentComments.map((comment) => (
-                <Card key={comment._id || `comment-${comment.userName}-${comment.timestamp}`} className="p-3 sm:p-4 bg-muted/30 comment-item">
-                  <div className="flex items-start gap-2 sm:gap-3">
-                    <div className={cn(
-                      "w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center flex-shrink-0",
-                      comment.userId ? "bg-primary/20" : "bg-primary/10"
-                    )}>
-                      {comment.userId ? (
-                        <Shield className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-                      ) : (
-                        <User className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-                      )}
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm comment-username vietnamese-text">{comment.displayName || comment.userName}</span>
-                          {comment.userId && (
-                            <Badge variant="secondary" className="text-xs py-0 px-1.5 h-5">
-                              <Shield className="h-3 w-3 mr-1" />
-                              Thành viên
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {comment.episodeViewing && (
-                            <Badge variant="outline" className="text-xs flex items-center gap-1">
-                              <Play className="h-3 w-3" />
-                              Tập {comment.episodeViewing}
-                            </Badge>
-                          )}
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <Clock className="h-3 w-3" />
-                            {CommentService.formatRelativeTime(comment.timestamp)}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <p className="text-sm sm:text-base leading-relaxed comment-content vietnamese-text">
-                        {comment.content}
-                      </p>
-                    </div>
-                  </div>
-                </Card>
+                <CommentItem 
+                  key={comment._id || `comment-${comment.userName}-${comment.timestamp}`} 
+                  comment={comment}
+                  onReplyAdded={(reply) => {
+                    // Refresh comments to show the new reply
+                    console.log('Reply added:', reply);
+                  }}
+                  onLikeToggled={(commentId, liked, likeCount) => {
+                    // Update like count in the comment list
+                    console.log(`Comment ${commentId} liked: ${liked}, count: ${likeCount}`);
+                  }}
+                />
               ))}
             </div>
 

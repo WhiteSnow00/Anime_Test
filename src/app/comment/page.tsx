@@ -5,9 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useAdminComments } from '@/hooks/use-comments';
 import { 
   Shield, 
   MessageCircle, 
@@ -20,77 +18,257 @@ import {
   EyeOff,
   BarChart3,
   Calendar,
-  TrendingUp,
   Lock,
-  Play
+  Play,
+  Heart,
+  Reply,
+  UserCheck,
+  UserX,
+  Activity,
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export default function CommentManagement() {
+interface EnhancedComment {
+  _id?: string;
+  userName: string;
+  displayName?: string;
+  content: string;
+  timestamp: Date;
+  isApproved: boolean;
+  userAgent?: string;
+  ipAddress?: string;
+  episodeViewing?: number;
+  userId?: string;
+  likeCount: number;
+  replies: any[];
+  replyCount: number;
+}
+
+interface EnhancedStats {
+  totalComments: number;
+  approvedComments: number;
+  pendingComments: number;
+  commentsToday: number;
+  totalLikes: number;
+  totalReplies: number;
+  repliesWithLikes: number;
+  registeredComments: number;
+  guestComments: number;
+  registeredReplies: number;
+  guestReplies: number;
+  totalInteractions: number;
+  averageLikesPerComment: string;
+  averageRepliesPerComment: string;
+}
+
+export default function EnhancedCommentManagement() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
-  const [filter, setFilter] = useState<'all' | 'approved' | 'pending'>('all');
+  const [comments, setComments] = useState<EnhancedComment[]>([]);
+  const [stats, setStats] = useState<EnhancedStats | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'approved' | 'pending' | 'with-replies' | 'with-likes'>('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const { comments, stats, isLoading, toggleApproval, deleteComment, refreshComments } = useAdminComments(
-    isAuthenticated && password ? password : ''
-  );
-
-  useEffect(() => {
-    sessionStorage.removeItem('comment-admin-auth');
-    sessionStorage.removeItem('comment-admin-password');
-  }, []);
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
-      try {
-      const response = await fetch(`/api/comments/admin?password=${encodeURIComponent(password)}`);
+    setIsLoading(true);
+    
+    try {
+      const response = await fetch(`/api/comments/admin-enhanced?password=${encodeURIComponent(password)}`);
       const result = await response.json();
       
       if (result.success) {
         setIsAuthenticated(true);
-        setAuthError('');
-        sessionStorage.setItem('comment-admin-auth', 'true');
-        sessionStorage.setItem('comment-admin-password', password);
+        setComments(result.comments);
+        setStats(result.stats);
+        sessionStorage.setItem('admin-auth', 'true');
+        sessionStorage.setItem('admin-password', password);
       } else {
         setAuthError('Mật khẩu không đúng. Vui lòng kiểm tra lại.');
       }
     } catch (error) {
       console.error('Login error:', error);
       setAuthError('Có lỗi xảy ra, vui lòng thử lại');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
     setPassword('');
-    sessionStorage.removeItem('comment-admin-auth');
-    sessionStorage.removeItem('comment-admin-password');
+    setComments([]);
+    setStats(null);
+    sessionStorage.removeItem('admin-auth');
+    sessionStorage.removeItem('admin-password');
+  };
+
+  const refreshData = async () => {
+    if (!password) return;
+    
+    setIsLoading(true);
+    try {
+      const response = await fetch(`/api/comments/admin-enhanced?password=${encodeURIComponent(password)}`);
+      const result = await response.json();
+      
+      if (result.success) {
+        setComments(result.comments);
+        setStats(result.stats);
+      }
+    } catch (error) {
+      console.error('Refresh error:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const toggleCommentApproval = async (commentId: string) => {
+    try {
+      const response = await fetch('/api/comments/admin-enhanced', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          password,
+          action: 'toggle-approval',
+          commentId
+        })
+      });
+
+      if (response.ok) {
+        await refreshData();
+      }
+    } catch (error) {
+      console.error('Toggle approval error:', error);
+    }
+  };
+
+  const deleteComment = async (commentId: string) => {
+    if (!confirm('Bạn có chắc muốn xóa bình luận này và tất cả trả lời của nó?')) return;
+    
+    try {
+      const response = await fetch('/api/comments/admin-enhanced', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          password,
+          action: 'delete',
+          commentId
+        })
+      });
+
+      if (response.ok) {
+        await refreshData();
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+    }
+  };
+
+  const toggleReplyApproval = async (replyId: string) => {
+    try {
+      const response = await fetch('/api/comments/admin-enhanced', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          password,
+          action: 'toggle-reply-approval',
+          replyId
+        })
+      });
+
+      if (response.ok) {
+        await refreshData();
+      }
+    } catch (error) {
+      console.error('Toggle reply approval error:', error);
+    }
+  };
+
+  const deleteReply = async (replyId: string) => {
+    if (!confirm('Bạn có chắc muốn xóa trả lời này?')) return;
+    
+    try {
+      const response = await fetch('/api/comments/admin-enhanced', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          password,
+          action: 'delete-reply',
+          replyId
+        })
+      });
+
+      if (response.ok) {
+        await refreshData();
+      }
+    } catch (error) {
+      console.error('Delete reply error:', error);
+    }
+  };
+
+  const toggleCommentExpansion = (commentId: string) => {
+    const newExpanded = new Set(expandedComments);
+    if (newExpanded.has(commentId)) {
+      newExpanded.delete(commentId);
+    } else {
+      newExpanded.add(commentId);
+    }
+    setExpandedComments(newExpanded);
   };
 
   const filteredComments = comments.filter(comment => {
     const matchesFilter = filter === 'all' || 
       (filter === 'approved' && comment.isApproved) ||
-      (filter === 'pending' && !comment.isApproved);
+      (filter === 'pending' && !comment.isApproved) ||
+      (filter === 'with-replies' && comment.replyCount > 0) ||
+      (filter === 'with-likes' && comment.likeCount > 0);
     
     const matchesSearch = searchTerm === '' ||
       comment.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      comment.content.toLowerCase().includes(searchTerm.toLowerCase());
+      comment.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (comment.displayName && comment.displayName.toLowerCase().includes(searchTerm.toLowerCase()));
     
     return matchesFilter && matchesSearch;
   });
 
+  useEffect(() => {
+    const savedAuth = sessionStorage.getItem('admin-auth');
+    const savedPassword = sessionStorage.getItem('admin-password');
+    
+    if (savedAuth === 'true' && savedPassword) {
+      setPassword(savedPassword);
+      setIsAuthenticated(true);
+      setIsLoading(true);
+      fetch(`/api/comments/admin-enhanced?password=${encodeURIComponent(savedPassword)}`)
+        .then(res => res.json())
+        .then(result => {
+          if (result.success) {
+            setComments(result.comments);
+            setStats(result.stats);
+          }
+        })
+        .finally(() => setIsLoading(false));
+    }
+  }, []);
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background to-muted/20 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md p-4 sm:p-6">
-          <div className="text-center mb-4 sm:mb-6">
-            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-              <Shield className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
+        <Card className="w-full max-w-md p-6">
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Shield className="h-8 w-8 text-primary" />
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold mb-2">Quản lý bình luận</h1>
-            <p className="text-sm text-muted-foreground">Vui lòng nhập mật khẩu để tiếp tục</p>
+            <h1 className="text-2xl font-bold mb-2">Quản lý bình luận</h1>
+            <p className="text-sm text-muted-foreground">Vui lòng đăng nhập để tiếp tục</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
@@ -103,22 +281,30 @@ export default function CommentManagement() {
                 <Input
                   id="password"
                   type="password"
-                  placeholder="Nhập mật khẩu..."
+                  placeholder="Nhập mật khẩu admin..."
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 h-11 text-base"
+                  className="pl-10"
+                  disabled={isLoading}
                 />
               </div>
             </div>
 
             {authError && (
               <Alert variant="destructive">
-                <AlertDescription className="text-sm">{authError}</AlertDescription>
+                <AlertDescription>{authError}</AlertDescription>
               </Alert>
             )}
 
-            <Button type="submit" className="w-full h-11 text-base">
-              Đăng nhập
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Đang xác thực...
+                </>
+              ) : (
+                'Đăng nhập'
+              )}
             </Button>
           </form>
         </Card>
@@ -127,151 +313,187 @@ export default function CommentManagement() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-muted/20 p-2 sm:p-4">
-      <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-background to-muted/20 p-4">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold">Quản lý bình luận</h1>
-            <p className="text-sm sm:text-base text-muted-foreground">Theo dõi và quản lý tất cả bình luận</p>
+            <h1 className="text-3xl font-bold">Quản lý bình luận</h1>
+            <p className="text-muted-foreground">Quản lý bình luận, trả lời và tương tác</p>
           </div>
-          <Button variant="outline" onClick={handleLogout} className="self-start sm:self-auto">
-            Đăng xuất
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleLogout}>
+              Đăng xuất
+            </Button>
+            <Button 
+              variant="outline" 
+              size="icon"
+              onClick={refreshData} 
+              disabled={isLoading}
+              title="Làm mới dữ liệu"
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
         </div>
 
-        {/* Statistics */}
-        {isLoading ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
-            {[1, 2, 3, 4].map((i) => (
-              <Card key={i} className="p-3 sm:p-4">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gray-200 rounded-lg animate-pulse mx-auto sm:mx-0" />
-                  <div className="space-y-1 sm:space-y-2 text-center sm:text-left">
-                    <div className="h-3 sm:h-4 bg-gray-200 rounded animate-pulse w-16 sm:w-20 mx-auto sm:mx-0" />
-                    <div className="h-4 sm:h-6 bg-gray-200 rounded animate-pulse w-8 sm:w-12 mx-auto sm:mx-0" />
-                  </div>
+        {/* Enhanced Statistics */}
+        {stats && (
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <Card className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <MessageCircle className="h-5 w-5 text-blue-600" />
                 </div>
-              </Card>
-            ))}
-          </div>
-        ) : stats ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
-            <Card className="p-3 sm:p-4">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-lg flex items-center justify-center mx-auto sm:mx-0">
-                  <MessageCircle className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Tổng bình luận</p>
+                  <p className="text-2xl font-bold">{stats.totalComments}</p>
                 </div>
-                <div className="text-center sm:text-left">
-                  <p className="text-xs sm:text-sm text-muted-foreground">Tổng bình luận</p>
-                  <p className="text-lg sm:text-2xl font-bold">{stats.totalComments}</p>
               </div>
-            </div>
-          </Card>
+            </Card>
 
-          <Card className="p-3 sm:p-4">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-green-100 rounded-lg flex items-center justify-center mx-auto sm:mx-0">
-                <Check className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
-              </div>
-              <div className="text-center sm:text-left">
-                <p className="text-xs sm:text-sm text-muted-foreground">Đã duyệt</p>
-                <p className="text-lg sm:text-2xl font-bold">{stats.approvedComments}</p>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-3 sm:p-4">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-yellow-100 rounded-lg flex items-center justify-center mx-auto sm:mx-0">
-                <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-600" />
-              </div>
-              <div className="text-center sm:text-left">
-                <p className="text-xs sm:text-sm text-muted-foreground">Chờ duyệt</p>
-                <p className="text-lg sm:text-2xl font-bold">{stats.pendingComments}</p>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-3 sm:p-4">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-purple-100 rounded-lg flex items-center justify-center mx-auto sm:mx-0">
-                <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
-              </div>
-              <div className="text-center sm:text-left">
-                <p className="text-xs sm:text-sm text-muted-foreground">Hôm nay</p>
-                <p className="text-lg sm:text-2xl font-bold">{stats.commentsToday}</p>
-              </div>
-            </div>
-          </Card>
-        </div>
-        ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
-            {[1, 2, 3, 4].map((i) => (
-              <Card key={i} className="p-3 sm:p-4">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gray-100 rounded-lg animate-pulse mx-auto sm:mx-0" />
-                  <div className="text-center sm:text-left">
-                    <div className="h-3 sm:h-4 w-16 sm:w-20 bg-gray-200 rounded animate-pulse mb-1 mx-auto sm:mx-0" />
-                    <div className="h-4 sm:h-6 w-8 sm:w-12 bg-gray-200 rounded animate-pulse mx-auto sm:mx-0" />
-                  </div>
+            <Card className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                  <Heart className="h-5 w-5 text-red-600" />
                 </div>
-              </Card>
-            ))}
+                <div>
+                  <p className="text-sm text-muted-foreground">Tổng lượt thích</p>
+                  <p className="text-2xl font-bold">{stats.totalLikes}</p>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <Reply className="h-5 w-5 text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Tổng trả lời</p>
+                  <p className="text-2xl font-bold">{stats.totalReplies}</p>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                  <UserCheck className="h-5 w-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">BL thành viên</p>
+                  <p className="text-2xl font-bold">{stats.registeredComments}</p>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                  <UserX className="h-5 w-5 text-yellow-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">BL khách</p>
+                  <p className="text-2xl font-bold">{stats.guestComments}</p>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                  <Activity className="h-5 w-5 text-indigo-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Tương tác</p>
+                  <p className="text-2xl font-bold">{stats.totalInteractions}</p>
+                </div>
+              </div>
+            </Card>
           </div>
         )}
 
+        {/* Additional Stats */}
+        {stats && (
+          <Card className="p-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">TB lượt thích/bình luận</span>
+                <Badge variant="secondary">{stats.averageLikesPerComment}</Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">TB trả lời/bình luận</span>
+                <Badge variant="secondary">{stats.averageRepliesPerComment}</Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Trả lời từ thành viên</span>
+                <Badge variant="secondary">{stats.registeredReplies}</Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Bình luận hôm nay</span>
+                <Badge variant="secondary">{stats.commentsToday}</Badge>
+              </div>
+            </div>
+          </Card>
+        )}
+
         {/* Filters and Search */}
-        <Card className="p-3 sm:p-4">
-          <div className="flex flex-col gap-3 sm:gap-4">
-            {/* Filter buttons - stack on mobile */}
+        <Card className="p-4">
+          <div className="space-y-4">
             <div className="flex flex-wrap gap-2">
               <Button
                 variant={filter === 'all' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setFilter('all')}
-                className="text-xs sm:text-sm"
               >
-                Tất cả {stats ? `(${stats.totalComments})` : ''}
+                Tất cả ({comments.length})
               </Button>
               <Button
                 variant={filter === 'approved' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setFilter('approved')}
-                className="text-xs sm:text-sm"
               >
-                Đã duyệt {stats ? `(${stats.approvedComments})` : ''}
+                Đã duyệt ({comments.filter(c => c.isApproved).length})
               </Button>
               <Button
                 variant={filter === 'pending' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setFilter('pending')}
-                className="text-xs sm:text-sm"
               >
-                Chờ duyệt {stats ? `(${stats.pendingComments})` : ''}
+                Chờ duyệt ({comments.filter(c => !c.isApproved).length})
+              </Button>
+              <Button
+                variant={filter === 'with-replies' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setFilter('with-replies')}
+              >
+                Có trả lời ({comments.filter(c => c.replyCount > 0).length})
+              </Button>
+              <Button
+                variant={filter === 'with-likes' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setFilter('with-likes')}
+              >
+                Có lượt thích ({comments.filter(c => c.likeCount > 0).length})
               </Button>
             </div>
 
-            {/* Search and refresh */}
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
-              <div className="flex-1">
-                <Input
-                  placeholder="Tìm kiếm theo tên hoặc nội dung..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="text-sm"
-                />
-              </div>
-              <Button variant="outline" onClick={refreshComments} size="sm" className="self-start sm:self-auto">
-                Làm mới
-              </Button>
-            </div>
+            <Input
+              placeholder="Tìm kiếm theo tên hoặc nội dung..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
         </Card>
 
         {/* Comments List */}
-        <Card className="p-3 sm:p-6">
-          <div className="space-y-3 sm:space-y-4">
+        <Card className="p-6">
+          <div className="space-y-4">
             {filteredComments.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <MessageCircle className="h-12 w-12 mx-auto mb-3 opacity-50" />
@@ -279,127 +501,177 @@ export default function CommentManagement() {
               </div>
             ) : (
               filteredComments.map((comment) => (
-                <div key={comment._id || `admin-comment-${comment.userName}-${comment.timestamp}`} className="border rounded-lg p-3 sm:p-4 space-y-3 admin-comment-card">
-                  {/* Comment Header - Mobile optimized */}
-                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                    <div className="flex items-start gap-2 sm:gap-3 flex-1 min-w-0">
-                      <div className="w-6 h-6 sm:w-8 sm:h-8 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
-                        <User className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+                <div key={comment._id} className="border rounded-lg p-4 space-y-3">
+                  {/* Comment Header */}
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-3 flex-1">
+                      <div className={cn(
+                        "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0",
+                        comment.userId ? "bg-primary/20" : "bg-muted"
+                      )}>
+                        {comment.userId ? (
+                          <UserCheck className="h-4 w-4 text-primary" />
+                        ) : (
+                          <User className="h-4 w-4 text-muted-foreground" />
+                        )}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                          <span className="font-medium text-sm sm:text-base truncate">{comment.userName}</span>
-                          <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-                            {comment.episodeViewing && (
-                              <Badge variant="outline" className="text-xs flex items-center gap-1">
-                                <Play className="h-2 w-2 sm:h-3 sm:w-3" />
-                                Tập {comment.episodeViewing}
-                              </Badge>
-                            )}
-                            <Badge variant={comment.isApproved ? 'default' : 'secondary'} className="text-xs">
-                              {comment.isApproved ? (
-                                <>
-                                  <Eye className="h-2 w-2 sm:h-3 sm:w-3 mr-1" />
-                                  Đã duyệt
-                                </>
-                              ) : (
-                                <>
-                                  <EyeOff className="h-2 w-2 sm:h-3 sm:w-3 mr-1" />
-                                  Chờ duyệt
-                                </>
-                              )}
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium">
+                            {comment.displayName || comment.userName}
+                          </span>
+                          {comment.userId && (
+                            <Badge variant="secondary" className="text-xs">
+                              <Shield className="h-3 w-3 mr-1" />
+                              Thành viên
                             </Badge>
-                          </div>
+                          )}
+                          {comment.episodeViewing && (
+                            <Badge variant="outline" className="text-xs">
+                              <Play className="h-3 w-3 mr-1" />
+                              Tập {comment.episodeViewing}
+                            </Badge>
+                          )}
+                          <Badge variant={comment.isApproved ? 'default' : 'secondary'} className="text-xs">
+                            {comment.isApproved ? 'Đã duyệt' : 'Chờ duyệt'}
+                          </Badge>
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                          <Clock className="h-3 w-3" />
-                          <span>{comment.timestamp.toLocaleString('vi-VN')}</span>
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1">
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {new Date(comment.timestamp).toLocaleString('vi-VN')}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Heart className="h-3 w-3" />
+                            {comment.likeCount} lượt thích
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <MessageCircle className="h-3 w-3" />
+                            {comment.replyCount} trả lời
+                          </span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Action buttons - Better mobile layout */}
-                    <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                    {/* Action buttons */}
+                    <div className="flex items-center gap-2">
                       <Button
                         size="sm"
                         variant={comment.isApproved ? "outline" : "default"}
-                        onClick={() => toggleApproval(comment._id!)}
-                        className="text-xs sm:text-sm px-2 sm:px-3"
+                        onClick={() => toggleCommentApproval(comment._id!)}
                       >
-                        {comment.isApproved ? (
-                          <>
-                            <EyeOff className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
-                            <span className="hidden sm:inline">Ẩn</span>
-                          </>
-                        ) : (
-                          <>
-                            <Check className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
-                            <span className="hidden sm:inline">Duyệt</span>
-                          </>
-                        )}
+                        {comment.isApproved ? <EyeOff className="h-4 w-4" /> : <Check className="h-4 w-4" />}
                       </Button>
                       <Button
                         size="sm"
                         variant="destructive"
-                        onClick={() => {
-                          if (confirm('Bạn có chắc muốn xóa bình luận này?')) {
-                            deleteComment(comment._id!);
-                          }
-                        }}
-                        className="px-2 sm:px-3"
+                        onClick={() => deleteComment(comment._id!)}
                       >
-                        <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
 
                   {/* Comment Content */}
-                  <div className="pl-8 sm:pl-11">
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap break-words bg-muted/30 rounded-md p-2 sm:p-3">
+                  <div className="pl-11">
+                    <p className="text-sm leading-relaxed bg-muted/30 rounded-md p-3">
                       {comment.content}
                     </p>
                   </div>
 
-                  {/* Comment Metadata - Collapsible on mobile */}
-                  {comment.userAgent && (
-                    <div className="pl-8 sm:pl-11 text-xs text-muted-foreground">
-                      <details>
-                        <summary className="cursor-pointer hover:text-foreground">
-                          Thông tin kỹ thuật
-                        </summary>
-                        <div className="mt-2 space-y-1 text-xs">
-                          <p className="break-all">User Agent: {comment.userAgent}</p>
-                          <p>IP: {comment.ipAddress}</p>
-                          <p>ID: {comment._id}</p>
+                  {/* Replies Section */}
+                  {comment.replyCount > 0 && (
+                    <div className="pl-11">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleCommentExpansion(comment._id!)}
+                        className="text-xs"
+                      >
+                        {expandedComments.has(comment._id!) ? (
+                          <>
+                            <ChevronUp className="h-3 w-3 mr-1" />
+                            Ẩn {comment.replyCount} trả lời
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="h-3 w-3 mr-1" />
+                            Xem {comment.replyCount} trả lời
+                          </>
+                        )}
+                      </Button>
+
+                      {expandedComments.has(comment._id!) && (
+                        <div className="mt-3 space-y-2">
+                          {comment.replies.map((reply: any) => (
+                            <div key={reply._id} className="border-l-2 border-primary/20 pl-4 py-2">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium text-sm">
+                                      {reply.displayName || reply.userName}
+                                    </span>
+                                    {reply.userId && (
+                                      <Badge variant="secondary" className="text-xs">
+                                        Thành viên
+                                      </Badge>
+                                    )}
+                                    <Badge variant={reply.isApproved ? 'default' : 'secondary'} className="text-xs">
+                                      {reply.isApproved ? 'Đã duyệt' : 'Chờ duyệt'}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-sm mt-1">{reply.content}</p>
+                                  <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                                    <span>{new Date(reply.timestamp).toLocaleString('vi-VN')}</span>
+                                    <span className="flex items-center gap-1">
+                                      <Heart className="h-3 w-3" />
+                                      {reply.likeCount}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => toggleReplyApproval(reply._id)}
+                                  >
+                                    {reply.isApproved ? <EyeOff className="h-3 w-3" /> : <Check className="h-3 w-3" />}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => deleteReply(reply._id)}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      </details>
+                      )}
                     </div>
+                  )}
+
+                  {/* Technical Info */}
+                  {comment.ipAddress && (
+                    <details className="pl-11">
+                      <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+                        Thông tin kỹ thuật
+                      </summary>
+                      <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                        <p>IP: {comment.ipAddress}</p>
+                        <p>User Agent: {comment.userAgent}</p>
+                        <p>ID: {comment._id}</p>
+                        {comment.userId && <p>User ID: {comment.userId}</p>}
+                      </div>
+                    </details>
                   )}
                 </div>
               ))
             )}
           </div>
         </Card>
-
-        {/* Overall Statistics */}
-        {stats && (
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              Tổng quan
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                <span className="font-medium">Tổng số bình luận</span>
-                <Badge variant="secondary">{stats.totalComments}</Badge>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                <span className="font-medium">Bình luận hôm nay</span>
-                <Badge variant="secondary">{stats.commentsToday}</Badge>
-              </div>
-            </div>
-          </Card>
-        )}
       </div>
     </div>
   );

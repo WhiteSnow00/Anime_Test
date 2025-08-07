@@ -1,17 +1,75 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SimpleMongoDBService } from '@/lib/simple-mongodb-service';
+import { MongoDBExtendedService } from '@/lib/mongodb-extended-service';
 import { verifyToken } from '@/lib/auth-utils';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const comments = await SimpleMongoDBService.getComments();
+    // Get episode ID from query params if provided
+    const { searchParams } = new URL(request.url);
+    const episodeId = searchParams.get('episode');
     
-    console.log(`[COMMENTS-GET] ✅ Fetched ${comments.length} approved comments from MongoDB`);
+    // Get comments with interactions (likes and replies)
+    const comments = await MongoDBExtendedService.getCommentsWithInteractions(
+      episodeId ? parseInt(episodeId) : undefined
+    );
+    
+    // Get user information to determine like status
+    let userId: string | undefined;
+    const token = request.cookies.get('auth-token')?.value;
+    
+    if (token) {
+      try {
+        const decoded = verifyToken(token);
+        userId = decoded.userId;
+      } catch (error) {
+        // Invalid token, proceed as guest
+      }
+    }
+
+    // Get IP address for guest like status
+    const forwardedFor = request.headers.get('x-forwarded-for');
+    const realIp = request.headers.get('x-real-ip');
+    const ipAddress = forwardedFor?.split(',')[0] || realIp || 'localhost';
+
+    // Add user's like status to each comment
+    const commentsWithUserStatus = await Promise.all(
+      comments.map(async (comment) => {
+        const likeStatus = await MongoDBExtendedService.getCommentLikeStatus(
+          comment._id!,
+          userId,
+          ipAddress
+        );
+
+        // Add user's like status to replies as well
+        const repliesWithStatus = comment.replies ? await Promise.all(
+          comment.replies.map(async (reply) => {
+            const replyLikeStatus = await MongoDBExtendedService.getCommentLikeStatus(
+              reply._id!,
+              userId,
+              ipAddress
+            );
+            return {
+              ...reply,
+              userLiked: replyLikeStatus.userLiked
+            };
+          })
+        ) : [];
+
+        return {
+          ...comment,
+          userLiked: likeStatus.userLiked,
+          replies: repliesWithStatus
+        };
+      })
+    );
+    
+    console.log(`[COMMENTS-GET] ✅ Fetched ${commentsWithUserStatus.length} comments with interactions from MongoDB`);
     
     return NextResponse.json({
       success: true,
-      comments: comments,
-      count: comments.length,
+      comments: commentsWithUserStatus,
+      count: commentsWithUserStatus.length,
       database: 'MongoDB',
       timestamp: new Date().toISOString()
     });
