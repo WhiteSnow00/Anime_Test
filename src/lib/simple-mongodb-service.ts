@@ -113,6 +113,7 @@ export class SimpleMongoDBService {
   private static readonly RECONNECT_DELAY_BASE = parseInt(process.env.RECONNECT_DELAY_BASE || '1000');
   private static lastConnectionError: Error | null = null;
   private static _lastConnectedLogTime: number = 0;
+  private static _connectionPromise: Promise<void> | null = null;
   private static connectionHealth = {
     status: 'disconnected' as 'connected' | 'connecting' | 'disconnected' | 'error',
     lastCheck: new Date(),
@@ -135,10 +136,19 @@ export class SimpleMongoDBService {
 
   // Lightweight connection check that doesn't trigger logs for established connections
   protected static async ensureConnection(): Promise<void> {
+    // If there's a connection in progress, wait for it
+    if (this._connectionPromise) {
+      await this._connectionPromise;
+      return;
+    }
+    
+    // Check if connection is fully established (readyState 1 = connected)
     if (this.isConnected && mongoose.connection.readyState === 1) {
       return; // Already connected, no logging needed
     }
-    await this.connect(); // Only call full connect if not connected
+    
+    // If not connected or connection is broken, establish connection
+    await this.connect();
   }
 
   private static async retryOperation<T>(
@@ -288,6 +298,22 @@ export class SimpleMongoDBService {
       return;
     }
 
+    // If a connection is already in progress, wait for it
+    if (this._connectionPromise) {
+      return this._connectionPromise;
+    }
+
+    // Create a new connection promise
+    this._connectionPromise = this._performConnection();
+    
+    try {
+      await this._connectionPromise;
+    } finally {
+      this._connectionPromise = null;
+    }
+  }
+
+  private static async _performConnection(): Promise<void> {
     this.connectionHealth.status = 'connecting';
     let lastError: Error | null = null;
 
