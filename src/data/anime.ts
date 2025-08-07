@@ -29,7 +29,7 @@ export interface Anime {
   episodes: Episode[];
 }
 
-export const h264EpisodeIds: number[] = [1, 2]; 
+export const h264EpisodeIds: number[] = [1]; 
 
 export const isH265Episode = (episodeId: number): boolean => {
   return !h264EpisodeIds.includes(episodeId);
@@ -106,10 +106,10 @@ export const animeData: Anime = {
       videoId: '05',
       servers: {
         hls: 'Tập5.m3u8',
-        helvid: 'ec6ea16c9c5e',
-        hydax: 'nc905xM7j'
+        helvid: '136aa79ac114',
+        hydax: 'cN3EniKSx'
       },
-      downloadUrl: '',
+      downloadUrl: 'https://drive.google.com/file/d/18xbLTX3hUO9KvahZ9UWCRqdntZurlwm3/view?usp=sharing',
       rawDownloadUrl: 'https://drive.google.com/file/d/13KCpzY2jDfPxtGqE87ZuaJxL-XupXzwu/view?usp=sharing'
     },
   ],
