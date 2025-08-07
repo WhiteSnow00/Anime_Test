@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
     // Validate input
     if (!username || !password) {
       return NextResponse.json(
-        { success: false, error: 'Username and password are required' },
+        { success: false, error: 'Cần điền tên đăng nhập và mật khẩu' },
         { status: 400 }
       );
     }
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     
     if (!user) {
       return NextResponse.json(
-        { success: false, error: 'Invalid username or password' },
+        { success: false, error: 'Sai tên đăng nhập hoặc mật khẩu' },
         { status: 401 }
       );
     }

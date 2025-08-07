@@ -637,7 +637,6 @@ export class SimpleMongoDBService {
     }
   }
 
-  // User Authentication Methods
   static async createUser(username: string, password: string, email?: string, displayName?: string): Promise<User | null> {
     if (!isServer || !UserModel) return null;
     
