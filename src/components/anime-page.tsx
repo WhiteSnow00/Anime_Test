@@ -224,7 +224,7 @@ const layoutConfig = useMemo(() => {
     
     return {
       containerClass: isActualMobile
-        ? "px-2 sm:px-4 pb-32"
+        ? "px-2 sm:px-4 pb-20"
         : isTablet
         ? "px-4 lg:px-6 pb-20"
         : "px-6 pb-6",

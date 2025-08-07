@@ -21,7 +21,7 @@ interface CommentSectionProps {
 }
 
 export function CommentSection({ currentEpisodeId, className }: CommentSectionProps) {
-  const { comments, isLoading, isSubmitting, addComment } = useComments();
+  const { comments, setComments, isLoading, isSubmitting, addComment, removeComment, refreshComments } = useComments();
   const { isLoggedIn, user } = useAuth();
   const [formData, setFormData] = useState({
     userName: '',
@@ -86,8 +86,27 @@ export function CommentSection({ currentEpisodeId, className }: CommentSectionPr
     }));
   };
 
+  const handleCommentDeleted = async (commentId: string) => {
+    // Remove the comment from local state without reloading
+    removeComment(commentId);
+    
+    // Recalculate pagination based on new comment count
+    const newCommentsLength = comments.length - 1;
+    const newTotalPages = Math.ceil(newCommentsLength / commentsPerPage);
+    
+    // If we're on a page that now has no comments, go to the previous page
+    if (currentPage > newTotalPages && newTotalPages > 0) {
+      setCurrentPage(newTotalPages);
+    } else if (newCommentsLength === 0) {
+      setCurrentPage(1);
+    }
+    
+    // Show success message
+    console.log('Comment deleted successfully and removed from UI');
+  };
+
   return (
-    <Card className={cn("w-full p-4 sm:p-6 mb-20 lg:mb-0", className)}>
+    <Card className={cn("w-full p-4 sm:p-6 lg:mb-0", className)}>
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
@@ -285,6 +304,7 @@ export function CommentSection({ currentEpisodeId, className }: CommentSectionPr
                     // Update like count in the comment list
                     console.log(`Comment ${commentId} liked: ${liked}, count: ${likeCount}`);
                   }}
+                  onCommentDeleted={handleCommentDeleted}
                 />
               ))}
             </div>

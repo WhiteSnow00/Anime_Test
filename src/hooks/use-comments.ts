@@ -51,6 +51,11 @@ export function useComments() {
     }
   };
 
+  // Remove comment from local state
+  const removeComment = (commentId: string) => {
+    setComments(prev => prev.filter(comment => comment._id !== commentId));
+  };
+
   // Load comments on mount
   useEffect(() => {
     loadComments();
@@ -58,9 +63,11 @@ export function useComments() {
 
   return {
     comments,
+    setComments,
     isLoading,
     isSubmitting,
     addComment,
+    removeComment,
     refreshComments: loadComments,
   };
 }

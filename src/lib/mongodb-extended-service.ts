@@ -40,10 +40,12 @@ if (isServer) {
   commentLikeSchema.index({ commentId: 1, userId: 1 }, { unique: true, sparse: true });
   commentLikeSchema.index({ commentId: 1, ipAddress: 1 });
   commentLikeSchema.index({ timestamp: -1 });
+  commentLikeSchema.index({ userId: 1, commentId: 1 }); // For getUserLikeHistory optimization
   commentReplySchema.index({ parentCommentId: 1 });
   commentReplySchema.index({ timestamp: -1 });
   commentReplySchema.index({ isApproved: 1 });
   commentReplySchema.index({ userId: 1 });
+  commentReplySchema.index({ parentCommentId: 1, isApproved: 1, timestamp: 1 }); // Compound index for optimization
 
   CommentLikeModel = mongoose.models.CommentLike || mongoose.model('CommentLike', commentLikeSchema);
   CommentReplyModel = mongoose.models.CommentReply || mongoose.model('CommentReply', commentReplySchema);
@@ -68,7 +70,7 @@ export class MongoDBExtendedService extends SimpleMongoDBService {
     }
 
     try {
-      await this.connect();
+      await this.ensureConnection();
 
       const existingLike = userId
         ? await CommentLikeModel.findOne({ commentId, userId })
@@ -119,7 +121,7 @@ export class MongoDBExtendedService extends SimpleMongoDBService {
     }
 
     try {
-      await this.connect();
+      await this.ensureConnection();
 
       const likeCount = await CommentLikeModel.countDocuments({ commentId });
       
@@ -156,7 +158,7 @@ export class MongoDBExtendedService extends SimpleMongoDBService {
     }
 
     try {
-      await this.connect();
+      await this.ensureConnection();
 
       const newReply = new CommentReplyModel({
         parentCommentId,
@@ -199,47 +201,59 @@ export class MongoDBExtendedService extends SimpleMongoDBService {
 
   static async getCommentReplies(
     commentId: string,
-    includeUnapproved: boolean = false
+    includeUnapproved: boolean = false,
+    limit: number = 0
   ): Promise<CommentReply[]> {
     if (!isServer || !CommentReplyModel) {
       return [];
     }
 
     try {
-      await this.connect();
+      await this.ensureConnection();
 
       const query = includeUnapproved 
         ? { parentCommentId: commentId }
         : { parentCommentId: commentId, isApproved: true };
 
-      const replies = await CommentReplyModel.find(query)
+      let repliesQuery = CommentReplyModel.find(query)
         .sort({ timestamp: 1 })
         .lean();
+      
+      if (limit > 0) {
+        repliesQuery = repliesQuery.limit(limit);
+      }
 
-      const repliesWithLikes = await Promise.all(
-        replies.map(async (reply: any) => {
-          const likeCount = await CommentLikeModel.countDocuments({ 
-            commentId: reply._id 
-          });
+      const replies = await repliesQuery;
 
-          return {
-            _id: reply._id.toString(),
-            parentCommentId: reply.parentCommentId.toString(),
-            id: reply.id,
-            userName: reply.userName,
-            displayName: reply.displayName,
-            userId: reply.userId?.toString(),
-            content: reply.content,
-            timestamp: reply.timestamp,
-            isApproved: reply.isApproved,
-            userAgent: reply.userAgent,
-            ipAddress: reply.ipAddress,
-            episodeViewing: reply.episodeViewing,
-            likes: [],
-            likeCount
-          };
-        })
-      );
+      // Use aggregation to get like counts efficiently
+      const replyIds = replies.map((reply: any) => reply._id);
+      const likeCounts = await CommentLikeModel.aggregate([
+        { $match: { commentId: { $in: replyIds } } },
+        { $group: { _id: '$commentId', count: { $sum: 1 } } }
+      ]);
+
+      const likeCountMap = new Map(likeCounts.map((item: any) => [item._id.toString(), item.count]));
+
+      const repliesWithLikes = replies.map((reply: any) => {
+        const likeCount = likeCountMap.get(reply._id.toString()) || 0;
+
+        return {
+          _id: reply._id.toString(),
+          parentCommentId: reply.parentCommentId.toString(),
+          id: reply.id,
+          userName: reply.userName,
+          displayName: reply.displayName,
+          userId: reply.userId?.toString(),
+          content: reply.content,
+          timestamp: reply.timestamp,
+          isApproved: reply.isApproved,
+          userAgent: reply.userAgent,
+          ipAddress: reply.ipAddress,
+          episodeViewing: reply.episodeViewing,
+          likes: [],
+          likeCount
+        };
+      });
 
       return repliesWithLikes;
     } catch (error) {
@@ -254,7 +268,7 @@ export class MongoDBExtendedService extends SimpleMongoDBService {
     }
 
     try {
-      await this.connect();
+      await this.ensureConnection();
 
       const comment = await CommentModel.findById(commentId).lean();
       if (comment) {
@@ -301,19 +315,26 @@ export class MongoDBExtendedService extends SimpleMongoDBService {
     }
 
     try {
-      await this.connect();
-
+      await this.ensureConnection();
+      
+      // Try to delete as a main comment first
       const commentResult = await CommentModel.findByIdAndDelete(commentId);
       
       if (commentResult) {
-        await CommentReplyModel.deleteMany({ parentCommentId: commentId });
-        await CommentLikeModel.deleteMany({ commentId: commentId });
+        // Also delete all related replies and likes
+        const repliesDeleted = await CommentReplyModel.deleteMany({ parentCommentId: commentId });
+        const likesDeleted = await CommentLikeModel.deleteMany({ commentId: commentId });
+        console.log(`Comment deleted successfully. Related data: ${repliesDeleted.deletedCount} replies, ${likesDeleted.deletedCount} likes`);
         return true;
       }
 
+      // If not found as main comment, try to delete as a reply
       const replyResult = await CommentReplyModel.findByIdAndDelete(commentId);
+      
       if (replyResult) {
-        await CommentLikeModel.deleteMany({ commentId: commentId });
+        // Also delete related likes for this reply
+        const likesDeleted = await CommentLikeModel.deleteMany({ commentId: commentId });
+        console.log(`Reply deleted successfully. Related data: ${likesDeleted.deletedCount} likes`);
         return true;
       }
 
@@ -332,30 +353,113 @@ export class MongoDBExtendedService extends SimpleMongoDBService {
     }
 
     try {
-      await this.connect();
-      const comments = await this.getComments();
-      const filteredComments = episodeId
-        ? comments.filter(c => c.episodeViewing === episodeId)
-        : comments;
-      const enhancedComments = await Promise.all(
-        filteredComments.map(async (comment) => {
-          const likeCount = await CommentLikeModel.countDocuments({
-            commentId: comment._id 
-          });
-          const replyCount = await CommentReplyModel.countDocuments({
-            parentCommentId: comment._id,
-            isApproved: true
-          });
-          const replies = await this.getCommentReplies(comment._id!, false);
-          return {
-            ...comment,
-            likes: [],
-            likeCount,
-            replies: replies.slice(0, 5),
-            replyCount
-          } as ExtendedComment;
-        })
-      );
+      await this.ensureConnection();
+      
+      // Build aggregation pipeline for optimized comment retrieval
+      const pipeline: any[] = [
+        // Match comments by episode if specified
+        ...(episodeId ? [{ $match: { episodeViewing: episodeId } }] : []),
+        
+        // Sort by timestamp descending
+        { $sort: { timestamp: -1 } },
+        
+        // Add like count with lookup
+        {
+          $lookup: {
+            from: 'comment_likes',
+            localField: '_id',
+            foreignField: 'commentId',
+            as: 'commentLikes'
+          }
+        },
+        
+        // Add reply count and recent replies with lookup
+        {
+          $lookup: {
+            from: 'comment_replies',
+            let: { commentId: '$_id' },
+            pipeline: [
+              { $match: { 
+                $expr: { $eq: ['$parentCommentId', '$$commentId'] },
+                isApproved: true 
+              }},
+              { $sort: { timestamp: 1 } },
+              {
+                $lookup: {
+                  from: 'comment_likes',
+                  localField: '_id',
+                  foreignField: 'commentId',
+                  as: 'replyLikes'
+                }
+              },
+              {
+                $addFields: {
+                  likeCount: { $size: '$replyLikes' }
+                }
+              },
+              {
+                $project: {
+                  replyLikes: 0
+                }
+              }
+            ],
+            as: 'allReplies'
+          }
+        },
+        
+        // Add computed fields
+        {
+          $addFields: {
+            likeCount: { $size: '$commentLikes' },
+            replyCount: { $size: '$allReplies' },
+            replies: { $slice: ['$allReplies', 5] },
+            likes: []
+          }
+        },
+        
+        // Remove temporary fields
+        {
+          $project: {
+            commentLikes: 0,
+            allReplies: 0
+          }
+        }
+      ];
+
+      const results = await CommentModel.aggregate(pipeline);
+      
+      // Transform results to match expected format
+      const enhancedComments = results.map((comment: any) => ({
+        _id: comment._id.toString(),
+        userName: comment.userName,
+        displayName: comment.displayName,
+        userId: comment.userId?.toString(),
+        content: comment.content,
+        timestamp: comment.timestamp,
+        isApproved: comment.isApproved,
+        userAgent: comment.userAgent,
+        ipAddress: comment.ipAddress,
+        episodeViewing: comment.episodeViewing,
+        likes: [],
+        likeCount: comment.likeCount,
+        replies: comment.replies.map((reply: any) => ({
+          _id: reply._id.toString(),
+          parentCommentId: reply.parentCommentId.toString(),
+          id: reply.id,
+          userName: reply.userName,
+          displayName: reply.displayName,
+          userId: reply.userId?.toString(),
+          content: reply.content,
+          timestamp: reply.timestamp,
+          isApproved: reply.isApproved,
+          userAgent: reply.userAgent,
+          ipAddress: reply.ipAddress,
+          episodeViewing: reply.episodeViewing,
+          likes: [],
+          likeCount: reply.likeCount
+        })),
+        replyCount: comment.replyCount
+      })) as ExtendedComment[];
 
       return enhancedComments;
     } catch (error) {
@@ -379,7 +483,7 @@ export class MongoDBExtendedService extends SimpleMongoDBService {
     }
 
     try {
-      await this.connect();
+      await this.ensureConnection();
       const result = await CommentReplyModel.deleteOne({ _id: replyId });
       
       await CommentLikeModel.deleteMany({ commentId: replyId });
@@ -397,7 +501,7 @@ export class MongoDBExtendedService extends SimpleMongoDBService {
     }
 
     try {
-      await this.connect();
+      await this.ensureConnection();
       
       const reply = await CommentReplyModel.findById(replyId);
       if (!reply) {
@@ -421,18 +525,24 @@ export class MongoDBExtendedService extends SimpleMongoDBService {
 
   static async getUserLikeHistory(
     userId?: string,
-    ipAddress?: string
+    ipAddress?: string,
+    commentIds?: string[]
   ): Promise<string[]> {
     if (!isServer || !CommentLikeModel) {
       return [];
     }
 
     try {
-      await this.connect();
+      await this.ensureConnection();
 
-      const query = userId 
+      const query: any = userId 
         ? { userId }
         : { ipAddress };
+
+      // If specific comment IDs are provided, filter by them
+      if (commentIds && commentIds.length > 0) {
+        query.commentId = { $in: commentIds.map(id => new mongoose.Types.ObjectId(id)) };
+      }
 
       const likes = await CommentLikeModel.find(query)
         .select('commentId')
@@ -451,7 +561,7 @@ export class MongoDBExtendedService extends SimpleMongoDBService {
     }
 
     try {
-      await this.connect();
+      await this.ensureConnection();
       const user = await UserModel.findById(userId).lean();
       
       if (user) {

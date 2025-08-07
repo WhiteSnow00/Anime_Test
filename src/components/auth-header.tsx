@@ -51,7 +51,7 @@ export function AuthHeader() {
   if (isMobile) {
     return null;
   }
-    if (pathname?.includes('/comment') || pathname?.includes('/admin')) {
+    if (pathname !== "/") {
       return null;
     }
 

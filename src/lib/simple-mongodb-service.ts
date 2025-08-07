@@ -5,9 +5,11 @@ const isServer = typeof window === 'undefined';
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const DATABASE_NAME = process.env.MONGODB_DB_NAME || 'anime_streaming';
-const MAX_POOL_SIZE = parseInt(process.env.MONGODB_MAX_POOL_SIZE || '25');
-const SERVER_SELECTION_TIMEOUT = parseInt(process.env.MONGODB_SERVER_SELECTION_TIMEOUT || '15000');
-const MAX_IDLE_TIME = parseInt(process.env.MONGODB_MAX_IDLE_TIME || '1800000');
+const MAX_POOL_SIZE = parseInt(process.env.MONGODB_MAX_POOL_SIZE || '50');
+const SERVER_SELECTION_TIMEOUT = parseInt(process.env.MONGODB_SERVER_SELECTION_TIMEOUT || '5000');
+const MAX_IDLE_TIME = parseInt(process.env.MONGODB_MAX_IDLE_TIME || '600000');
+const CONNECT_TIMEOUT = parseInt(process.env.MONGODB_CONNECT_TIMEOUT || '10000');
+const SOCKET_TIMEOUT = parseInt(process.env.MONGODB_SOCKET_TIMEOUT || '45000');
 
 function validateEnvironment() {
   if (!MONGODB_URI) {
@@ -110,6 +112,7 @@ export class SimpleMongoDBService {
   private static readonly MAX_RECONNECT_ATTEMPTS = parseInt(process.env.MAX_RECONNECT_ATTEMPTS || '5');
   private static readonly RECONNECT_DELAY_BASE = parseInt(process.env.RECONNECT_DELAY_BASE || '1000');
   private static lastConnectionError: Error | null = null;
+  private static _lastConnectedLogTime: number = 0;
   private static connectionHealth = {
     status: 'disconnected' as 'connected' | 'connecting' | 'disconnected' | 'error',
     lastCheck: new Date(),
@@ -130,6 +133,14 @@ export class SimpleMongoDBService {
     }
   }
 
+  // Lightweight connection check that doesn't trigger logs for established connections
+  protected static async ensureConnection(): Promise<void> {
+    if (this.isConnected && mongoose.connection.readyState === 1) {
+      return; // Already connected, no logging needed
+    }
+    await this.connect(); // Only call full connect if not connected
+  }
+
   private static async retryOperation<T>(
     operation: () => Promise<T>,
     operationName: string,
@@ -141,7 +152,7 @@ export class SimpleMongoDBService {
       try {
         if (!this.isConnected || mongoose.connection.readyState !== 1) {
           this.logConnectionStatus(`Reconnecting before ${operationName} (attempt ${attempt + 1})`);
-          await this.connect();
+          await this.ensureConnection();
         }
         
         const result = await operation();
@@ -224,7 +235,7 @@ export class SimpleMongoDBService {
     
     try {
       if (!this.isConnected) {
-        await this.connect();
+        await this.ensureConnection();
       }
       
       const pingPromise = new Promise<boolean>((resolve) => {
@@ -268,7 +279,12 @@ export class SimpleMongoDBService {
     validateEnvironment();
     
     if (this.isConnected && mongoose.connection.readyState === 1) {
-      this.logConnectionStatus('Already connected to MongoDB');
+      // Only log if we haven't logged recently to reduce noise
+      const now = Date.now();
+      if (!this._lastConnectedLogTime || (now - this._lastConnectedLogTime) > 30000) { // Log once per 30 seconds max
+        this.logConnectionStatus('Already connected to MongoDB');
+        this._lastConnectedLogTime = now;
+      }
       return;
     }
 
@@ -281,15 +297,27 @@ export class SimpleMongoDBService {
         this.logConnectionStatus(`Connection attempt ${attempt + 1}/${this.MAX_RECONNECT_ATTEMPTS}`);
 
         if (mongoose.connection.readyState === 0) {
-          await mongoose.connect(MONGODB_URI + DATABASE_NAME, {
+          // Validate environment before connection
+          validateEnvironment();
+          
+          // Properly format the MongoDB URI with database name
+          const connectionUri = MONGODB_URI!.endsWith('/') 
+            ? MONGODB_URI! + DATABASE_NAME 
+            : MONGODB_URI! + '/' + DATABASE_NAME;
+            
+          await mongoose.connect(connectionUri, {
             maxPoolSize: MAX_POOL_SIZE,
+            minPoolSize: 5,
             serverSelectionTimeoutMS: SERVER_SELECTION_TIMEOUT,
+            connectTimeoutMS: CONNECT_TIMEOUT,
+            socketTimeoutMS: SOCKET_TIMEOUT,
             maxIdleTimeMS: MAX_IDLE_TIME,
             retryWrites: true,
             w: 'majority',
-            readPreference: 'primary',
+            readPreference: 'primaryPreferred',
             compressors: ['zlib'],
             heartbeatFrequencyMS: 10000,
+            bufferCommands: false,
           });
         }
 
@@ -361,7 +389,7 @@ export class SimpleMongoDBService {
     if (!isServer) throw new Error('Database initialization is server-side only');
     
     try {
-      await this.connect();
+      await this.ensureConnection();
 
       if (AdminModel) {
         const adminCount = await AdminModel.countDocuments();
@@ -464,7 +492,7 @@ export class SimpleMongoDBService {
     if (!isServer || !CommentModel) return false;
     
     try {
-      await this.connect();
+      await this.ensureConnection();
       const result = await CommentModel.updateOne(
         { _id: commentId },
         { isApproved: true }
@@ -481,7 +509,7 @@ export class SimpleMongoDBService {
     if (!isServer || !CommentModel) return false;
     
     try {
-      await this.connect();
+      await this.ensureConnection();
       
       const comment = await CommentModel.findOne({ _id: commentId });
       if (!comment) {
@@ -507,7 +535,7 @@ export class SimpleMongoDBService {
     if (!isServer || !CommentModel) return false;
     
     try {
-      await this.connect();
+      await this.ensureConnection();
       const result = await CommentModel.deleteOne({ _id: commentId });
       return result.deletedCount > 0;
     } catch (error) {
@@ -520,7 +548,7 @@ export class SimpleMongoDBService {
     if (!isServer || !AdminModel) return null;
     
     try {
-      await this.connect();
+      await this.ensureConnection();
       const admin = await AdminModel.findOne({ 
         username: username,
         isActive: true 
@@ -564,7 +592,7 @@ export class SimpleMongoDBService {
         return null;
       }
 
-      await this.connect();
+      await this.ensureConnection();
       
       const comments = await CommentModel.find({})
         .sort({ timestamp: -1 })
@@ -615,7 +643,7 @@ export class SimpleMongoDBService {
     if (!isServer || !CommentModel) throw new Error('Server-side only operation');
     
     try {
-      await this.connect();
+      await this.ensureConnection();
       
       for (const pgComment of postgresComments) {
         const mongoComment = {
@@ -641,7 +669,7 @@ export class SimpleMongoDBService {
     if (!isServer || !UserModel) return null;
     
     try {
-      await this.connect();
+      await this.ensureConnection();
       
       const existingUser = await UserModel.findOne({ 
         username: username.trim() 
@@ -681,7 +709,7 @@ export class SimpleMongoDBService {
     if (!isServer || !UserModel) return null;
     
     try {
-      await this.connect();
+      await this.ensureConnection();
       
       const user = await UserModel.findOne({ 
         username: username.trim(),
@@ -723,7 +751,7 @@ export class SimpleMongoDBService {
     if (!isServer || !UserModel) return null;
     
     try {
-      await this.connect();
+      await this.ensureConnection();
       
       const user = await UserModel.findOne({ 
         _id: userId,
@@ -754,7 +782,7 @@ export class SimpleMongoDBService {
     if (!isServer || !UserModel) return false;
     
     try {
-      await this.connect();
+      await this.ensureConnection();
       
       const user = await UserModel.findOne({ 
         username: username.trim() 
@@ -771,7 +799,7 @@ export class SimpleMongoDBService {
     if (!isServer || !UserModel) return false;
     
     try {
-      await this.connect();
+      await this.ensureConnection();
       
       const result = await UserModel.updateOne(
         { _id: userId },

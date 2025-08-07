@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { SimpleMongoDBService } from '@/lib/simple-mongodb-service';
 import { MongoDBExtendedService } from '@/lib/mongodb-extended-service';
 import { verifyToken } from '@/lib/auth-utils';
+import CacheService from '@/lib/cache-service';
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,10 +10,19 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const episodeId = searchParams.get('episode');
     
-    // Get comments with interactions (likes and replies)
-    const comments = await MongoDBExtendedService.getCommentsWithInteractions(
-      episodeId ? parseInt(episodeId) : undefined
-    );
+    // Check cache first
+    const cacheKey = CacheService.getCacheKey('comments', episodeId || 'all');
+    let comments: any[] = CacheService.get(cacheKey) || [];
+    
+    if (comments.length === 0) {
+      // Get comments with interactions (likes and replies) from database
+      comments = await MongoDBExtendedService.getCommentsWithInteractions(
+        episodeId ? parseInt(episodeId) : undefined
+      );
+      
+      // Cache for 2 minutes
+      CacheService.set(cacheKey, comments, 2);
+    }
     
     // Get user information to determine like status
     let userId: string | undefined;
@@ -32,45 +42,45 @@ export async function GET(request: NextRequest) {
     const realIp = request.headers.get('x-real-ip');
     const ipAddress = forwardedFor?.split(',')[0] || realIp || 'localhost';
 
-    // Add user's like status to each comment
-    const commentsWithUserStatus = await Promise.all(
-      comments.map(async (comment) => {
-        const likeStatus = await MongoDBExtendedService.getCommentLikeStatus(
-          comment._id!,
-          userId,
-          ipAddress
-        );
-
-        // Add user's like status to replies as well
-        const repliesWithStatus = comment.replies ? await Promise.all(
-          comment.replies.map(async (reply) => {
-            const replyLikeStatus = await MongoDBExtendedService.getCommentLikeStatus(
-              reply._id!,
-              userId,
-              ipAddress
-            );
-            return {
-              ...reply,
-              userLiked: replyLikeStatus.userLiked
-            };
-          })
-        ) : [];
-
-        return {
-          ...comment,
-          userLiked: likeStatus.userLiked,
-          replies: repliesWithStatus
-        };
-      })
-    );
+    // Batch get user like status for all comments and replies
+    const allCommentIds: string[] = [];
+    const allReplyIds: string[] = [];
     
-    console.log(`[COMMENTS-GET] ✅ Fetched ${commentsWithUserStatus.length} comments with interactions from MongoDB`);
+    comments.forEach((comment: any) => {
+      if (comment._id) allCommentIds.push(comment._id);
+      comment.replies?.forEach((reply: any) => {
+        if (reply._id) allReplyIds.push(reply._id);
+      });
+    });
+    
+    const allIds = [...allCommentIds, ...allReplyIds];
+    
+    // Get all user likes in batch for only the relevant comment/reply IDs
+    const userLikedComments = await MongoDBExtendedService.getUserLikeHistory(userId, ipAddress, allIds);
+    const userLikedSet = new Set(userLikedComments);
+
+    // Add user's like status to each comment and reply
+    const commentsWithUserStatus = comments.map((comment: any) => {
+      const repliesWithStatus = comment.replies?.map((reply: any) => ({
+        ...reply,
+        userLiked: userLikedSet.has(reply._id!)
+      })) || [];
+
+      return {
+        ...comment,
+        userLiked: userLikedSet.has(comment._id!),
+        replies: repliesWithStatus
+      };
+    });
+    
+    console.log(`[COMMENTS-GET] ✅ Fetched ${commentsWithUserStatus.length} comments with interactions from ${comments === CacheService.get(cacheKey) ? 'cache' : 'MongoDB'}`);
     
     return NextResponse.json({
       success: true,
       comments: commentsWithUserStatus,
       count: commentsWithUserStatus.length,
       database: 'MongoDB',
+      cached: comments === CacheService.get(cacheKey),
       timestamp: new Date().toISOString()
     });
   } catch (error) {
@@ -143,6 +153,9 @@ export async function POST(request: NextRequest) {
       episodeViewing,
       userId
     });
+
+    // Invalidate cache after adding new comment
+    CacheService.invalidateComments(episodeViewing);
 
     console.log(`[COMMENTS-POST] New comment added to MongoDB: ${savedComment._id}`);
 

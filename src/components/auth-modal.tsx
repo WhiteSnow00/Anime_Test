@@ -126,6 +126,8 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         setMode('login');
         setShowPassword(false);
         setShowConfirmPassword(false);
+        // Always reset remember password when modal closes
+        setRememberPassword(false);
       }, 200);
       return () => clearTimeout(timer);
     } else {
@@ -134,14 +136,16 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         const savedPassword = localStorage.getItem('savedPassword');
         const savedRemember = localStorage.getItem('rememberPassword') === 'true';
         
+        // Auto-fill saved credentials if they exist, but don't auto-check remember
         if (savedRemember && savedUsername && savedPassword) {
           setUsername(savedUsername);
           setPassword(savedPassword);
-          setRememberPassword(true);
+          // Keep rememberPassword false until user manually checks it
+          setRememberPassword(false);
         }
       }
     }
-  }, [isOpen, rememberPassword]);
+  }, [isOpen]); // Remove rememberPassword from dependency array
   
   useEffect(() => {
     setError('');

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { MongoDBExtendedService } from '@/lib/mongodb-extended-service';
 import { verifyToken } from '@/lib/auth-utils';
+import CacheService from '@/lib/cache-service';
 
 export async function POST(request: NextRequest) {
   try {
@@ -46,6 +47,9 @@ export async function POST(request: NextRequest) {
       ipAddress,
       userAgent
     );
+
+    // Invalidate cache after like toggle
+    CacheService.clear('comments:');
 
     console.log(`[LIKE] Like toggled successfully: userLiked=${result.userLiked}, count=${result.likeCount}`);
 

@@ -39,7 +39,8 @@
   }
 
   .comment-form-container {
-    padding-bottom: 2rem;
+    padding-bottom: 1rem;
+    margin-bottom: 0.5rem;
   }
 
   .mobile-input {
@@ -71,13 +72,62 @@
     -webkit-overflow-scrolling: touch;
   }
 
-  .comment-form-container {
-    margin-bottom: 1rem;
-  }
-
   .mobile-input:focus {
     transform: scale(1.01);
     transition: transform 0.2s ease;
+  }
+
+  /* Enhanced Mobile Comment Interactions */
+  .comment-item {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  .comment-item:active {
+    background-color: rgba(var(--muted), 0.8);
+  }
+
+  /* Mobile long-press visual feedback */
+  .comment-item[data-long-pressing="true"] {
+    transform: scale(0.98);
+    background-color: rgba(var(--muted), 0.6);
+    transition: all 0.2s ease;
+  }
+
+  /* Mobile delete overlay animations */
+  .mobile-delete-overlay {
+    animation: fadeInScale 0.2s ease-out;
+  }
+
+  @keyframes fadeInScale {
+    from {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  /* Better touch targets for mobile */
+  .comment-action-button {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 8px;
+  }
+
+  /* Enhanced mobile typography */
+  .comment-content {
+    font-size: 15px;
+    line-height: 1.5;
+    letter-spacing: -0.01em;
+  }
+
+  .reply-content {
+    font-size: 14px;
+    line-height: 1.4;
   }
 }
 

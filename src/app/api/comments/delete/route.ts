@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { MongoDBExtendedService } from '@/lib/mongodb-extended-service';
 import { cookies } from 'next/headers';
-import jwt from 'jsonwebtoken';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
+import { isValidObjectId, verifyToken } from '@/lib/auth-utils';
+import CacheService from '@/lib/cache-service';
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,8 +16,16 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    // Validate ObjectId format
+    if (!isValidObjectId(commentId)) {
+      return NextResponse.json({
+        success: false,
+        message: 'Định dạng ID bình luận không hợp lệ'
+      }, { status: 400 });
+    }
+
     // Get auth token from cookies
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const token = cookieStore.get('auth-token')?.value;
     
     if (!token) {
@@ -30,7 +37,7 @@ export async function POST(request: NextRequest) {
 
     let user;
     try {
-      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      const decoded = verifyToken(token);
       user = decoded;
     } catch (error) {
       return NextResponse.json({
@@ -50,8 +57,25 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user is the owner
-    const isOwner = (comment.userId === user.userId) || 
-                    (comment.userName === user.username);
+    // Compare userId strings (both should be converted to strings for safety)
+    const userIdMatch = comment.userId && user.userId && 
+                       comment.userId.toString() === user.userId.toString();
+    
+    // Compare usernames as fallback (case-insensitive)
+    const usernameMatch = comment.userName && user.username && 
+                         comment.userName.trim().toLowerCase() === user.username.trim().toLowerCase();
+    
+    const isOwner = userIdMatch || usernameMatch;
+
+    console.log('Delete ownership check:', {
+      commentUserId: comment.userId,
+      tokenUserId: user.userId,
+      commentUserName: comment.userName,
+      tokenUsername: user.username,
+      userIdMatch,
+      usernameMatch,
+      isOwner
+    });
 
     if (!isOwner) {
       return NextResponse.json({
@@ -61,12 +85,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Delete the comment
+    console.log('Attempting to delete comment:', commentId);
     const success = await MongoDBExtendedService.deleteComment(commentId);
+    console.log('Delete result:', success);
 
     if (success) {
+      // More targeted cache invalidation instead of clearing all caches
+      CacheService.invalidateComments();
+      
       return NextResponse.json({
         success: true,
-        message: 'Đã xóa bình luận thành công'
+        message: 'Đã xóa bình luận thành công',
+        deletedId: commentId,
+        comment: comment // Return comment info for client-side updates
       });
     } else {
       return NextResponse.json({

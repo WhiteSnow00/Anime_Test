@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -16,6 +16,7 @@ import { CommentService } from '@/lib/comment-service';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/auth-context';
 import { AuthModal } from '@/components/auth-modal';
+import { useToast } from '@/hooks/use-toast';
 
 interface CommentReply {
   _id?: string;
@@ -45,6 +46,7 @@ interface CommentItemProps {
 
 export function CommentItem({ comment, onReplyAdded, onLikeToggled, onCommentDeleted }: CommentItemProps) {
   const { isLoggedIn, user } = useAuth();
+  const { toast } = useToast();
   const [isLiked, setIsLiked] = useState(comment.userLiked || false);
   const [likeCount, setLikeCount] = useState(comment.likeCount || 0);
   const [isLiking, setIsLiking] = useState(false);
@@ -60,6 +62,11 @@ export function CommentItem({ comment, onReplyAdded, onLikeToggled, onCommentDel
   const [isDeleting, setIsDeleting] = useState(false);
   const [replyToUsername, setReplyToUsername] = useState('');
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+
+  // Mobile long-press delete functionality
+  const [showMobileDelete, setShowMobileDelete] = useState(false);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [isLongPressing, setIsLongPressing] = useState(false);
 
   const handleLikeToggle = async () => {
     if (isLiking) return;
@@ -190,8 +197,11 @@ export function CommentItem({ comment, onReplyAdded, onLikeToggled, onCommentDel
     }
   };
 
-  const handleDelete = async () => {
-    if (!confirm('Bạn có chắc chắn muốn xóa bình luận này?')) return;
+  const handleDelete = async (skipConfirm = false) => {
+    // Only show confirm dialog for desktop users or when explicitly needed
+    if (!skipConfirm && window.innerWidth > 768) {
+      if (!confirm('Bạn có chắc chắn muốn xóa bình luận này?')) return;
+    }
     
     setIsDeleting(true);
     
@@ -209,18 +219,93 @@ export function CommentItem({ comment, onReplyAdded, onLikeToggled, onCommentDel
       const data = await response.json();
       
       if (data.success) {
+        // Show success toast
+        toast({
+          title: "Đã xóa bình luận",
+          description: "Bình luận đã được xóa thành công",
+          duration: 3000,
+        });
+        
+        // Immediately hide the comment with a fade out effect
+        const commentElement = document.querySelector(`[data-comment-id="${comment._id}"]`);
+        if (commentElement) {
+          commentElement.classList.add('opacity-50', 'pointer-events-none');
+        }
+        
+        // Call the parent callback to remove from state
         if (onCommentDeleted) {
-          onCommentDeleted(comment._id);
+          setTimeout(() => {
+            onCommentDeleted(comment._id);
+          }, 300); // Small delay for visual feedback
         }
       } else {
-        alert(data.message || 'Không thể xóa bình luận');
+        toast({
+          title: "Lỗi xóa bình luận",
+          description: data.message || 'Không thể xóa bình luận',
+          variant: "destructive",
+          duration: 3000,
+        });
       }
     } catch (error) {
       console.error('Failed to delete comment:', error);
-      alert('Có lỗi xảy ra khi xóa bình luận');
+      toast({
+        title: "Lỗi xóa bình luận",
+        description: 'Có lỗi xảy ra khi xóa bình luận',
+        variant: "destructive",
+        duration: 3000,
+      });
     } finally {
       setIsDeleting(false);
     }
+  };
+
+  // Mobile long-press handlers
+  const handleTouchStart = useCallback((e: React.TouchEvent | React.MouseEvent) => {
+    // Only enable long-press for comment owners on mobile
+    if (!isLoggedIn || !user || window.innerWidth > 768) return;
+    if (!(comment.userId === user.id || comment.userName === user.username)) return;
+
+    // Check if the touch/click is on a reply element or its children
+    const target = e.target as HTMLElement;
+    const replyElement = target.closest('[data-reply-container]');
+    if (replyElement) {
+      // Don't trigger parent comment long-press when touching replies
+      return;
+    }
+
+    // Also check if touching action buttons area
+    const actionButton = target.closest('button') || target.closest('[role="button"]');
+    if (actionButton) {
+      // Don't trigger long-press when clicking buttons
+      return;
+    }
+
+    setIsLongPressing(true);
+    longPressTimerRef.current = setTimeout(() => {
+      setShowMobileDelete(true);
+      setIsLongPressing(false);
+      // Add haptic feedback if available
+      if (navigator.vibrate) {
+        navigator.vibrate(50);
+      }
+    }, 800); // 800ms long press
+  }, [isLoggedIn, user, comment.userId, comment.userName]);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent | React.MouseEvent) => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    setIsLongPressing(false);
+  }, []);
+
+  const handleMobileDelete = async () => {
+    setShowMobileDelete(false);
+    await handleDelete(true); // Skip confirm dialog since mobile already confirmed
+  };
+
+  const closeMobileDelete = () => {
+    setShowMobileDelete(false);
   };
 
   const displayedReplies = showAllReplies ? replies : replies.slice(0, 3);
@@ -228,7 +313,59 @@ export function CommentItem({ comment, onReplyAdded, onLikeToggled, onCommentDel
 
   return (
     <>
-      <Card className="p-3 sm:p-4 bg-muted/30 comment-item">
+      <Card 
+        className={cn(
+          "p-3 sm:p-4 bg-muted/30 comment-item transition-all duration-300 relative",
+          isLongPressing && "scale-[0.98] bg-muted/50",
+          showMobileDelete && "ring-2 ring-destructive/20"
+        )} 
+        data-comment-id={comment._id}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
+        onMouseDown={handleTouchStart}
+        onMouseUp={handleTouchEnd}
+        onMouseLeave={handleTouchEnd}
+      >
+        {/* Mobile Delete Overlay */}
+        {showMobileDelete && (
+          <div className="absolute inset-0 bg-black/20 backdrop-blur-[1px] rounded-lg flex items-center justify-center z-10 lg:hidden">
+            <div className="bg-background/95 backdrop-blur rounded-lg p-4 shadow-lg border flex flex-col gap-3 min-w-[200px]">
+              <p className="text-sm text-center font-medium">Xóa bình luận này?</p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={closeMobileDelete}
+                  className="flex-1"
+                >
+                  Hủy
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleMobileDelete}
+                  disabled={isDeleting}
+                  className="flex-1"
+                >
+                  {isDeleting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    'Xóa'
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Long Press Progress Indicator */}
+        {isLongPressing && (
+          <div className="absolute top-2 right-2 w-8 h-8 rounded-full border-2 border-destructive/30 flex items-center justify-center lg:hidden">
+            <div className="w-4 h-4 rounded-full bg-destructive/20 animate-pulse" />
+          </div>
+        )}
+
         <div className="flex items-start gap-2 sm:gap-3">
           {/* Avatar */}
           <div className={cn(
@@ -273,7 +410,7 @@ export function CommentItem({ comment, onReplyAdded, onLikeToggled, onCommentDel
                 </div>
               </div>
               
-              {/* Options Menu - Only show for comment owner */}
+              {/* Options Menu - Desktop only, hidden on mobile (use long-press instead) */}
               {isLoggedIn && user && (
                 (comment.userId === user.id || comment.userName === user.username) && (
                   <DropdownMenu>
@@ -281,14 +418,14 @@ export function CommentItem({ comment, onReplyAdded, onLikeToggled, onCommentDel
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 w-8 p-0"
+                        className="h-8 w-8 p-0 hidden lg:flex"
                       >
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem
-                        onClick={handleDelete}
+                        onClick={() => handleDelete(false)}
                         disabled={isDeleting}
                         className="text-destructive focus:text-destructive"
                       >
@@ -314,6 +451,14 @@ export function CommentItem({ comment, onReplyAdded, onLikeToggled, onCommentDel
             <p className="text-sm sm:text-base leading-relaxed comment-content vietnamese-text mb-3">
               {comment.content}
             </p>
+
+            {/* Mobile Long-press Hint - Only show for comment owners on mobile */}
+            {isLoggedIn && user && (comment.userId === user.id || comment.userName === user.username) && (
+              <div className="text-xs text-muted-foreground mb-2 lg:hidden flex items-center gap-1">
+                <span className="w-1 h-1 bg-muted-foreground rounded-full animate-pulse" />
+                Nhấn giữ để xóa bình luận
+              </div>
+            )}
             
             {/* Action Buttons */}
             <div className="flex items-center gap-2">
@@ -494,6 +639,7 @@ interface ReplyItemProps {
 }
 function ReplyItem({ reply, parentCommentId, onReplyAdded, onReplyDeleted }: ReplyItemProps) {
   const { isLoggedIn, user } = useAuth();
+  const { toast } = useToast();
   const [isLiked, setIsLiked] = useState(reply.userLiked || false);
   const [likeCount, setLikeCount] = useState(reply.likeCount || 0);
   const [isLiking, setIsLiking] = useState(false);
@@ -504,6 +650,11 @@ function ReplyItem({ reply, parentCommentId, onReplyAdded, onReplyDeleted }: Rep
   const [isDeleting, setIsDeleting] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+
+  // Mobile long-press delete functionality
+  const [showMobileDelete, setShowMobileDelete] = useState(false);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [isLongPressing, setIsLongPressing] = useState(false);
 
   const handleReplyLike = async () => {
     if (isLiking) return;
@@ -596,8 +747,11 @@ function ReplyItem({ reply, parentCommentId, onReplyAdded, onReplyDeleted }: Rep
     }
   };
 
-  const handleDelete = async () => {
-    if (!confirm('Bạn có chắc chắn muốn xóa trả lời này?')) return;
+  const handleDelete = async (skipConfirm = false) => {
+    // Only show confirm dialog for desktop users or when explicitly needed
+    if (!skipConfirm && window.innerWidth > 768) {
+      if (!confirm('Bạn có chắc chắn muốn xóa trả lời này?')) return;
+    }
     
     setIsDeleting(true);
     
@@ -615,23 +769,130 @@ function ReplyItem({ reply, parentCommentId, onReplyAdded, onReplyDeleted }: Rep
       const data = await response.json();
       
       if (data.success) {
+        toast({
+          title: "Đã xóa trả lời",
+          description: "Trả lời đã được xóa thành công",
+          duration: 3000,
+        });
+        
         if (onReplyDeleted) {
           onReplyDeleted(reply._id!);
         }
       } else {
-        alert(data.message || 'Không thể xóa trả lời');
+        toast({
+          title: "Lỗi xóa trả lời",
+          description: data.message || 'Không thể xóa trả lời',
+          variant: "destructive",
+          duration: 3000,
+        });
       }
     } catch (error) {
       console.error('Failed to delete reply:', error);
-      alert('Có lỗi xảy ra khi xóa trả lời');
+      toast({
+        title: "Lỗi xóa trả lời",
+        description: 'Có lỗi xảy ra khi xóa trả lời',
+        variant: "destructive",
+        duration: 3000,
+      });
     } finally {
       setIsDeleting(false);
     }
   };
 
+  // Mobile long-press handlers for replies
+  const handleTouchStart = useCallback((e: React.TouchEvent | React.MouseEvent) => {
+    // Only enable long-press for reply owners on mobile
+    if (!isLoggedIn || !user || window.innerWidth > 768) return;
+    if (!(reply.userId === user.id || reply.userName === user.username)) return;
+
+    // Stop event from bubbling up to parent comment
+    e.stopPropagation();
+
+    setIsLongPressing(true);
+    longPressTimerRef.current = setTimeout(() => {
+      setShowMobileDelete(true);
+      setIsLongPressing(false);
+      // Add haptic feedback if available
+      if (navigator.vibrate) {
+        navigator.vibrate(50);
+      }
+    }, 800); // 800ms long press
+  }, [isLoggedIn, user, reply.userId, reply.userName]);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent | React.MouseEvent) => {
+    // Stop event from bubbling up to parent comment
+    e.stopPropagation();
+    
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    setIsLongPressing(false);
+  }, []);
+
+  const handleMobileDelete = async () => {
+    setShowMobileDelete(false);
+    await handleDelete(true); // Skip confirm dialog since mobile already confirmed
+  };
+
+  const closeMobileDelete = () => {
+    setShowMobileDelete(false);
+  };
+
   return (
     <>
-    <div className="flex items-start gap-2 bg-muted/20 rounded-lg p-2.5 hover:bg-muted/30 transition-colors">
+    <div className={cn(
+      "flex items-start gap-2 bg-muted/20 rounded-lg p-2.5 hover:bg-muted/30 transition-all relative",
+      isLongPressing && "scale-[0.98] bg-muted/40",
+      showMobileDelete && "ring-2 ring-destructive/20"
+    )}
+    data-reply-container="true"
+    onTouchStart={handleTouchStart}
+    onTouchEnd={handleTouchEnd}
+    onTouchCancel={handleTouchEnd}
+    onMouseDown={handleTouchStart}
+    onMouseUp={handleTouchEnd}
+    onMouseLeave={handleTouchEnd}
+    >
+      {/* Mobile Delete Overlay for Replies */}
+      {showMobileDelete && (
+        <div className="absolute inset-0 bg-black/20 backdrop-blur-[1px] rounded-lg flex items-center justify-center z-10 lg:hidden">
+          <div className="bg-background/95 backdrop-blur rounded-lg p-3 shadow-lg border flex flex-col gap-2 min-w-[180px]">
+            <p className="text-xs text-center font-medium">Xóa trả lời này?</p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={closeMobileDelete}
+                className="flex-1 text-xs h-7"
+              >
+                Hủy
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleMobileDelete}
+                disabled={isDeleting}
+                className="flex-1 text-xs h-7"
+              >
+                {isDeleting ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  'Xóa'
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Long Press Progress Indicator for Replies */}
+      {isLongPressing && (
+        <div className="absolute top-1 right-1 w-6 h-6 rounded-full border-2 border-destructive/30 flex items-center justify-center lg:hidden">
+          <div className="w-3 h-3 rounded-full bg-destructive/20 animate-pulse" />
+        </div>
+      )}
+
       <div className={cn(
         "w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5",
         reply.userId ? "bg-primary/20" : "bg-muted"
@@ -660,7 +921,7 @@ function ReplyItem({ reply, parentCommentId, onReplyAdded, onReplyDeleted }: Rep
             </span>
           </div>
           
-          {/* Options Menu for Reply - Only show for reply owner */}
+          {/* Options Menu for Reply - Desktop only, hidden on mobile (use long-press instead) */}
           {isLoggedIn && user && (
             (reply.userId === user.id || reply.userName === user.username) && (
               <DropdownMenu>
@@ -668,14 +929,14 @@ function ReplyItem({ reply, parentCommentId, onReplyAdded, onReplyDeleted }: Rep
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-6 w-6 p-0 -mt-1"
+                    className="h-6 w-6 p-0 -mt-1 hidden lg:flex"
                   >
                     <MoreHorizontal className="h-3 w-3" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem
-                    onClick={handleDelete}
+                    onClick={() => handleDelete(false)}
                     disabled={isDeleting}
                     className="text-destructive focus:text-destructive text-xs"
                   >
@@ -703,6 +964,14 @@ function ReplyItem({ reply, parentCommentId, onReplyAdded, onReplyDeleted }: Rep
           )}
           {reply.content}
         </p>
+
+        {/* Mobile Long-press Hint for Replies - Only show for reply owners on mobile */}
+        {isLoggedIn && user && (reply.userId === user.id || reply.userName === user.username) && (
+          <div className="text-[10px] text-muted-foreground mb-1 lg:hidden flex items-center gap-1">
+            <span className="w-0.5 h-0.5 bg-muted-foreground rounded-full animate-pulse" />
+            Nhấn giữ để xóa
+          </div>
+        )}
         
         <div className="flex items-center gap-1">
           <Button
