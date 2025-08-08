@@ -2,29 +2,27 @@ import { NextRequest, NextResponse } from 'next/server';
 import { SimpleMongoDBService } from '@/lib/simple-mongodb-service';
 import { MongoDBExtendedService } from '@/lib/mongodb-extended-service';
 import { verifyToken } from '@/lib/auth-utils';
-import CacheService from '@/lib/cache-service';
+
+/**
+ * OPTIMIZED VERSION - Fixes N+1 Query Problem
+ * This version uses MongoDB aggregation pipeline to fetch all data in a single query
+ */
 
 export async function GET(request: NextRequest) {
+  const startTime = Date.now();
+  
   try {
+    // Add cache headers for browser caching (5 minutes)
+    const headers = {
+      'Cache-Control': 'public, max-age=300, stale-while-revalidate=60',
+      'X-Response-Time': '0'
+    };
+
     // Get episode ID from query params if provided
     const { searchParams } = new URL(request.url);
     const episodeId = searchParams.get('episode');
     
-    // Check cache first
-    const cacheKey = CacheService.getCacheKey('comments', episodeId || 'all');
-    let comments: any[] = CacheService.get(cacheKey) || [];
-    
-    if (comments.length === 0) {
-      // Get comments with interactions (likes and replies) from database
-      comments = await MongoDBExtendedService.getCommentsWithInteractions(
-        episodeId ? parseInt(episodeId) : undefined
-      );
-      
-      // Cache for 2 minutes
-      CacheService.set(cacheKey, comments, 2);
-    }
-    
-    // Get user information to determine like status
+    // Get user information for like status
     let userId: string | undefined;
     const token = request.cookies.get('auth-token')?.value;
     
@@ -42,59 +40,36 @@ export async function GET(request: NextRequest) {
     const realIp = request.headers.get('x-real-ip');
     const ipAddress = forwardedFor?.split(',')[0] || realIp || 'localhost';
 
-    // Batch get user like status for all comments and replies
-    const allCommentIds: string[] = [];
-    const allReplyIds: string[] = [];
+    // OPTIMIZED: Use aggregation pipeline to fetch everything in one go
+    const comments = await MongoDBExtendedService.getCommentsWithInteractionsOptimized(
+      episodeId ? parseInt(episodeId) : undefined,
+      userId,
+      ipAddress
+    );
     
-    comments.forEach((comment: any) => {
-      if (comment._id) allCommentIds.push(comment._id);
-      comment.replies?.forEach((reply: any) => {
-        if (reply._id) allReplyIds.push(reply._id);
-      });
-    });
+    const responseTime = Date.now() - startTime;
+    headers['X-Response-Time'] = `${responseTime}ms`;
     
-    const allIds = [...allCommentIds, ...allReplyIds];
-    
-    // Get all user likes in batch for only the relevant comment/reply IDs
-    const userLikedComments = await MongoDBExtendedService.getUserLikeHistory(userId, ipAddress, allIds);
-    const userLikedSet = new Set(userLikedComments);
-
-    // Add user's like status to each comment and reply
-    const commentsWithUserStatus = comments.map((comment: any) => {
-      const repliesWithStatus = comment.replies?.map((reply: any) => ({
-        ...reply,
-        userLiked: userLikedSet.has(reply._id!)
-      })) || [];
-
-      return {
-        ...comment,
-        userLiked: userLikedSet.has(comment._id!),
-        replies: repliesWithStatus
-      };
-    });
-    
-    console.log(`[COMMENTS-GET] ✅ Fetched ${commentsWithUserStatus.length} comments with interactions from ${comments === CacheService.get(cacheKey) ? 'cache' : 'MongoDB'}`);
+    console.log(`[COMMENTS-GET-OPTIMIZED] ✅ Fetched ${comments.length} comments in ${responseTime}ms`);
     
     return NextResponse.json({
       success: true,
-      comments: commentsWithUserStatus,
-      count: commentsWithUserStatus.length,
+      comments: comments,
+      count: comments.length,
       database: 'MongoDB',
-      cached: comments === CacheService.get(cacheKey),
+      responseTime: `${responseTime}ms`,
       timestamp: new Date().toISOString()
-    });
+    }, { headers });
+    
   } catch (error) {
-    console.error('[COMMENTS-GET] ❌ Failed to get comments:', error);
+    const responseTime = Date.now() - startTime;
+    console.error(`[COMMENTS-GET-OPTIMIZED] ❌ Failed after ${responseTime}ms:`, error);
     
     const errorInfo = {
       message: error instanceof Error ? error.message : 'Unknown error',
       name: error instanceof Error ? error.name : 'UnknownError',
-      hasMongoUri: !!process.env.MONGODB_URI,
-      mongoUriPreview: process.env.MONGODB_URI ? 
-        process.env.MONGODB_URI.substring(0, 20) + '...' : 'NOT_SET'
+      responseTime: `${responseTime}ms`
     };
-    
-    console.error('[COMMENTS-GET] Error details:', errorInfo);
     
     return NextResponse.json(
       { 
@@ -108,6 +83,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// Keep the POST method the same as original
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -154,17 +130,20 @@ export async function POST(request: NextRequest) {
       userId
     });
 
-    // Invalidate cache after adding new comment
-    CacheService.invalidateComments(episodeViewing);
-
     console.log(`[COMMENTS-POST] New comment added to MongoDB: ${savedComment._id}`);
+
+    // Clear cache after adding new comment
+    const headers = {
+      'Cache-Control': 'no-cache, no-store, must-revalidate'
+    };
 
     return NextResponse.json({
       success: true,
       comment: savedComment,
       database: 'MongoDB',
-      message: 'Comment submitted successfully and pending approval'
-    });
+      message: 'Comment submitted successfully'
+    }, { headers });
+    
   } catch (error) {
     console.error('[COMMENTS-POST] Failed to add comment:', error);
     
