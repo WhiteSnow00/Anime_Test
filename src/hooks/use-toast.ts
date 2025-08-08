@@ -8,13 +8,17 @@ import type {
 } from "@/components/ui/toast"
 
 const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 1000000
+// Time the toast stays visible before starting close animation
+const TOAST_AUTO_DISMISS = 2000
+// Extra time to let exit animation play before removing from state
+const TOAST_REMOVE_DELAY = 300
 
 type ToasterToast = ToastProps & {
   id: string
   title?: React.ReactNode
   description?: React.ReactNode
   action?: ToastActionElement
+  duration?: number // optional per-toast override
 }
 
 const actionTypes = {
@@ -56,6 +60,7 @@ interface State {
 }
 
 const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
+const toastDismissTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
 const addToRemoveQueue = (toastId: string) => {
   if (toastTimeouts.has(toastId)) {
@@ -121,6 +126,12 @@ export const reducer = (state: State, action: Action): State => {
           toasts: [],
         }
       }
+      // Clear any pending dismiss timer
+      if (action.toastId) {
+        const tm = toastDismissTimers.get(action.toastId)
+        if (tm) clearTimeout(tm)
+        toastDismissTimers.delete(action.toastId)
+      }
       return {
         ...state,
         toasts: state.toasts.filter((t) => t.id !== action.toastId),
@@ -162,6 +173,13 @@ function toast({ ...props }: Toast) {
       },
     },
   })
+
+  // Schedule automatic dismiss
+  const autoDuration = (props as any).duration ?? TOAST_AUTO_DISMISS
+  const dismissTimer = setTimeout(() => {
+    dispatch({ type: "DISMISS_TOAST", toastId: id })
+  }, autoDuration)
+  toastDismissTimers.set(id, dismissTimer)
 
   return {
     id: id,
