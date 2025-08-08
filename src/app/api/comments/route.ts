@@ -45,12 +45,34 @@ function validateCommentInput(content: string, userName: string): { valid: boole
   if (userName.length > CONTENT_LIMITS.MAX_USERNAME) {
     return { valid: false, error: `Tên quá dài (tối đa ${CONTENT_LIMITS.MAX_USERNAME} ký tự)` };
   }
+  
+  // Simple spam check - repeated characters
   if (/(.)\1{9,}/.test(content)) {
     return { valid: false, error: 'Nội dung có dấu hiệu spam' };
   }
-    const urlCount = (content.match(/https?:\/\//gi) || []).length;
-  if (urlCount > 2) {
-    return { valid: false, error: 'Quá nhiều liên kết trong bình luận' };
+  
+  // Check for URLs and validate them
+  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi;
+  const urls = content.match(urlRegex) || [];
+  
+  if (urls.length > 3) {
+    return { valid: false, error: 'Quá nhiều liên kết (tối đa 3)' };
+  }
+  
+  // Check for suspicious URL patterns
+  const suspiciousPatterns = [
+    /casino/i, /poker/i, /gambling/i, /bet365/i,
+    /porn/i, /xxx/i, /adult/i,
+    /bit\.ly/i, /tinyurl/i, /adf\.ly/i,
+    /earn.*money/i, /get.*rich/i, /forex/i
+  ];
+  
+  for (const url of urls) {
+    for (const pattern of suspiciousPatterns) {
+      if (pattern.test(url)) {
+        return { valid: false, error: 'Liên kết không được phép' };
+      }
+    }
   }
   
   return { valid: true };

@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/auth-context';
 import { AuthModal } from '@/components/auth-modal';
 import { useToast } from '@/hooks/use-toast';
+import { CommentContent } from '@/components/comment-content';
 
 interface CommentReply {
   _id?: string;
@@ -63,8 +64,6 @@ export function CommentItem({ comment, onReplyAdded, onLikeToggled, onCommentDel
   const [isDeleting, setIsDeleting] = useState(false);
   const [replyToUsername, setReplyToUsername] = useState('');
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
-
-  // Mobile long-press delete functionality
   const [showMobileDelete, setShowMobileDelete] = useState(false);
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [isLongPressing, setIsLongPressing] = useState(false);
@@ -199,7 +198,6 @@ export function CommentItem({ comment, onReplyAdded, onLikeToggled, onCommentDel
   };
 
   const handleDelete = async (skipConfirm = false) => {
-    // Only show confirm dialog for desktop users or when explicitly needed
     if (!skipConfirm && window.innerWidth > 768) {
       if (!confirm('Bạn có chắc chắn muốn xóa bình luận này?')) return;
     }
@@ -220,24 +218,19 @@ export function CommentItem({ comment, onReplyAdded, onLikeToggled, onCommentDel
       const data = await response.json();
       
       if (data.success) {
-        // Show success toast
         toast({
           title: "Đã xóa bình luận",
           description: "Bình luận đã được xóa thành công",
           duration: 3000,
         });
-        
-        // Immediately hide the comment with a fade out effect
         const commentElement = document.querySelector(`[data-comment-id="${comment._id}"]`);
         if (commentElement) {
           commentElement.classList.add('opacity-50', 'pointer-events-none');
         }
-        
-        // Call the parent callback to remove from state
         if (onCommentDeleted) {
           setTimeout(() => {
             onCommentDeleted(comment._id);
-          }, 300); // Small delay for visual feedback
+          }, 300); 
         }
       } else {
         toast({
@@ -260,21 +253,15 @@ export function CommentItem({ comment, onReplyAdded, onLikeToggled, onCommentDel
     }
   };
 
-  // Mobile long-press handlers
   const handleTouchStart = useCallback((e: React.TouchEvent | React.MouseEvent) => {
-    // Only enable long-press for comment owners on mobile
     if (!isLoggedIn || !user || window.innerWidth > 768) return;
     if (!(comment.userId === user.id || comment.userName === user.username)) return;
-
-    // Check if the touch/click is on a reply element or its children
     const target = e.target as HTMLElement;
     const replyElement = target.closest('[data-reply-container]');
     if (replyElement) {
       // Don't trigger parent comment long-press when touching replies
       return;
     }
-
-    // Also check if touching action buttons area
     const actionButton = target.closest('button') || target.closest('[role="button"]');
     if (actionButton) {
       // Don't trigger long-press when clicking buttons
@@ -285,11 +272,10 @@ export function CommentItem({ comment, onReplyAdded, onLikeToggled, onCommentDel
     longPressTimerRef.current = setTimeout(() => {
       setShowMobileDelete(true);
       setIsLongPressing(false);
-      // Add haptic feedback if available
       if (navigator.vibrate) {
         navigator.vibrate(50);
       }
-    }, 800); // 800ms long press
+    }, 800); 
   }, [isLoggedIn, user, comment.userId, comment.userName]);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent | React.MouseEvent) => {
@@ -302,7 +288,7 @@ export function CommentItem({ comment, onReplyAdded, onLikeToggled, onCommentDel
 
   const handleMobileDelete = async () => {
     setShowMobileDelete(false);
-    await handleDelete(true); // Skip confirm dialog since mobile already confirmed
+    await handleDelete(true); 
   };
 
   const closeMobileDelete = () => {
@@ -466,9 +452,10 @@ export function CommentItem({ comment, onReplyAdded, onLikeToggled, onCommentDel
             </div>
             
             {/* Comment Content */}
-            <p className="text-sm sm:text-base leading-relaxed comment-content vietnamese-text mb-3">
-              {comment.content}
-            </p>
+            <CommentContent 
+              content={comment.content}
+              className="text-sm sm:text-base leading-relaxed vietnamese-text mb-3"
+            />
 
             {/* Mobile Long-press Hint - Only show for comment owners on mobile */}
             {isLoggedIn && user && (comment.userId === user.id || comment.userName === user.username) && (
@@ -675,8 +662,6 @@ function ReplyItem({ reply, parentCommentId, onReplyAdded, onReplyDeleted }: Rep
   const [isDeleting, setIsDeleting] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
-
-  // Mobile long-press delete functionality
   const [showMobileDelete, setShowMobileDelete] = useState(false);
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [isLongPressing, setIsLongPressing] = useState(false);
@@ -773,7 +758,6 @@ function ReplyItem({ reply, parentCommentId, onReplyAdded, onReplyDeleted }: Rep
   };
 
   const handleDelete = async (skipConfirm = false) => {
-    // Only show confirm dialog for desktop users or when explicitly needed
     if (!skipConfirm && window.innerWidth > 768) {
       if (!confirm('Bạn có chắc chắn muốn xóa trả lời này?')) return;
     }
@@ -824,28 +808,21 @@ function ReplyItem({ reply, parentCommentId, onReplyAdded, onReplyDeleted }: Rep
     }
   };
 
-  // Mobile long-press handlers for replies
   const handleTouchStart = useCallback((e: React.TouchEvent | React.MouseEvent) => {
-    // Only enable long-press for reply owners on mobile
     if (!isLoggedIn || !user || window.innerWidth > 768) return;
     if (!(reply.userId === user.id || reply.userName === user.username)) return;
-
-    // Stop event from bubbling up to parent comment
     e.stopPropagation();
-
     setIsLongPressing(true);
     longPressTimerRef.current = setTimeout(() => {
       setShowMobileDelete(true);
       setIsLongPressing(false);
-      // Add haptic feedback if available
       if (navigator.vibrate) {
         navigator.vibrate(50);
       }
-    }, 800); // 800ms long press
+    }, 800); 
   }, [isLoggedIn, user, reply.userId, reply.userName]);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent | React.MouseEvent) => {
-    // Stop event from bubbling up to parent comment
     e.stopPropagation();
     
     if (longPressTimerRef.current) {
@@ -857,7 +834,7 @@ function ReplyItem({ reply, parentCommentId, onReplyAdded, onReplyDeleted }: Rep
 
   const handleMobileDelete = async () => {
     setShowMobileDelete(false);
-    await handleDelete(true); // Skip confirm dialog since mobile already confirmed
+    await handleDelete(true); 
   };
 
   const closeMobileDelete = () => {
@@ -1000,12 +977,15 @@ function ReplyItem({ reply, parentCommentId, onReplyAdded, onReplyDeleted }: Rep
           )}
         </div>
         
-        <p className="text-sm leading-relaxed text-foreground/80 mb-1.5">
+        <div className="text-sm leading-relaxed text-foreground/80 mb-1.5">
           {reply.replyTo && (
             <span className="text-primary font-medium">@{reply.replyTo} </span>
           )}
-          {reply.content}
-        </p>
+          <CommentContent 
+            content={reply.content}
+            className="inline"
+          />
+        </div>
 
         {/* Mobile Long-press Hint for Replies - Only show for reply owners on mobile */}
         {isLoggedIn && user && (reply.userId === user.id || reply.userName === user.username) && (
