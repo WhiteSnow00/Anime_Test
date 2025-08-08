@@ -9,6 +9,7 @@ export interface Comment {
   ipAddress?: string;
   episodeViewing?: number; 
   userId?: string;
+  userRole?: 'user' | 'administrator';
 }
 
 export interface CommentFormData {

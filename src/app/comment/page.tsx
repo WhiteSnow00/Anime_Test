@@ -153,23 +153,24 @@ export default function EnhancedCommentManagement() {
 
   const deleteComment = async (commentId: string) => {
     if (!confirm('Bạn có chắc muốn xóa bình luận này và tất cả trả lời của nó?')) return;
-    
+    setComments(prev => prev.filter(c => c._id !== commentId));
     try {
       const response = await fetch('/api/comments/admin-enhanced', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          password,
-          action: 'delete',
-          commentId
-        })
+        body: JSON.stringify({ password, action: 'delete', commentId })
       });
-
-      if (response.ok) {
+      const data = await response.json().catch(() => ({ success: false, error: 'Bad response' }));
+      if (!response.ok || !data.success) {
+        await refreshData();
+        alert(data.error || 'Xóa bình luận thất bại');
+      } else {
         await refreshData();
       }
     } catch (error) {
       console.error('Delete error:', error);
+      await refreshData();
+      alert('Có lỗi xảy ra khi xóa');
     }
   };
 

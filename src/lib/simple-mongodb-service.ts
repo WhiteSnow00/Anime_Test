@@ -136,20 +136,16 @@ export class SimpleMongoDBService {
     }
   }
 
-  // Lightweight connection check that doesn't trigger logs for established connections
   protected static async ensureConnection(): Promise<void> {
-    // If there's a connection in progress, wait for it
     if (this._connectionPromise) {
       await this._connectionPromise;
       return;
     }
     
-    // Check if connection is fully established (readyState 1 = connected)
     if (this.isConnected && mongoose.connection.readyState === 1) {
-      return; // Already connected, no logging needed
+      return;
     }
     
-    // If not connected or connection is broken, establish connection
     await this.connect();
   }
 
@@ -291,21 +287,18 @@ export class SimpleMongoDBService {
     validateEnvironment();
     
     if (this.isConnected && mongoose.connection.readyState === 1) {
-      // Only log if we haven't logged recently to reduce noise
       const now = Date.now();
-      if (!this._lastConnectedLogTime || (now - this._lastConnectedLogTime) > 30000) { // Log once per 30 seconds max
+      if (!this._lastConnectedLogTime || (now - this._lastConnectedLogTime) > 30000) {
         this.logConnectionStatus('Already connected to MongoDB');
         this._lastConnectedLogTime = now;
       }
       return;
     }
 
-    // If a connection is already in progress, wait for it
     if (this._connectionPromise) {
       return this._connectionPromise;
     }
 
-    // Create a new connection promise
     this._connectionPromise = this._performConnection();
     
     try {
@@ -325,10 +318,8 @@ export class SimpleMongoDBService {
         this.logConnectionStatus(`Connection attempt ${attempt + 1}/${this.MAX_RECONNECT_ATTEMPTS}`);
 
         if (mongoose.connection.readyState === 0) {
-          // Validate environment before connection
           validateEnvironment();
           
-          // Properly format the MongoDB URI with database name
           const connectionUri = MONGODB_URI!.endsWith('/') 
             ? MONGODB_URI! + DATABASE_NAME 
             : MONGODB_URI! + '/' + DATABASE_NAME;
@@ -482,7 +473,8 @@ export class SimpleMongoDBService {
           userAgent: comment.userAgent,
           ipAddress: comment.ipAddress,
           episodeViewing: comment.episodeViewing,
-          userId: comment.userId?.toString()
+          userId: comment.userId?.toString(),
+          userRole: undefined
         }));
       },
       'getComments'
@@ -509,7 +501,8 @@ export class SimpleMongoDBService {
           userAgent: savedComment.userAgent,
           ipAddress: savedComment.ipAddress,
           episodeViewing: savedComment.episodeViewing,
-          userId: savedComment.userId?.toString()
+          userId: savedComment.userId?.toString(),
+          userRole: (comment as any).userRole
         };
       },
       'addComment'
@@ -755,7 +748,6 @@ export class SimpleMongoDBService {
         return null;
       }
       
-      // Update last login
       await UserModel.updateOne(
         { _id: user._id },
         { lastLogin: new Date() }

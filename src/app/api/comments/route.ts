@@ -29,6 +29,15 @@ function checkRateLimit(identifier: string, limit: number = 10, windowMs: number
   record.count++;
   return true;
 }
+const REPEATED_CHAR_PATTERN = /(.)\1{9,}/;
+const URL_EXTRACT_REGEX = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi;
+const SUSPICIOUS_URL_PATTERNS = [
+  /casino/i, /poker/i, /gambling/i, /bet365/i,
+  /porn/i, /xxx/i, /adult/i,
+  /bit\.ly/i, /tinyurl/i, /adf\.ly/i,
+  /earn.*money/i, /get.*rich/i, /forex/i
+];
+
 function validateCommentInput(content: string, userName: string): { valid: boolean; error?: string } {
   if (!content?.trim() || !userName?.trim()) {
     return { valid: false, error: 'Tên và nội dung không được để trống' };
@@ -46,29 +55,18 @@ function validateCommentInput(content: string, userName: string): { valid: boole
     return { valid: false, error: `Tên quá dài (tối đa ${CONTENT_LIMITS.MAX_USERNAME} ký tự)` };
   }
   
-  // Simple spam check - repeated characters
-  if (/(.)\1{9,}/.test(content)) {
+  if (REPEATED_CHAR_PATTERN.test(content)) {
     return { valid: false, error: 'Nội dung có dấu hiệu spam' };
   }
   
-  // Check for URLs and validate them
-  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi;
-  const urls = content.match(urlRegex) || [];
+  const urls = content.match(URL_EXTRACT_REGEX) || [];
   
   if (urls.length > 3) {
     return { valid: false, error: 'Quá nhiều liên kết (tối đa 3)' };
   }
   
-  // Check for suspicious URL patterns
-  const suspiciousPatterns = [
-    /casino/i, /poker/i, /gambling/i, /bet365/i,
-    /porn/i, /xxx/i, /adult/i,
-    /bit\.ly/i, /tinyurl/i, /adf\.ly/i,
-    /earn.*money/i, /get.*rich/i, /forex/i
-  ];
-  
   for (const url of urls) {
-    for (const pattern of suspiciousPatterns) {
+    for (const pattern of SUSPICIOUS_URL_PATTERNS) {
       if (pattern.test(url)) {
         return { valid: false, error: 'Liên kết không được phép' };
       }
@@ -83,8 +81,7 @@ function sanitizeInput(text: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;')
-    .replace(/\//g, '&#x2F;');
+  .replace(/'/g, '&#x27;'); // Removed forward slash escaping to preserve valid URLs
 }
 
 function getClientIp(request: NextRequest): string {
@@ -205,36 +202,43 @@ export async function GET(request: NextRequest) {
     const token = request.cookies.get('auth-token')?.value;
     const { userId, userRole } = await getUserInfo(token);
     
-    const result = await MongoDBExtendedService.getCommentsWithInteractions(
+    const allComments = await MongoDBExtendedService.getCommentsWithInteractions(
       episodeId ? parseInt(episodeId) : undefined
     );
-    
-    const allCommentIds: string[] = [];
-    result.forEach((comment: any) => {
-      if (comment._id) allCommentIds.push(comment._id);
-      comment.replies?.forEach((reply: any) => {
-        if (reply._id) allCommentIds.push(reply._id);
-      });
-    });
-    
-    const userLikedComments = await MongoDBExtendedService.getUserLikeHistory(userId, clientIp, allCommentIds);
-    const userLikedSet = new Set(userLikedComments);
-    const commentsWithUserStatus = result.map((comment: any) => {
-      const repliesWithStatus = comment.replies?.map((reply: any) => ({
-        ...reply,
-        userLiked: userLikedSet.has(reply._id)
-      })) || [];
-      
-      return {
-        ...comment,
-        userLiked: userLikedSet.has(comment._id),
-        replies: repliesWithStatus
-      };
-    });
-    
+    const baseComments = filterApproved
+      ? allComments.filter((c: any) => c.isApproved)
+      : allComments;
+
+    const totalCount = baseComments.length;
     const startIndex = (page - 1) * limit;
-    const paginatedComments = commentsWithUserStatus.slice(startIndex, startIndex + limit);
-    const totalPages = Math.ceil(commentsWithUserStatus.length / limit);    
+    const endIndex = startIndex + limit;
+    const pageSlice = baseComments.slice(startIndex, endIndex);
+
+    const pageIds: string[] = [];
+    for (const c of pageSlice) {
+      if (c._id) pageIds.push(c._id);
+      if (c.replies && Array.isArray(c.replies)) {
+        for (const r of c.replies) {
+          if (r._id) pageIds.push(r._id);
+        }
+      }
+    }
+
+    const userLikedComments = pageIds.length
+      ? await MongoDBExtendedService.getUserLikeHistory(userId, clientIp, pageIds)
+      : [];
+    const likedSet = new Set(userLikedComments);
+
+    const paginatedComments = pageSlice.map((comment: any) => ({
+      ...comment,
+      userLiked: likedSet.has(comment._id),
+      replies: comment.replies?.map((r: any) => ({
+        ...r,
+        userLiked: likedSet.has(r._id)
+      })) || []
+    }));
+
+    const totalPages = Math.ceil(totalCount / limit);
     const responseTime = Date.now() - startTime;
     
     return NextResponse.json(
@@ -245,7 +249,7 @@ export async function GET(request: NextRequest) {
         pagination: {
           page,
           limit,
-          totalItems: commentsWithUserStatus.length,
+          totalItems: totalCount,
           totalPages,
           hasNextPage: page < totalPages,
           hasPrevPage: page > 1
@@ -259,7 +263,7 @@ export async function GET(request: NextRequest) {
           'Cache-Control': 'public, max-age=300, stale-while-revalidate=60',
           'X-Response-Time': `${responseTime}ms`,
           'X-Request-Id': requestId,
-          'X-Total-Count': String(commentsWithUserStatus.length),
+          'X-Total-Count': String(totalCount),
           'X-Total-Pages': String(totalPages)
         }
       }
@@ -298,8 +302,10 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const body = await request.json();
-    let { userName, content, episodeViewing } = body;
+  const body = await request.json();
+  const { userName: rawUserName, content: rawContent, episodeViewing } = body;
+  let userName = rawUserName;
+  let content = rawContent;
     
     const validation = validateCommentInput(content, userName);
     if (!validation.valid) {

@@ -11,7 +11,8 @@ interface CommentContentProps {
 
 export function CommentContent({ content, className = "" }: CommentContentProps) {
   const processedContent = React.useMemo(() => {
-    const linkParts = LinkProcessor.parseTextWithLinks(content);
+    const normalized = content.replace(/&#x2F;/g, '/');
+    const linkParts = LinkProcessor.parseTextWithLinks(normalized);
     
     if (linkParts.length === 1 && linkParts[0].type === 'text') {
       return content;
@@ -47,8 +48,8 @@ export function CommentContent({ content, className = "" }: CommentContentProps)
             inline-flex items-center gap-0.5 underline decoration-1 underline-offset-2
             hover:no-underline transition-all duration-200
             ${link.isTrusted 
-              ? 'text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 decoration-blue-600/50 dark:decoration-blue-400/50' 
-              : 'text-amber-600 hover:text-amber-700 dark:text-amber-500 dark:hover:text-amber-400 decoration-amber-600/50 dark:decoration-amber-500/50'}
+              ? 'text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 decoration-red-600/50 dark:decoration-red-400/50' 
+              : 'text-red-500 hover:text-red-600 dark:text-red-300 dark:hover:text-red-200 decoration-red-500/40 dark:decoration-red-300/40'}
           `}
           title={link.isTrusted 
             ? `Mở liên kết: ${link.url}` 

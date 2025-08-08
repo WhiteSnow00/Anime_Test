@@ -9,7 +9,6 @@ export function useComments() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Load comments from API
   const loadComments = async () => {
     setIsLoading(true);
     try {
@@ -22,27 +21,21 @@ export function useComments() {
     }
   };
 
-  // Add comment via API
   const addComment = async (formData: CommentFormData): Promise<{ success: boolean; errors?: string[] }> => {
     setIsSubmitting(true);
-    
     try {
-      // Validate comment
       const errors = CommentService.validateComment(formData);
-      if (errors.length > 0) {
-        return { success: false, errors };
-      }
+      if (errors.length > 0) return { success: false, errors };
 
-      // Add comment via API
       const newComment = await CommentService.addComment(formData);
-      
-      if (newComment) {
-        // Reload comments to reflect changes
-        await loadComments();
-        return { success: true };
-      } else {
-        return { success: false, errors: ['Có lỗi xảy ra khi gửi bình luận'] };
-      }
+      if (!newComment) return { success: false, errors: ['Có lỗi xảy ra khi gửi bình luận'] };
+
+      const enriched: Comment = {
+        ...newComment,
+        userRole: (newComment as any).userRole || (prevUserRoleForSameUser(comments, newComment.userId) ?? newComment.userRole)
+      } as Comment;
+      setComments(prev => [enriched, ...prev]);
+      return { success: true };
     } catch (error) {
       console.error('Error adding comment:', error);
       return { success: false, errors: ['Có lỗi xảy ra, vui lòng thử lại'] };
@@ -51,12 +44,10 @@ export function useComments() {
     }
   };
 
-  // Remove comment from local state
   const removeComment = (commentId: string) => {
     setComments(prev => prev.filter(comment => comment._id !== commentId));
   };
 
-  // Load comments on mount
   useEffect(() => {
     loadComments();
   }, []);
@@ -72,13 +63,17 @@ export function useComments() {
   };
 }
 
-// Separate hook for admin functions
+function prevUserRoleForSameUser(list: Comment[], userId?: string) {
+  if (!userId) return undefined;
+  const found = list.find(c => c.userId === userId && c.userRole);
+  return found?.userRole;
+}
+
 export function useAdminComments(password: string) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load all comments (including unapproved)
   const loadComments = async () => {
     if (!password || password.trim() === '') {
       setIsLoading(false);
@@ -105,7 +100,6 @@ export function useAdminComments(password: string) {
     }
   };
 
-  // Toggle approval (admin only)
   const toggleApproval = async (commentId: string) => {
     try {
       const response = await fetch('/api/comments/admin', {
@@ -132,7 +126,6 @@ export function useAdminComments(password: string) {
     }
   };
 
-  // Delete comment (admin only)
   const deleteComment = async (commentId: string) => {
     try {
       const response = await fetch('/api/comments/admin', {
@@ -159,7 +152,6 @@ export function useAdminComments(password: string) {
     }
   };
 
-  // Load comments on mount
   useEffect(() => {
     if (password && password.trim() !== '') {
       loadComments();
