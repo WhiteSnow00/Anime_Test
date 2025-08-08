@@ -6,7 +6,7 @@ export class CommentService {
   // Get all approved comments from API
   static async getComments(): Promise<Comment[]> {
     try {
-      const response = await fetch('/api/comments', {
+      const response = await fetch('/api/comments?limit=10000', {
         method: 'GET',
         cache: 'no-store'
       });
