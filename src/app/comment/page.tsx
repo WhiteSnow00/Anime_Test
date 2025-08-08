@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
   Shield, 
   MessageCircle, 
-  User, 
+  Squirrel, 
   Clock, 
   Check, 
   X, 
@@ -22,8 +22,8 @@ import {
   Play,
   Heart,
   Reply,
-  UserCheck,
-  UserX,
+  Turtle,
+  Snowflake,
   Activity,
   ChevronDown,
   ChevronUp,
@@ -43,6 +43,7 @@ interface EnhancedComment {
   ipAddress?: string;
   episodeViewing?: number;
   userId?: string;
+  userRole?: 'user' | 'administrator';
   likeCount: number;
   replies: any[];
   replyCount: number;
@@ -382,8 +383,8 @@ export default function EnhancedCommentManagement() {
 
             <Card className="p-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                  <UserCheck className="h-5 w-5 text-green-600" />
+                <div className="w-10 h-10 bg-muted/50 dark:bg-muted/30 rounded-lg flex items-center justify-center">
+                  <Turtle className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">BL thành viên</p>
@@ -394,8 +395,8 @@ export default function EnhancedCommentManagement() {
 
             <Card className="p-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-                  <UserX className="h-5 w-5 text-yellow-600" />
+                <div className="w-10 h-10 bg-muted/50 dark:bg-muted/30 rounded-lg flex items-center justify-center">
+                  <Squirrel className="h-5 w-5 text-muted-foreground/70" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">BL khách</p>
@@ -507,12 +508,14 @@ export default function EnhancedCommentManagement() {
                     <div className="flex items-start gap-3 flex-1">
                       <div className={cn(
                         "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0",
-                        comment.userId ? "bg-primary/20" : "bg-muted"
+                        comment.userRole === 'administrator' ? "bg-red-50 dark:bg-red-950/30" : "bg-muted/50 dark:bg-muted/30"
                       )}>
-                        {comment.userId ? (
-                          <UserCheck className="h-4 w-4 text-primary" />
+                        {comment.userRole === 'administrator' ? (
+                          <Snowflake className="h-4 w-4 text-red-500/80" />
+                        ) : comment.userId ? (
+                          <Turtle className="h-4 w-4 text-muted-foreground" />
                         ) : (
-                          <User className="h-4 w-4 text-muted-foreground" />
+                          <Squirrel className="h-4 w-4 text-muted-foreground/70" />
                         )}
                       </div>
                       <div className="flex-1">
@@ -521,9 +524,24 @@ export default function EnhancedCommentManagement() {
                             {comment.displayName || comment.userName}
                           </span>
                           {comment.userId && (
-                            <Badge variant="secondary" className="text-xs">
-                              <Shield className="h-3 w-3 mr-1" />
-                              Thành viên
+                            <Badge 
+                              variant="outline" 
+                              className={cn(
+                                "text-xs",
+                                comment.userRole === 'administrator' && "border-red-500/40 text-red-600/90 bg-red-50/50 dark:bg-red-950/20"
+                              )}
+                            >
+                              {comment.userRole === 'administrator' ? (
+                                <>
+                                  <Snowflake className="h-3 w-3 mr-1" />
+                                  Quản Trị Viên
+                                </>
+                              ) : (
+                                <>
+                                  <Turtle className="h-3 w-3 mr-1" />
+                                  Thành Viên
+                                </>
+                              )}
                             </Badge>
                           )}
                           {comment.episodeViewing && (
@@ -612,8 +630,24 @@ export default function EnhancedCommentManagement() {
                                       {reply.displayName || reply.userName}
                                     </span>
                                     {reply.userId && (
-                                      <Badge variant="secondary" className="text-xs">
-                                        Thành viên
+                                      <Badge 
+                                        variant="outline" 
+                                        className={cn(
+                                          "text-xs",
+                                          reply.userRole === 'administrator' && "border-red-500/40 text-red-600/90 bg-red-50/50 dark:bg-red-950/20"
+                                        )}
+                                      >
+                                        {reply.userRole === 'administrator' ? (
+                                          <>
+                                            <Snowflake className="h-2.5 w-2.5 mr-0.5" />
+                                            Quản Trị Viên
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Turtle className="h-2.5 w-2.5 mr-0.5" />
+                                            Thành Viên
+                                          </>
+                                        )}
                                       </Badge>
                                     )}
                                     <Badge variant={reply.isApproved ? 'default' : 'secondary'} className="text-xs">

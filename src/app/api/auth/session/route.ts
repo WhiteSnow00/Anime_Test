@@ -40,7 +40,8 @@ export async function GET(request: NextRequest) {
           id: user._id,
           username: user.username,
           email: user.email,
-          displayName: user.displayName
+          displayName: user.displayName,
+          role: user.role
         }
       });
     } catch (error) {

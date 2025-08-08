@@ -49,6 +49,7 @@ export interface User {
   passwordHash: string;
   email?: string;
   displayName?: string;
+  role?: 'user' | 'administrator';
   createdAt: Date;
   lastLogin?: Date;
   isActive: boolean;
@@ -89,6 +90,7 @@ if (isServer) {
     passwordHash: { type: String, required: true },
     email: { type: String, maxlength: 255, sparse: true, unique: true },
     displayName: { type: String, maxlength: 100, trim: true },
+    role: { type: String, enum: ['user', 'administrator'], default: 'user' },
     createdAt: { type: Date, default: Date.now },
     lastLogin: { type: Date },
     isActive: { type: Boolean, default: true }
@@ -712,6 +714,7 @@ export class SimpleMongoDBService {
         passwordHash,
         email: email?.toLowerCase().trim(),
         displayName: displayName?.trim(),
+        role: 'user',
         isActive: true
       });
       
@@ -721,6 +724,7 @@ export class SimpleMongoDBService {
         passwordHash: newUser.passwordHash,
         email: newUser.email,
         displayName: newUser.displayName,
+        role: newUser.role,
         createdAt: newUser.createdAt,
         lastLogin: newUser.lastLogin,
         isActive: newUser.isActive
@@ -763,6 +767,7 @@ export class SimpleMongoDBService {
         passwordHash: user.passwordHash,
         email: user.email,
         displayName: user.displayName,
+        role: user.role,
         createdAt: user.createdAt,
         lastLogin: new Date(),
         isActive: user.isActive
@@ -794,6 +799,7 @@ export class SimpleMongoDBService {
         passwordHash: user.passwordHash,
         email: user.email,
         displayName: user.displayName,
+        role: user.role,
         createdAt: user.createdAt,
         lastLogin: user.lastLogin,
         isActive: user.isActive

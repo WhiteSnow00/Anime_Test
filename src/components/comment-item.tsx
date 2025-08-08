@@ -11,7 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Heart, MessageCircle, User, Clock, Play, Shield, Send, Loader2, ChevronDown, ChevronUp, Trash2, MoreHorizontal } from 'lucide-react';
+import { Heart, MessageCircle, Squirrel, Clock, Play, Snowflake, Turtle, Send, Loader2, ChevronDown, ChevronUp, Trash2, MoreHorizontal } from 'lucide-react';
 import { CommentService } from '@/lib/comment-service';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/auth-context';
@@ -25,6 +25,7 @@ interface CommentReply {
   userName: string;
   displayName?: string;
   userId?: string;
+  userRole?: 'user' | 'administrator';
   content: string;
   timestamp: Date | string;
   isApproved?: boolean;
@@ -370,12 +371,14 @@ export function CommentItem({ comment, onReplyAdded, onLikeToggled, onCommentDel
           {/* Avatar */}
           <div className={cn(
             "w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center flex-shrink-0",
-            comment.userId ? "bg-primary/20" : "bg-primary/10"
+            comment.userRole === 'administrator' ? "bg-red-50 dark:bg-red-950/30" : "bg-muted/50 dark:bg-muted/30"
           )}>
-            {comment.userId ? (
-              <Shield className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+            {comment.userRole === 'administrator' ? (
+              <Snowflake className="h-3 w-3 sm:h-4 sm:w-4 text-red-500/80" />
+            ) : comment.userId ? (
+              <Turtle className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
             ) : (
-              <User className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+              <Squirrel className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground/70" />
             )}
           </div>
           
@@ -389,9 +392,24 @@ export function CommentItem({ comment, onReplyAdded, onLikeToggled, onCommentDel
                       {comment.displayName || comment.userName}
                     </span>
                     {comment.userId && (
-                      <Badge variant="secondary" className="text-xs py-0 px-1.5 h-5">
-                        <Shield className="h-3 w-3 mr-1" />
-                        Thành viên
+                      <Badge 
+                        variant={comment.userRole === 'administrator' ? "outline" : "secondary"} 
+                        className={cn(
+                          "text-xs py-0 px-1.5 h-5",
+                          comment.userRole === 'administrator' && "border-red-500/40 text-red-600/90 bg-red-50/50 dark:bg-red-950/20"
+                        )}
+                      >
+                        {comment.userRole === 'administrator' ? (
+                          <>
+                            <Snowflake className="h-3 w-3 mr-1" />
+                            Quản Trị Viên
+                          </>
+                        ) : (
+                          <>
+                            <Turtle className="h-3 w-3 mr-1" />
+                            Thành Viên
+                          </>
+                        )}
                       </Badge>
                     )}
                   </div>
@@ -502,8 +520,15 @@ export function CommentItem({ comment, onReplyAdded, onLikeToggled, onCommentDel
             {showReplyForm && isLoggedIn && (
               <div className="mt-3 space-y-2">
                 <div className="flex items-start gap-2">
-                  <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                    <Shield className="h-3 w-3 text-primary" />
+                  <div className={cn(
+                    "w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0",
+                    user?.role === 'administrator' ? "bg-red-50 dark:bg-red-950/30" : "bg-muted/50 dark:bg-muted/30"
+                  )}>
+                    {user?.role === 'administrator' ? (
+                      <Snowflake className="h-4 w-4 text-red-500/80" />
+                    ) : (
+                      <Turtle className="h-4 w-4 text-muted-foreground" />
+                    )}
                   </div>
                   <div className="flex-1">
                     <Textarea
@@ -895,12 +920,14 @@ function ReplyItem({ reply, parentCommentId, onReplyAdded, onReplyDeleted }: Rep
 
       <div className={cn(
         "w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5",
-        reply.userId ? "bg-primary/20" : "bg-muted"
+        reply.userRole === 'administrator' ? "bg-red-50 dark:bg-red-950/30" : "bg-muted/50 dark:bg-muted/30"
       )}>
-        {reply.userId ? (
-          <Shield className="h-3 w-3 text-primary" />
+        {reply.userRole === 'administrator' ? (
+          <Snowflake className="h-2.5 w-2.5 text-red-500/80" />
+        ) : reply.userId ? (
+          <Turtle className="h-3 w-3 text-muted-foreground" />
         ) : (
-          <User className="h-3 w-3 text-muted-foreground" />
+          <Squirrel className="h-3 w-3 text-muted-foreground/70" />
         )}
       </div>
       
@@ -911,9 +938,24 @@ function ReplyItem({ reply, parentCommentId, onReplyAdded, onReplyDeleted }: Rep
               {reply.displayName || reply.userName}
             </span>
             {reply.userId && (
-              <Badge variant="secondary" className="text-[10px] py-0 px-1 h-4">
-                <Shield className="h-2.5 w-2.5 mr-0.5" />
-                TV
+              <Badge 
+                variant={reply.userRole === 'administrator' ? "outline" : "secondary"} 
+                className={cn(
+                  "text-[10px] py-0 px-1 h-4",
+                  reply.userRole === 'administrator' && "border-red-500/40 text-red-600/90 bg-red-50/50 dark:bg-red-950/20"
+                )}
+              >
+                {reply.userRole === 'administrator' ? (
+                  <>
+                    <Snowflake className="h-2.5 w-2.5 mr-0.5" />
+                    Quản Trị Viên
+                  </>
+                ) : (
+                  <>
+                    <Turtle className="h-2.5 w-2.5 mr-0.5" />
+                    Thành Viên
+                  </>
+                )}
               </Badge>
             )}
             <span className="text-[11px] text-muted-foreground">
@@ -1012,8 +1054,15 @@ function ReplyItem({ reply, parentCommentId, onReplyAdded, onReplyDeleted }: Rep
     {showReplyForm && isLoggedIn && (
       <div className="ml-8 mt-2 space-y-2">
         <div className="flex items-start gap-2">
-          <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-            <Shield className="h-2.5 w-2.5 text-primary" />
+          <div className={cn(
+            "w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0",
+            user?.role === 'administrator' ? "bg-red-50 dark:bg-red-950/30" : "bg-muted/50 dark:bg-muted/30"
+          )}>
+            {user?.role === 'administrator' ? (
+              <Snowflake className="h-3.5 w-3.5 text-red-500/80" />
+            ) : (
+              <Turtle className="h-3.5 w-3.5 text-muted-foreground" />
+            )}
           </div>
           <div className="flex-1">
             <Textarea

@@ -345,6 +345,21 @@ export class MongoDBExtendedService extends SimpleMongoDBService {
     }
   }
 
+  static async getUserRole(userId: string): Promise<'user' | 'administrator' | null> {
+    if (!isServer || !UserModel) {
+      return null;
+    }
+
+    try {
+      await this.ensureConnection();
+      const user = await UserModel.findById(userId).select('role');
+      return user?.role || 'user';
+    } catch (error) {
+      console.error('Failed to get user role:', error);
+      return null;
+    }
+  }
+
   static async getCommentsWithInteractions(
     episodeId?: number
   ): Promise<ExtendedComment[]> {
@@ -428,12 +443,31 @@ export class MongoDBExtendedService extends SimpleMongoDBService {
 
       const results = await CommentModel.aggregate(pipeline);
       
-      // Transform results to match expected format
+      // Get unique user IDs from comments and replies
+      const userIds = new Set<string>();
+      results.forEach((comment: any) => {
+        if (comment.userId) userIds.add(comment.userId.toString());
+        comment.replies?.forEach((reply: any) => {
+          if (reply.userId) userIds.add(reply.userId.toString());
+        });
+      });
+      
+      // Fetch user roles for all unique user IDs
+      const userRoles = new Map<string, string>();
+      if (userIds.size > 0 && UserModel) {
+        const users = await UserModel.find({ _id: { $in: Array.from(userIds) } }).select('_id role');
+        users.forEach((user: any) => {
+          userRoles.set(user._id.toString(), user.role || 'user');
+        });
+      }
+      
+      // Transform results to match expected format and include role information
       const enhancedComments = results.map((comment: any) => ({
         _id: comment._id.toString(),
         userName: comment.userName,
         displayName: comment.displayName,
         userId: comment.userId?.toString(),
+        userRole: comment.userId ? userRoles.get(comment.userId.toString()) : undefined,
         content: comment.content,
         timestamp: comment.timestamp,
         isApproved: comment.isApproved,
@@ -449,6 +483,7 @@ export class MongoDBExtendedService extends SimpleMongoDBService {
           userName: reply.userName,
           displayName: reply.displayName,
           userId: reply.userId?.toString(),
+          userRole: reply.userId ? userRoles.get(reply.userId.toString()) : undefined,
           content: reply.content,
           timestamp: reply.timestamp,
           isApproved: reply.isApproved,
