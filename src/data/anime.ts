@@ -113,7 +113,7 @@ export const animeData: Anime = {
       rawDownloadUrl: 'https://drive.google.com/file/d/13KCpzY2jDfPxtGqE87ZuaJxL-XupXzwu/view?usp=sharing'
     },
     { 
-      id: 6, 
+      id: 5, 
       title: 'Episode 6', 
       videoId: '06',
       servers: {
@@ -121,8 +121,8 @@ export const animeData: Anime = {
         helvid: 'ec6ea16c9c5e',
         hydax: 'nc905xM7j'
       },
-      downloadUrl: 'https://drive.google.com/file/d/18xbLTX3hUO9KvahZ9UWCRqdntZurlwm3/view?usp=sharing',
-      rawDownloadUrl: 'https://drive.google.com/file/d/13KCpzY2jDfPxtGqE87ZuaJxL-XupXzwu/view?usp=sharing'
+      downloadUrl: '',
+      rawDownloadUrl: 'https://drive.google.com/file/d/17nuFongdzfpvYlMx4ReUWduWVT8wH52C/view?usp=sharing'
     },
   ],
 };
