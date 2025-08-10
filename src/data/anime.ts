@@ -113,7 +113,7 @@ export const animeData: Anime = {
       rawDownloadUrl: 'https://drive.google.com/file/d/13KCpzY2jDfPxtGqE87ZuaJxL-XupXzwu/view?usp=sharing'
     },
     { 
-      id: 5, 
+      id: 6, 
       title: 'Episode 6', 
       videoId: '06',
       servers: {
