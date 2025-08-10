@@ -1,6 +1,10 @@
 "use client";
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
+import { antiDebugger } from '@/lib/anti-debugger';
+import { streamProtection, initializeProtection } from '@/lib/stream-protection';
+import { initializeNetworkInterceptor } from '@/lib/network-interceptor';
+import { consoleProtection } from '@/lib/console-protection';
 
 interface JWPlayerProps {
   videoId: string;
@@ -48,6 +52,28 @@ export function JWPlayerComponent({
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    
+    // Initialize console protection - continuously clear console
+    consoleProtection.start({
+      clearIntervalMs: 1000, // Clear every second
+      showWarning: true,
+      allowPatterns: [
+        /^Video ID:/,
+        /^Server:/,
+        /^Player ready/,
+      ]
+    });
+    
+    // Detect when DevTools is opened
+    consoleProtection.detectConsoleAccess();
+    
+    // Initialize network interceptor to hide CDN URLs
+    const cleanupNetworkInterceptor = initializeNetworkInterceptor();
+    
+    // Temporarily disabled for performance
+    // antiDebugger.initialize();
+    // initializeProtection();
+    
     const isMobile = isMobileDevice();
     if (!isMobile) {
       let customContextMenu: HTMLElement | null = null;
@@ -640,6 +666,8 @@ export function JWPlayerComponent({
       document.getElementsByTagName = originalGetElementsByTagName;
       observer.disconnect();
       clearInterval(decoyInterval);
+      cleanupNetworkInterceptor?.();
+      consoleProtection.stop();
     };
     } else {
       console.log('Mobile device detected - applying mobile-specific security measures');
@@ -892,9 +920,27 @@ export function JWPlayerComponent({
     }
   }, []);
 
-  const getVideoUrl = useCallback(() => {
+  const getVideoUrl = useCallback(async () => {
     if (server === 'hls') {
-
+      try {
+        const response = await fetch('/api/stream', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            file: `${videoId}`
+          })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          return data.streamUrl;
+        }
+      } catch (error) {
+        console.error('Failed to get encrypted stream URL:', error);
+      }
+      
       return `/api/hls?file=${videoId}`;
     } else if (server === 'helvid') {
       return `https://helvid.net/play/index/${videoId}`;
@@ -1007,12 +1053,24 @@ export function JWPlayerComponent({
       console.log('Skipping player initialization due to player fullscreen flag');
       return;
     }
+    
+    // Check if we're already initializing
+    if (playerInstanceRef.current && playerInstanceRef.current._isInitializing) {
+      console.log('Player is already initializing, skipping duplicate call');
+      return;
+    }
 
     try {
       const jwplayer = (window as any).jwplayer;
-      const videoUrl = getVideoUrl();
       
-      console.log('Initializing JWPlayer with URL:', videoUrl);
+      // Set initializing flag
+      if (playerInstanceRef.current) {
+        playerInstanceRef.current._isInitializing = true;
+      }
+      
+      const videoUrl = await getVideoUrl();
+      
+      console.log('Initializing JWPlayer with protected stream');
       console.log('Video ID:', videoId, 'Server:', server);
       
       if (server === 'hls' && isMobileDevice()) {
@@ -1154,7 +1212,7 @@ export function JWPlayerComponent({
           hlsjsdefault: isAndroid ? true : !isNativeHLSSupported,
           enableNativeHls: isAndroid ? false : isNativeHLSSupported,
           safarihlsjs: false,
-          title: `Hoa Thơm Kiêu hãnh ${videoId}`,
+          title: `Protected Stream`,
           hlshtml5: {
             ...hlsConfig,
             xhrSetup: function(xhr: any, url: any) {
@@ -1194,9 +1252,19 @@ export function JWPlayerComponent({
 
       const player = jwplayer("kana-jwplayer").setup(playerConfig);
       playerInstanceRef.current = player;
+      
+      // Store current video and server to prevent unnecessary reinitializations
+      playerInstanceRef.current._currentVideoId = videoId;
+      playerInstanceRef.current._currentServer = server;
 
       player.on('ready', () => {
         console.log('JWPlayer ready');
+        
+        // Clear initializing flag
+        if (playerInstanceRef.current) {
+          playerInstanceRef.current._isInitializing = false;
+        }
+        
         setPlayerLoaded(true);
         setIsLoading(false);
         setError(null);
@@ -1595,8 +1663,11 @@ export function JWPlayerComponent({
 
   useEffect(() => {
     let scriptLoaded = false;
+    let mounted = true;
 
     const loadJWPlayer = () => {
+      if (!mounted) return;
+      
       if (typeof window !== 'undefined' && (window as any).jwplayer) {
         initializePlayer();
         return;
@@ -1607,12 +1678,14 @@ export function JWPlayerComponent({
       script.async = true;
       
       script.onload = () => {
+        if (!mounted) return;
         console.log('JWPlayer script loaded');
         scriptLoaded = true;
         initializePlayer();
       };
 
       script.onerror = () => {
+        if (!mounted) return;
         console.error('Failed to load JWPlayer script');
         setError('Không thể tải script player');
         setIsLoading(false);
@@ -1624,8 +1697,14 @@ export function JWPlayerComponent({
     loadJWPlayer();
 
     return () => {
+      mounted = false;
       if (playerInstanceRef.current) {
         try {
+          // Stop any ongoing playback before removing
+          if (playerInstanceRef.current.getState && 
+              playerInstanceRef.current.getState() === 'playing') {
+            playerInstanceRef.current.stop();
+          }
           playerInstanceRef.current.remove();
         } catch (e) {
           console.warn('Error during player cleanup:', e);
@@ -1647,8 +1726,13 @@ export function JWPlayerComponent({
         return;
       }
       
-      setIsLoading(true);
-      initializePlayer();
+      // Only reinitialize if videoId or server actually changed
+      if (playerInstanceRef.current._currentVideoId !== videoId || 
+          playerInstanceRef.current._currentServer !== server) {
+        console.log('Video or server changed, reinitializing player');
+        setIsLoading(true);
+        initializePlayer();
+      }
     }
   }, [videoId, server, playerLoaded]);
 

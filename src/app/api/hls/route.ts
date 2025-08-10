@@ -1,12 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
+import crypto from 'crypto';
+
+// Create a mapping between encrypted IDs and real filenames
+const fileMapping = new Map<string, string>();
+const reverseMapping = new Map<string, string>();
+
+function getOrCreateFileId(realFileName: string): string {
+  if (reverseMapping.has(realFileName)) {
+    return reverseMapping.get(realFileName)!;
+  }
+  
+  const fileId = crypto.randomBytes(16).toString('hex');
+  fileMapping.set(fileId, realFileName);
+  reverseMapping.set(realFileName, fileId);
+  return fileId;
+}
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     
-    let file = searchParams.get('file'); 
+    let file = searchParams.get('file');
+    const streamId = searchParams.get('id');
     const obfuscatedFile = searchParams.get('f'); 
     const token = searchParams.get('t');
     const sessionId = searchParams.get('s');
@@ -59,11 +76,29 @@ export async function GET(request: NextRequest) {
       }
     }
     
+    // Handle encrypted stream ID
+    if (streamId && !file) {
+      const realFileName = fileMapping.get(streamId);
+      if (realFileName) {
+        file = realFileName;
+      } else {
+        return NextResponse.json(
+          { error: 'Invalid stream ID' },
+          { status: 403 }
+        );
+      }
+    }
+    
     if (!file) {
       return NextResponse.json(
         { error: 'File parameter is required' },
         { status: 400 }
       );
+    }
+    
+    // If using old format, create mapping for future use
+    if (file.includes('Tập')) {
+      getOrCreateFileId(file);
     }
 
     // Security: Only allow specific file patterns

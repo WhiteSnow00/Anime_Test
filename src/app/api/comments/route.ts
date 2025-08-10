@@ -81,7 +81,7 @@ function sanitizeInput(text: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
-  .replace(/'/g, '&#x27;'); // Removed forward slash escaping to preserve valid URLs
+  .replace(/'/g, '&#x27;');
 }
 
 function getClientIp(request: NextRequest): string {
