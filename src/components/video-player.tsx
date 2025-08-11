@@ -8,7 +8,6 @@ import { withPerformanceOptimization, withErrorBoundary } from '@/lib/higher-ord
 import { performanceUtils } from '@/lib/advanced-utils';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { JWPlayerComponent } from './jwplayer';
 import { 
   recordServerError, 
   getErrorMessage,
@@ -16,6 +15,7 @@ import {
   createIframeErrorDetector
 } from '@/lib/video-server-utils';
 import { animeData } from '@/data/anime';
+import NJWPlayerComponent from './new-jwplayer';
 
 export type ServerType = 'hls' | 'helvid' | 'hydax';
 
@@ -413,7 +413,18 @@ function VideoPlayerComponent({
         )}
         
         {currentServer === 'hls' ? (
-          <JWPlayerComponent
+          // <JWPlayerComponent
+          //   key={`${currentServer}-${transitionComputed.currentVideoId}`}
+          //   videoId={getHLSVideoId(transitionComputed.currentVideoId || videoId)}
+          //   server={currentServer}
+          //   autoPlay={autoPlay}
+          //   muted={muted}
+          //   controls={controls}
+          //   onLoad={handleIframeLoad}
+          //   onError={handleIframeError}
+          //   className="w-full h-full"
+          // />
+          <NJWPlayerComponent
             key={`${currentServer}-${transitionComputed.currentVideoId}`}
             videoId={getHLSVideoId(transitionComputed.currentVideoId || videoId)}
             server={currentServer}
