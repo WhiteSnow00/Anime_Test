@@ -10,13 +10,12 @@ import React, {
 import {
   Volume2,
   Flag,
-  Settings,
-  RotateCw,
   VolumeOff,
   Volume1,
   Maximize2,
   Minimize2,
   PictureInPicture2,
+  Rabbit,
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import {
@@ -27,6 +26,7 @@ import {
 } from "./ui/player-icon";
 import { Tooltip, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { TooltipContent } from "@radix-ui/react-tooltip";
+import Image from "next/image";
 
 const JW_PLAYER_VERSION = "8.38.3" as const;
 const JW_PLAYER_SCRIPT_SRC =
@@ -45,6 +45,7 @@ const SKIP_SECONDS = 10;
 const BACKWARD_TOOLTIP = "Lùi 10 giây";
 const FORWARD_TOOLTIP = "Tiến 10 giây";
 const NEXT_CHAPTER_TOOLTIP = "Tới mốc tiếp theo";
+const SCREENSHOT_TOOLTIP = "Chụp màn hình";
 const CONTROLS_AUTOHIDE_MS = 2500; // touch devices
 const CONTROLS_AUTOHIDE_DESKTOP_MS = 1000; // desktop idle hide
 const DOUBLE_TAP_MS = 300;
@@ -56,10 +57,8 @@ const LABEL_PAUSE = "Pause";
 const LABEL_BACK_X_SECONDS = (x: number) => `Back ${x} seconds`;
 const LABEL_FORWARD_X_SECONDS = (x: number) => `Forward ${x} seconds`;
 const LABEL_MUTE = "Mute";
-const LABEL_SETTINGS = "Settings";
 const LABEL_FULLSCREEN = "Fullscreen";
 const LABEL_PIP = "Picture-in-Picture";
-const LABEL_SPEED_HEADER = "Tốc độ phát";
 const QUALITY_FALLBACK_PREFIX = "Q";
 const LABEL_NEXT_CHAPTER = "Next chapter";
 const ABOUT_MESSAGE_TIMEOUT_MS = 1800; // auto-hide for custom context message
@@ -128,7 +127,6 @@ const NJWPlayerComponent = ({
   const [volume, setVolume] = useState(80);
   const [levels, setLevels] = useState<{ label: string; index: number }[]>([]);
   const [currentLevel, setCurrentLevel] = useState<number | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
   const [hoverTime, setHoverTime] = useState<{ x: number; t: number } | null>(
     null
   );
@@ -142,11 +140,8 @@ const NJWPlayerComponent = ({
   const [aboutPos, setAboutPos] = useState<{ x: number; y: number } | null>(
     null
   );
-  const [playbackRate, setPlaybackRate] = useState<number>(1);
   const [isInPip, setIsInPip] = useState(false);
   const [pipSupported, setPipSupported] = useState(false);
-  const playbackRateRef = useRef<number>(1);
-  const speedOptions = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
   const initAutoPlayRef = useRef<boolean>(autoPlay);
   const initMutedRef = useRef<boolean>(muted);
   // Mobile/touch detection and auto-hide timer
@@ -163,6 +158,33 @@ const NJWPlayerComponent = ({
   useEffect(() => {
     callbacksRef.current = { onLoad, onError };
   }, [onLoad, onError]);
+
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [showImagePreview, setShowImagePreview] = useState(false);
+
+  // Capture video frame and download
+  const handleCaptureFrame = useCallback(() => {
+    const videoEl = containerRef.current?.querySelector("video");
+    if (!videoEl) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = videoEl.videoWidth;
+    canvas.height = videoEl.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL("image/png");
+    setCapturedImage(dataUrl);
+    setShowImagePreview(true);
+    // Download
+    const a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = `frame-${Date.now()}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    // Hide preview after 2s
+    setTimeout(() => setShowImagePreview(false), 2000);
+  }, []);
 
   // Load JW script once
   useEffect(() => {
@@ -320,18 +342,6 @@ const NJWPlayerComponent = ({
       });
       p.on("pip", ({ pip }: { pip: boolean }) => setIsInPip(pip));
 
-      // Initialize playback rate (persist across setups)
-      try {
-        if (typeof playbackRateRef.current === "number") {
-          p.setPlaybackRate?.(playbackRateRef.current);
-        }
-        const r = p.getPlaybackRate?.();
-        if (typeof r === "number" && !Number.isNaN(r)) {
-          setPlaybackRate(r);
-          playbackRateRef.current = r;
-        }
-      } catch {}
-
       p.on("setupError", (e: any) =>
         callbacksRef.current.onError?.(e?.message || ERR_SETUP)
       );
@@ -385,16 +395,13 @@ const NJWPlayerComponent = ({
       ? CONTROLS_AUTOHIDE_MS
       : CONTROLS_AUTOHIDE_DESKTOP_MS;
     controlsHideTimerRef.current = window.setTimeout(() => {
-      if (!showSettings && !isScrubbing) {
+      if (!isScrubbing && !isHovering) {
         setControlsVisible(false);
-        // On desktop, also hide the cursor after idle
-        if (!isTouchDevice && isHovering) {
-          setCursorHidden(true);
-        }
+        if (!isTouchDevice) setCursorHidden(true);
       }
       controlsHideTimerRef.current = null;
     }, timeoutMs);
-  }, [isTouchDevice, showSettings, isScrubbing, isHovering]);
+  }, [isTouchDevice, isScrubbing, isHovering]);
 
   // Global handlers for scrubbing across the document
   useEffect(() => {
@@ -430,12 +437,12 @@ const NJWPlayerComponent = ({
     const handleFsChange = () => {
       const fs = !!document.fullscreenElement;
       setIsFullscreen(fs);
+      // Always restore overflow on exit fullscreen (for all devices)
       if (!fs) {
-        if (originalOverflowRef.current !== null) {
-          document.documentElement.style.overflow = originalOverflowRef.current;
-        } else {
-          document.documentElement.style.overflow = "";
-        }
+        document.documentElement.style.overflow =
+          originalOverflowRef.current !== null
+            ? originalOverflowRef.current
+            : "";
       }
       // ask jwplayer to recalc layout
       try {
@@ -451,11 +458,24 @@ const NJWPlayerComponent = ({
   const toggleFullscreenDom = useCallback(() => {
     const el = containerRef.current as any;
     if (!el) return;
+
+    // Force exit browser fullscreen if browser is fullscreen but media is not
+    if (document.fullscreenElement && !isFullscreen) {
+      try {
+        document.exitFullscreen();
+      } catch (e) {
+        console.error("Failed to exit browser fullscreen:", e);
+      }
+      return; // Exit early after attempting to fix the state
+    }
+
+    // Only set overflow:hidden for desktop (not touch devices)
     if (!document.fullscreenElement) {
-      // save and hide scrollbars
-      originalOverflowRef.current =
-        document.documentElement.style.overflow || "";
-      document.documentElement.style.overflow = "hidden";
+      if (!isTouchDevice) {
+        originalOverflowRef.current =
+          document.documentElement.style.overflow || "";
+        document.documentElement.style.overflow = "hidden";
+      }
       try {
         const req = el.requestFullscreen?.();
         if (req && typeof (req as any).catch === "function") {
@@ -472,7 +492,22 @@ const NJWPlayerComponent = ({
         const p = playerInstance.current;
         p?.setFullscreen?.(true);
       }
+      // Force landscape orientation on mobile/touch devices
+      if (isTouchDevice && window.screen?.orientation) {
+        try {
+          (window.screen.orientation as any).lock?.("landscape");
+        } catch {}
+      }
     } else {
+      // Always restore overflow on exit
+      document.documentElement.style.overflow =
+        originalOverflowRef.current !== null ? originalOverflowRef.current : "";
+      // Unlock orientation on mobile/touch devices
+      if (isTouchDevice && window.screen?.orientation) {
+        try {
+          (window.screen.orientation as any).unlock?.();
+        } catch {}
+      }
       try {
         const ex = document.exitFullscreen?.();
         if (ex && typeof (ex as any).catch === "function") {
@@ -489,7 +524,7 @@ const NJWPlayerComponent = ({
         p?.setFullscreen?.(false);
       }
     }
-  }, []);
+  }, [isTouchDevice, isFullscreen]);
 
   // Keyboard shortcuts scoped to hover/focus on the player
   useEffect(() => {
@@ -547,7 +582,6 @@ const NJWPlayerComponent = ({
         : "";
   }
 
-  // Percentages for bars
   const playedPct = duration ? (position / duration) * 100 : 0;
   const bufferedPct = duration ? (buffer / duration) * 100 : 0;
   const effectivePlayedPct =
@@ -561,22 +595,31 @@ const NJWPlayerComponent = ({
         ref={containerRef}
         className={
           isFullscreen
-            ? "relative w-full h-full bg-black flex items-center justify-center"
+            ? isTouchDevice
+              ? "fixed inset-0 bg-black flex items-center justify-center z-50 box-border"
+              : "relative w-full h-full bg-black flex items-center justify-center"
             : "relative w-full aspect-video bg-black"
+        }
+        style={
+          isFullscreen && isTouchDevice
+            ? {
+                width: "100vw",
+                height: "100vh",
+                paddingTop: "env(safe-area-inset-top)",
+                paddingBottom: "env(safe-area-inset-bottom)",
+                paddingLeft: "env(safe-area-inset-left)",
+                paddingRight: "env(safe-area-inset-right)",
+              }
+            : undefined
         }
         onMouseEnter={() => {
           setIsHovering(true);
+          setControlsVisible(true);
           setCursorHidden(false);
         }}
-        onMouseMove={(e) => {
-          if (!containerRef.current) return;
-          const rect = containerRef.current.getBoundingClientRect();
-          const y = e.clientY - rect.top;
-          const bottomZone = y >= rect.height * CONTROLS_REVEAL_Y_FACTOR; // bottom 35%
-          setControlsVisible(bottomZone || showSettings);
-          // restart auto-hide timer on desktop as well
+        onMouseMove={() => {
+          setControlsVisible(true);
           scheduleControlsAutohide();
-          // any mouse movement should reveal cursor
           if (!isTouchDevice && cursorHidden) setCursorHidden(false);
         }}
         onMouseLeave={() => {
@@ -600,7 +643,6 @@ const NJWPlayerComponent = ({
           const rect = containerRef.current.getBoundingClientRect();
           const y = touch.clientY - rect.top;
           const bottomZone = y >= rect.height * CONTROLS_REVEAL_Y_FACTOR;
-          setControlsVisible(bottomZone || showSettings);
         }}
         onTouchEnd={(e) => {
           scheduleControlsAutohide();
@@ -610,7 +652,9 @@ const NJWPlayerComponent = ({
           ref={playerRef}
           className={
             isFullscreen
-              ? "relative w-full aspect-video z-0"
+              ? isTouchDevice
+                ? "relative aspect-video w-full max-w-[100vw] max-h-[100vh] z-0"
+                : "relative w-full aspect-video z-0"
               : "fixed inset-0 z-0"
           }
         />
@@ -769,7 +813,7 @@ const NJWPlayerComponent = ({
               {/* Backward 10s */}
               <button
                 aria-label={LABEL_BACK_X_SECONDS(SKIP_SECONDS)}
-                className="p-1 rounded-full bg-white/10 transition-colors duration-200 drop-shadow-lg"
+                className="flex items-center justify-center p-1 rounded-full bg-white/10 transition-colors duration-200 drop-shadow-lg"
                 onClick={(e) => {
                   e.stopPropagation();
                   const p = playerInstance.current;
@@ -791,7 +835,7 @@ const NJWPlayerComponent = ({
               {/* Play/Pause */}
               <button
                 aria-label={isPlaying ? LABEL_PAUSE : LABEL_PLAY}
-                className="p-1 rounded-full bg-white/10 transition-colors duration-200 drop-shadow-lg"
+                className="flex items-center justify-center p-1 rounded-full bg-white/10 transition-colors duration-200 drop-shadow-lg"
                 onClick={(e) => {
                   e.stopPropagation();
                   const p = playerInstance.current;
@@ -810,14 +854,14 @@ const NJWPlayerComponent = ({
                 {isPlaying ? (
                   <PauseIcon className="h-8 w-8 text-white" />
                 ) : (
-                  <PlayIcon className="h-8 w-8 text-white" />
+                  <PlayIcon className="h-8 w-8 pl-1 text-white" />
                 )}
               </button>
 
               {/* Forward 10s */}
               <button
                 aria-label={LABEL_FORWARD_X_SECONDS(SKIP_SECONDS)}
-                className="p-1 rounded-full bg-white/10 transition-colors duration-200 drop-shadow-lg"
+                className="flex items-center justify-center p-1 rounded-full bg-white/10 transition-colors duration-200 drop-shadow-lg"
                 onClick={(e) => {
                   e.stopPropagation();
                   const p = playerInstance.current;
@@ -840,9 +884,11 @@ const NJWPlayerComponent = ({
         )}
 
         <div
-          className={`absolute inset-x-0 bottom-0 z-20 flex flex-col gap-2 text-white transition-opacity duration-300 ${
+          className={`${
+            isFullscreen ? "fixed" : "absolute"
+          } inset-x-0 bottom-0 z-20 flex flex-col gap-2 text-white transition-opacity duration-300 ${
             controlsVisible ? "opacity-100" : "opacity-0"
-          } bg-gradient-to-t from-black/40 to-transparent px-3 pb-[max(env(safe-area-inset-bottom),0.2rem)]`}
+          } bg-gradient-to-t from-black/40 to-transparent px-3 pb-[calc(0.2rem+env(safe-area-inset-bottom))]`}
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
         >
@@ -932,6 +978,24 @@ const NJWPlayerComponent = ({
               e.preventDefault();
               e.stopPropagation();
             }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (!containerRef.current) return;
+              const rect = containerRef.current.getBoundingClientRect();
+              const x = e.clientX - rect.left;
+              const y = e.clientY - rect.top;
+              setAboutPos({ x, y });
+              setShowAboutMsg(true);
+              if (aboutHideTimerRef.current) {
+                window.clearTimeout(aboutHideTimerRef.current);
+                aboutHideTimerRef.current = null;
+              }
+              aboutHideTimerRef.current = window.setTimeout(() => {
+                setShowAboutMsg(false);
+                aboutHideTimerRef.current = null;
+              }, ABOUT_MESSAGE_TIMEOUT_MS);
+            }}
           >
             <div className="absolute inset-0 bg-gray-600/30 rounded-full transition-all duration-200 group-hover:scale-y-150 origin-center" />
             <div
@@ -953,7 +1017,27 @@ const NJWPlayerComponent = ({
           </div>
 
           {/* Bottom control bar */}
-          <div className="flex items-center justify-between gap-2 md:gap-4">
+          <div
+            className="flex items-center justify-between gap-2 md:gap-4"
+            onContextMenu={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (!containerRef.current) return;
+              const rect = containerRef.current.getBoundingClientRect();
+              const x = e.clientX - rect.left;
+              const y = e.clientY - rect.top;
+              setAboutPos({ x, y });
+              setShowAboutMsg(true);
+              if (aboutHideTimerRef.current) {
+                window.clearTimeout(aboutHideTimerRef.current);
+                aboutHideTimerRef.current = null;
+              }
+              aboutHideTimerRef.current = window.setTimeout(() => {
+                setShowAboutMsg(false);
+                aboutHideTimerRef.current = null;
+              }, ABOUT_MESSAGE_TIMEOUT_MS);
+            }}
+          >
             <div className="flex items-center gap-1 md:gap-3">
               {!isTouchDevice && (
                 <button
@@ -969,7 +1053,7 @@ const NJWPlayerComponent = ({
                   {isPlaying ? (
                     <PauseIcon className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7" />
                   ) : (
-                    <PlayIcon className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7" />
+                    <PlayIcon className="h-5 w-5 pl-1 sm:h-6 sm:w-6 md:h-7 md:w-7" />
                   )}
                 </button>
               )}
@@ -1080,7 +1164,7 @@ const NJWPlayerComponent = ({
                 </TooltipProvider>
               )}
 
-              {/* Volume control */}
+              {/* Volume control (desktop: show slider on hover) */}
               <div className="group relative flex items-center">
                 <button
                   aria-label={LABEL_MUTE}
@@ -1100,28 +1184,31 @@ const NJWPlayerComponent = ({
                     <Volume1 className="h-5 w-5 sm:h-5 sm:w-5 md:h-6 md:w-6 text-white" />
                   )}
                 </button>
-                <div className="px-2 left-12 w-0 group-hover:w-28 opacity-0 group-hover:opacity-100 transition-all duration-300 items-center hidden sm:flex">
-                  <Slider
-                    className="w-24 md:w-28"
-                    max={100}
-                    step={1}
-                    value={[isMuted ? 0 : volume]}
-                    onValueChange={(vals) => {
-                      const vRaw = Array.isArray(vals) ? vals[0] : 0;
-                      const v = Math.max(
-                        0,
-                        Math.min(100, Math.round(vRaw || 0))
-                      );
-                      const p = playerInstance.current;
-                      if (!p) return;
-                      p.setVolume?.(v);
-                      if (v === 0 && !isMuted) p.setMute?.(true);
-                      if (v > 0 && isMuted) p.setMute?.(false);
-                      setVolume(v);
-                      scheduleControlsAutohide();
-                    }}
-                  />
-                </div>
+                {/* Only show slider on desktop (not touch devices) */}
+                {!isTouchDevice && (
+                  <div className="pl-2 left-12 w-0 group-hover:w-28 opacity-0 group-hover:opacity-100 transition-all duration-300 items-center hidden sm:flex">
+                    <Slider
+                      className="w-24 md:w-28"
+                      max={100}
+                      step={1}
+                      value={[isMuted ? 0 : volume]}
+                      onValueChange={(vals) => {
+                        const vRaw = Array.isArray(vals) ? vals[0] : 0;
+                        const v = Math.max(
+                          0,
+                          Math.min(100, Math.round(vRaw || 0))
+                        );
+                        const p = playerInstance.current;
+                        if (!p) return;
+                        p.setVolume?.(v);
+                        if (v === 0 && !isMuted) p.setMute?.(true);
+                        if (v > 0 && isMuted) p.setMute?.(false);
+                        setVolume(v);
+                        scheduleControlsAutohide();
+                      }}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-1 md:gap-2 text-xs sm:text-sm font-medium text-white/90">
@@ -1147,92 +1234,25 @@ const NJWPlayerComponent = ({
                   <PictureInPicture2 className="h-5 w-5 sm:h-5 sm:w-5 md:h-6 md:w-6" />
                 </button>
               )}
-              {/* Settings(tắt tạm thời) */}
-              {!isTouchDevice && (
-                <div className="relative px-2">
-                  <button
-                    aria-label={LABEL_SETTINGS}
-                    onClick={() => setShowSettings((s) => !s)}
-                    className="p-2 rounded-full hover:bg-white/15 transition-colors duration-200"
-                  >
-                    <Settings className="h-5 w-5 sm:h-5 sm:w-5 md:h-6 md:w-6" />
-                  </button>
-                  {showSettings && !isTouchDevice && (
-                    <div className="absolute right-0 bottom-full mb-2 z-50 min-w-44 rounded-lg bg-gray-900/95 p-2 shadow-xl border border-gray-700/50">
-                      <div className="pb-2 text-xs font-semibold uppercase text-white/70 tracking-wide">
-                        {LABEL_SPEED_HEADER}
-                      </div>
-                      {speedOptions.map((sp) => (
-                        <button
-                          key={sp}
-                          className={`flex w-full items-center justify-between px-3 py-2 rounded-md text-sm hover:bg-white/10 transition-colors duration-200 ${
-                            playbackRate === sp ? "text-red-400" : "text-white"
-                          }`}
-                          onClick={() => {
-                            const p = playerInstance.current;
-                            if (!p) return;
-                            p.setPlaybackRate?.(sp);
-                            setPlaybackRate(sp);
-                            playbackRateRef.current = sp;
-                            setShowSettings(false);
-                            scheduleControlsAutohide();
-                          }}
-                        >
-                          <span>{sp}x</span>
-                          {playbackRate === sp && (
-                            <RotateCw className="h-4 w-4 text-red-400" />
-                          )}
-                        </button>
-                      ))}
+
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      aria-label="Capture video frame"
+                      onClick={handleCaptureFrame}
+                      className="p-2 rounded-full hover:bg-white/15 transition-colors duration-200"
+                    >
+                      <Rabbit className="h-5 w-5 sm:h-5 sm:w-5 md:h-6 md:w-6" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" sideOffset={15}>
+                    <div className="bg-gray-900 text-white text-xs font-medium rounded-lg px-3 py-1.5 shadow-lg">
+                      {SCREENSHOT_TOOLTIP}
                     </div>
-                  )}
-                  {/* Settings panel */}
-                  {showSettings && isTouchDevice && (
-                    <div className="fixed inset-0 z-40">
-                      {/* Backdrop */}
-                      <div
-                        className="absolute inset-0 bg-black/50"
-                        onClick={() => setShowSettings(false)}
-                      />
-                      {/* Panel */}
-                      <div className="absolute inset-x-0 bottom-0">
-                        <div
-                          className="w-full bg-gray-900/95 shadow-2xl border-t border-gray-700/50 p-3 overflow-auto"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-white/20" />
-                          <div className="pb-2 text-sm font-semibold uppercase text-white/70 tracking-wide">
-                            {LABEL_SPEED_HEADER}
-                          </div>
-                          <div className="grid grid-cols-3 gap-2">
-                            {speedOptions.map((sp) => (
-                              <button
-                                key={sp}
-                                className={`flex items-center justify-center rounded-lg px-3 py-3 text-sm font-medium transition-colors duration-200 ${
-                                  playbackRate === sp
-                                    ? "bg-red-600/20 text-red-400"
-                                    : "bg-white/5 text-white hover:bg-white/10"
-                                }`}
-                                onClick={() => {
-                                  const p = playerInstance.current;
-                                  if (!p) return;
-                                  p.setPlaybackRate?.(sp);
-                                  setPlaybackRate(sp);
-                                  playbackRateRef.current = sp;
-                                  setShowSettings(false);
-                                  scheduleControlsAutohide();
-                                }}
-                              >
-                                {sp}x
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
 
               {/* Fullscreen */}
               <button
@@ -1246,6 +1266,16 @@ const NJWPlayerComponent = ({
                   <Maximize2 className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7" />
                 )}
               </button>
+              {/* Temporary image preview overlay */}
+              {showImagePreview && capturedImage && (
+                <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/60">
+                  <img
+                    src={capturedImage}
+                    alt="Captured frame"
+                    className="max-w-[80vw] max-h-[80vh] rounded-lg shadow-2xl border-2 border-white"
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>
