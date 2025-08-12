@@ -112,7 +112,6 @@ const NJWPlayerComponent = ({
     if (isAndroid) return;
     if ((video as any)._protectedStreamSetup) return;
     (video as any)._protectedStreamSetup = true;
-    const protectionInterval: number | null = null;
     let cleanupObserver: MutationObserver | null = null;
     try {
       // Console protection: activate when player is ready
@@ -132,56 +131,61 @@ const NJWPlayerComponent = ({
         });
         consoleProtection.detectConsoleAccess();
       }
-      // Override getAttribute for 'src'
-      const originalGetAttribute = video.getAttribute;
-      video.getAttribute = function (name: string) {
-        if (name === "src") return "blob:protected-stream";
-        return originalGetAttribute.call(this, name);
-      };
-      // Override setAttribute for 'src'
-      const originalSetAttribute = video.setAttribute;
-      video.setAttribute = function (name: string, value: string) {
-        if (name === "src" && value.includes("blob:")) {
+      // Delay property overrides until video is playing
+      const applyProtection = () => {
+        // Override getAttribute for 'src'
+        const originalGetAttribute = video.getAttribute;
+        video.getAttribute = function (name: string) {
+          if (name === "src") return "blob:protected-stream";
+          return originalGetAttribute.call(this, name);
+        };
+        // Override setAttribute for 'src'
+        const originalSetAttribute = video.setAttribute;
+        video.setAttribute = function (name: string, value: string) {
+          if (name === "src" && value.includes("blob:")) {
+            return originalSetAttribute.call(this, name, value);
+          }
           return originalSetAttribute.call(this, name, value);
+        };
+        // Only override properties once
+        const srcDescriptor = Object.getOwnPropertyDescriptor(video, "src");
+        if (!srcDescriptor || srcDescriptor.configurable !== false) {
+          Object.defineProperty(video, "src", {
+            get: () => "blob:protected-stream",
+            set: () => {},
+            configurable: true,
+          });
         }
-        return originalSetAttribute.call(this, name, value);
-      };
-      // Only override properties once
-      const srcDescriptor = Object.getOwnPropertyDescriptor(video, "src");
-      if (!srcDescriptor || srcDescriptor.configurable !== false) {
-        Object.defineProperty(video, "src", {
-          get: () => "blob:protected-stream",
-          set: () => {},
-          configurable: true,
-        });
-      }
-      const currentSrcDescriptor = Object.getOwnPropertyDescriptor(video, "currentSrc");
-      if (!currentSrcDescriptor || currentSrcDescriptor.configurable !== false) {
-        Object.defineProperty(video, "currentSrc", {
-          get: () => "blob:protected-stream",
-          configurable: true,
-        });
-      }
-      const outerHTMLDescriptor = Object.getOwnPropertyDescriptor(video, "outerHTML");
-      if (!outerHTMLDescriptor || outerHTMLDescriptor.configurable !== false) {
-        Object.defineProperty(video, "outerHTML", {
-          get: function () {
-            const originalOuterHTML = Object.getOwnPropertyDescriptor(HTMLVideoElement.prototype, "outerHTML")?.get;
-            if (originalOuterHTML) {
-              try {
-                const html = originalOuterHTML.call(this);
-                return typeof html === "string"
-                  ? html.replace(/blob:[^"\s]+/g, "blob:protected-stream")
-                  : html;
-              } catch (e) {
-                return "<video>Protected Video Element</video>";
+        const currentSrcDescriptor = Object.getOwnPropertyDescriptor(video, "currentSrc");
+        if (!currentSrcDescriptor || currentSrcDescriptor.configurable !== false) {
+          Object.defineProperty(video, "currentSrc", {
+            get: () => "blob:protected-stream",
+            configurable: true,
+          });
+        }
+        const outerHTMLDescriptor = Object.getOwnPropertyDescriptor(video, "outerHTML");
+        if (!outerHTMLDescriptor || outerHTMLDescriptor.configurable !== false) {
+          Object.defineProperty(video, "outerHTML", {
+            get: function () {
+              const originalOuterHTML = Object.getOwnPropertyDescriptor(HTMLVideoElement.prototype, "outerHTML")?.get;
+              if (originalOuterHTML) {
+                try {
+                  const html = originalOuterHTML.call(this);
+                  return typeof html === "string"
+                    ? html.replace(/blob:[^"\s]+/g, "blob:protected-stream")
+                    : html;
+                } catch (e) {
+                  return "<video>Protected Video Element</video>";
+                }
               }
-            }
-            return "<video>Protected Video Element</video>";
-          },
-          configurable: true,
-        });
-      }
+              return "<video>Protected Video Element</video>";
+            },
+            configurable: true,
+          });
+        }
+      };
+      // Listen for play event to apply protection
+      video.addEventListener("play", applyProtection, { once: true });
       // Setup cleanup observer for video removal
       cleanupObserver = new MutationObserver((mutations) => {
         try {
@@ -189,14 +193,12 @@ const NJWPlayerComponent = ({
             mutation.removedNodes.forEach((node) => {
               if (node && node.nodeType === Node.ELEMENT_NODE) {
                 if (node === video || (node as Element).contains(video)) {
-                  if (protectionInterval) clearInterval(protectionInterval);
                   if (cleanupObserver) cleanupObserver.disconnect();
                 }
               }
             });
           });
         } catch (observerError) {
-          if (protectionInterval) clearInterval(protectionInterval);
           if (cleanupObserver) cleanupObserver.disconnect();
         }
       });
