@@ -1,4 +1,5 @@
 "use client";
+import { consoleProtection } from "../lib/console-protection";
 
 import React, {
   useCallback,
@@ -15,7 +16,10 @@ import {
   Maximize2,
   Minimize2,
   PictureInPicture2,
-  Rabbit,
+  Camera,
+  LoaderPinwheel,
+  FastForward,
+  Rewind,
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import {
@@ -26,32 +30,27 @@ import {
 } from "./ui/player-icon";
 import { Tooltip, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { TooltipContent } from "@radix-ui/react-tooltip";
-import Image from "next/image";
 
 const JW_PLAYER_VERSION = "8.38.3" as const;
 const JW_PLAYER_SCRIPT_SRC =
   `https://ssl.p.jwpcdn.com/player/v/${JW_PLAYER_VERSION}/jwplayer.js` as const;
 const JW_PLAYER_KEY = "cLGMn8T20tGvW+0eXPhq4NNmLB57TrscPjd1IyJF84o=" as const;
 const JW_ABOUT_TEXT = "Được Tạo Bởi KanaFansub" as const;
-const PLAYER_ASPECT_RATIO = "16:9" as const;
 const PLAYER_PRIMARY = "html5" as const;
 const HLS_TYPE = "hls" as const;
 
 const DEFAULT_VOLUME = 80;
-const AUTOPLAY_VIEWABLE = "viewable" as const;
 const AUTOPLAY_RETRY_DELAY_MS = 250;
-const CONTROLS_REVEAL_Y_FACTOR = 0; // bottom 35%
+const CONTROLS_REVEAL_Y_FACTOR = 0; 
 const SKIP_SECONDS = 10;
 const BACKWARD_TOOLTIP = "Lùi 10 giây";
 const FORWARD_TOOLTIP = "Tiến 10 giây";
 const NEXT_CHAPTER_TOOLTIP = "Tới mốc tiếp theo";
 const SCREENSHOT_TOOLTIP = "Chụp màn hình";
-const CONTROLS_AUTOHIDE_MS = 2500; // touch devices
-const CONTROLS_AUTOHIDE_DESKTOP_MS = 1000; // desktop idle hide
-const DOUBLE_TAP_MS = 300;
-const DOUBLE_TAP_ZONE_RATIO = 0.4; // left/right zones for skip
+const CONTROLS_AUTOHIDE_MS = 2500; 
+const CONTROLS_AUTOHIDE_DESKTOP_MS = 1000; 
+const DOUBLE_TAP_ZONE_RATIO = 0.5;
 
-// Labels (en + vi mix as currently used in UI)
 const LABEL_PLAY = "Play";
 const LABEL_PAUSE = "Pause";
 const LABEL_BACK_X_SECONDS = (x: number) => `Back ${x} seconds`;
@@ -61,9 +60,9 @@ const LABEL_FULLSCREEN = "Fullscreen";
 const LABEL_PIP = "Picture-in-Picture";
 const QUALITY_FALLBACK_PREFIX = "Q";
 const LABEL_NEXT_CHAPTER = "Next chapter";
-const ABOUT_MESSAGE_TIMEOUT_MS = 1800; // auto-hide for custom context message
+const ABOUT_MESSAGE_TIMEOUT_MS = 1800; 
 
-// Error messages
+
 const ERR_SCRIPT_LOAD = "Failed to load JWPlayer script";
 const ERR_SETUP = "Player setup error";
 const ERR_GENERAL = "Player error";
@@ -96,7 +95,6 @@ const NJWPlayerComponent = ({
   const progressBarRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const originalOverflowRef = useRef<string | null>(null);
-  // Stability/state refs
   const prevFileUrlRef = useRef<string | null>(null);
   const savedPositionRef = useRef<number>(0);
   const wasPlayingRef = useRef<boolean>(false);
@@ -106,6 +104,110 @@ const NJWPlayerComponent = ({
   }>({});
   const scriptLoadedRef = useRef<boolean>(false);
   const scriptLoadingRef = useRef<boolean>(false);
+  const isAndroid =
+    typeof navigator !== "undefined" && /android/i.test(navigator.userAgent);
+
+  const protectVideoElement = useCallback((video: HTMLVideoElement) => {
+    if (!video || !(video instanceof HTMLVideoElement) || !video.nodeType) return;
+    if (isAndroid) return;
+    if ((video as any)._protectedStreamSetup) return;
+    (video as any)._protectedStreamSetup = true;
+    const protectionInterval: number | null = null;
+    let cleanupObserver: MutationObserver | null = null;
+    try {
+      // Console protection: activate when player is ready
+      if (typeof window !== "undefined") {
+        consoleProtection.start({
+          showWarning: true,
+          allowPatterns: [
+            /^JWPlayer ready$/,
+            /^Initializing JWPlayer/,
+            /^Video playback completed$/,
+            /^First frame loaded$/,
+            /^Quality levels available$/,
+            /^Playback progress:/,
+            /^Player buffering/,
+            /^Bắt đầu phát video$/,
+          ],
+        });
+        consoleProtection.detectConsoleAccess();
+      }
+      // Override getAttribute for 'src'
+      const originalGetAttribute = video.getAttribute;
+      video.getAttribute = function (name: string) {
+        if (name === "src") return "blob:protected-stream";
+        return originalGetAttribute.call(this, name);
+      };
+      // Override setAttribute for 'src'
+      const originalSetAttribute = video.setAttribute;
+      video.setAttribute = function (name: string, value: string) {
+        if (name === "src" && value.includes("blob:")) {
+          return originalSetAttribute.call(this, name, value);
+        }
+        return originalSetAttribute.call(this, name, value);
+      };
+      // Only override properties once
+      const srcDescriptor = Object.getOwnPropertyDescriptor(video, "src");
+      if (!srcDescriptor || srcDescriptor.configurable !== false) {
+        Object.defineProperty(video, "src", {
+          get: () => "blob:protected-stream",
+          set: () => {},
+          configurable: true,
+        });
+      }
+      const currentSrcDescriptor = Object.getOwnPropertyDescriptor(video, "currentSrc");
+      if (!currentSrcDescriptor || currentSrcDescriptor.configurable !== false) {
+        Object.defineProperty(video, "currentSrc", {
+          get: () => "blob:protected-stream",
+          configurable: true,
+        });
+      }
+      const outerHTMLDescriptor = Object.getOwnPropertyDescriptor(video, "outerHTML");
+      if (!outerHTMLDescriptor || outerHTMLDescriptor.configurable !== false) {
+        Object.defineProperty(video, "outerHTML", {
+          get: function () {
+            const originalOuterHTML = Object.getOwnPropertyDescriptor(HTMLVideoElement.prototype, "outerHTML")?.get;
+            if (originalOuterHTML) {
+              try {
+                const html = originalOuterHTML.call(this);
+                return typeof html === "string"
+                  ? html.replace(/blob:[^"\s]+/g, "blob:protected-stream")
+                  : html;
+              } catch (e) {
+                return "<video>Protected Video Element</video>";
+              }
+            }
+            return "<video>Protected Video Element</video>";
+          },
+          configurable: true,
+        });
+      }
+      // Setup cleanup observer for video removal
+      cleanupObserver = new MutationObserver((mutations) => {
+        try {
+          mutations.forEach((mutation) => {
+            mutation.removedNodes.forEach((node) => {
+              if (node && node.nodeType === Node.ELEMENT_NODE) {
+                if (node === video || (node as Element).contains(video)) {
+                  if (protectionInterval) clearInterval(protectionInterval);
+                  if (cleanupObserver) cleanupObserver.disconnect();
+                }
+              }
+            });
+          });
+        } catch (observerError) {
+          if (protectionInterval) clearInterval(protectionInterval);
+          if (cleanupObserver) cleanupObserver.disconnect();
+        }
+      });
+      cleanupObserver.observe(document.body, {
+        childList: true,
+        subtree: true,
+      });
+    } catch (e) {
+      // Video protection error
+    }
+  }, []);
 
   const isHls = server === "hls";
   const fileUrl = useMemo(() => {
@@ -118,6 +220,7 @@ const NJWPlayerComponent = ({
 
   // UI state
   const [isReady, setIsReady] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(!!muted);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -127,34 +230,28 @@ const NJWPlayerComponent = ({
   const [volume, setVolume] = useState(80);
   const [levels, setLevels] = useState<{ label: string; index: number }[]>([]);
   const [currentLevel, setCurrentLevel] = useState<number | null>(null);
-  const [hoverTime, setHoverTime] = useState<{ x: number; t: number } | null>(
-    null
-  );
+  const [hoverTime, setHoverTime] = useState<{ x: number; t: number } | null>(null);
   const [libReady, setLibReady] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(false);
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [scrubPct, setScrubPct] = useState<number | null>(null);
   const [isHovering, setIsHovering] = useState(false);
+  const [isHoveringControls, setIsHoveringControls] = useState(false);
   const [cursorHidden, setCursorHidden] = useState(false);
   const [showAboutMsg, setShowAboutMsg] = useState(false);
-  const [aboutPos, setAboutPos] = useState<{ x: number; y: number } | null>(
-    null
-  );
+  const [aboutPos, setAboutPos] = useState<{ x: number; y: number } | null>(null);
   const [isInPip, setIsInPip] = useState(false);
   const [pipSupported, setPipSupported] = useState(false);
+  const [seekOverlay, setSeekOverlay] = useState<{ type: "back" | "forward"; seconds: number } | null>(null);
+  const seekOverlayTimerRef = useRef<number | null>(null);
   const initAutoPlayRef = useRef<boolean>(autoPlay);
   const initMutedRef = useRef<boolean>(muted);
-  // Mobile/touch detection and auto-hide timer
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const controlsHideTimerRef = useRef<number | null>(null);
   const aboutHideTimerRef = useRef<number | null>(null);
-  const lastTapTimeRef = useRef<number>(0);
-  const lastTapXRef = useRef<number>(0);
   const suppressClickRef = useRef<boolean>(false);
-  // Track if we muted to satisfy autoplay policies
   const forcedAutoplayMuteRef = useRef<boolean>(false);
 
-  // Keep latest callbacks without causing re-init
   useEffect(() => {
     callbacksRef.current = { onLoad, onError };
   }, [onLoad, onError]);
@@ -162,7 +259,6 @@ const NJWPlayerComponent = ({
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [showImagePreview, setShowImagePreview] = useState(false);
 
-  // Capture video frame and download
   const handleCaptureFrame = useCallback(() => {
     const videoEl = containerRef.current?.querySelector("video");
     if (!videoEl) return;
@@ -175,20 +271,17 @@ const NJWPlayerComponent = ({
     const dataUrl = canvas.toDataURL("image/png");
     setCapturedImage(dataUrl);
     setShowImagePreview(true);
-    // Download
     const a = document.createElement("a");
     a.href = dataUrl;
     a.download = `frame-${Date.now()}.png`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    // Hide preview after 2s
     setTimeout(() => setShowImagePreview(false), 2000);
   }, []);
 
   // Load JW script once
   useEffect(() => {
-    // Touch capability detection (run client-side only)
     try {
       const hasTouch =
         typeof window !== "undefined" &&
@@ -226,6 +319,22 @@ const NJWPlayerComponent = ({
     const w = window as any;
     if (!w.jwplayer || !playerRef.current) return;
 
+    const isFullscreen = document.fullscreenElement !== null;
+    if (isFullscreen && playerInstance.current) {
+      return;
+    }
+    if (playerInstance.current && playerInstance.current._isFullscreen) {
+      return;
+    }
+    const now = Date.now();
+    if (
+      playerInstance.current &&
+      playerInstance.current._lastFullscreenExit &&
+      now - playerInstance.current._lastFullscreenExit < 2000
+    ) {
+      return;
+    }
+
     if (playerInstance.current && prevFileUrlRef.current === fileUrl) {
       return;
     }
@@ -245,10 +354,9 @@ const NJWPlayerComponent = ({
       playerInstance.current = w.jwplayer(playerRef.current).setup({
         width: "100%",
         height: "100%",
-        aspectratio: PLAYER_ASPECT_RATIO,
         primary: PLAYER_PRIMARY,
         controls: false, // hide default; we render custom UI
-        autostart: initAutoPlayRef.current ? AUTOPLAY_VIEWABLE : false,
+        autostart: autoPlay,
         mute: initMutedRef.current,
         key: JW_PLAYER_KEY,
         hlsjsdefault: true,
@@ -258,16 +366,28 @@ const NJWPlayerComponent = ({
         playlist: [{ sources }],
         abouttext: JW_ABOUT_TEXT,
         playsinline: true,
+        fullscreenOrientationLock: "landscape",
+        pipIcon: "true",
       });
 
       const p = playerInstance.current;
+
+      // Store fullscreen state for reload prevention
+      p._isFullscreen = false;
+      p._lastFullscreenExit = 0;
 
       p.on("ready", () => {
         setIsReady(true);
         setIsMuted(!!p.getMute?.());
         setPipSupported(p.isPipSupported?.() === true);
-        const vol = p.getVolume?.();
-        setVolume(typeof vol === "number" ? vol : DEFAULT_VOLUME);
+        // If Android, set volume to max
+        if (isAndroid) {
+          p.setVolume?.(100);
+          setVolume(100);
+        } else {
+          const vol = p.getVolume?.();
+          setVolume(typeof vol === "number" ? vol : DEFAULT_VOLUME);
+        }
         const d = p.getDuration?.() ?? 0;
         setDuration(isFinite(d) ? d : 0);
 
@@ -289,11 +409,9 @@ const NJWPlayerComponent = ({
         } else if (initAutoPlayRef.current) {
           try {
             p.setMute?.(false);
-            // Only unmute later if the component wasn't configured muted
             forcedAutoplayMuteRef.current = !initMutedRef.current;
             p.play?.(true);
           } catch {}
-          // Optional retry: in case the first call didn't start
           setTimeout(() => {
             try {
               const st = p.getState?.();
@@ -306,9 +424,23 @@ const NJWPlayerComponent = ({
         savedPositionRef.current = 0;
         wasPlayingRef.current = false;
 
+        setTimeout(() => {
+          const videoEl = containerRef.current?.querySelector("video");
+          if (videoEl) protectVideoElement(videoEl);
+        }, 500);
         callbacksRef.current.onLoad?.();
       });
-      p.on("play", () => setIsPlaying(true));
+      p.on("play", () => {
+        setIsPlaying(true);
+        if (isAndroid) {
+          const videoEl = containerRef.current?.querySelector("video");
+          if (videoEl) {
+            videoEl.style.display = "";
+            videoEl.style.visibility = "visible";
+            videoEl.style.opacity = "1";
+          }
+        }
+      });
       p.on("pause", () => setIsPlaying(false));
       p.on("time", (e: any) => {
         setPosition(e?.position || 0);
@@ -316,17 +448,56 @@ const NJWPlayerComponent = ({
           typeof e?.duration === "number" ? e.duration : prev
         );
       });
+      p.on("resize", (e: any) => {
+        console.log("Player resized:", e.width, "x", e.height);
+        setIsFullscreen(document.fullscreenElement !== null);
+      });
       p.on("buffer", (e: any) => {
+        setIsBuffering(true);
         if (e && typeof e.bufferPercent === "number") {
           const dur = p.getDuration?.() || 0;
           setBuffer((e.bufferPercent / 100) * dur);
+        }
+      });
+      p.on("play", () => {
+        setIsPlaying(true);
+        setIsBuffering(false);
+        if (isAndroid) {
+          const videoEl = containerRef.current?.querySelector("video");
+          if (videoEl) {
+            videoEl.style.display = "";
+            videoEl.style.visibility = "visible";
+            videoEl.style.opacity = "1";
+          }
         }
       });
       p.on("volume", (e: any) =>
         setVolume(typeof e?.volume === "number" ? e.volume : DEFAULT_VOLUME)
       );
       p.on("mute", (e: any) => setIsMuted(!!e?.mute));
-      p.on("fullscreen", (e: any) => setIsFullscreen(!!e?.fullscreen));
+      p.on("fullscreen", (e: any) => {
+        setIsFullscreen(!!e.fullscreen);
+        if (e.fullscreen) {
+          p._isFullscreen = true;
+        } else {
+          p._lastFullscreenExit = Date.now();
+          setTimeout(() => {
+            if (playerInstance.current) {
+              playerInstance.current._isFullscreen = false;
+              if (isAndroid) {
+                const videoEl = containerRef.current?.querySelector("video");
+                if (videoEl) {
+                  videoEl.style.display = "";
+                  videoEl.style.visibility = "visible";
+                  videoEl.style.opacity = "1";
+                  // Force reflow
+                  videoEl.src = videoEl.src;
+                }
+              }
+            }
+          }, 1000);
+        }
+      });
       p.on("levels", () => {
         const q = p.getQualityLevels?.() || [];
         setLevels(
@@ -355,7 +526,7 @@ const NJWPlayerComponent = ({
     }
 
     return () => {};
-  }, [isHls, fileUrl, libReady]);
+  }, [isHls, fileUrl, libReady, isFullscreen]);
 
   useEffect(() => {
     if (!playerInstance.current) return;
@@ -383,6 +554,10 @@ const NJWPlayerComponent = ({
         window.clearTimeout(aboutHideTimerRef.current);
         aboutHideTimerRef.current = null;
       }
+      if (seekOverlayTimerRef.current) {
+        window.clearTimeout(seekOverlayTimerRef.current);
+        seekOverlayTimerRef.current = null;
+      }
     };
   }, []);
 
@@ -395,15 +570,21 @@ const NJWPlayerComponent = ({
       ? CONTROLS_AUTOHIDE_MS
       : CONTROLS_AUTOHIDE_DESKTOP_MS;
     controlsHideTimerRef.current = window.setTimeout(() => {
-      if (!isScrubbing && !isHovering) {
-        setControlsVisible(false);
-        if (!isTouchDevice) setCursorHidden(true);
+      if (isTouchDevice) {
+        if (!isScrubbing && !isHovering) {
+          setControlsVisible(false);
+        }
+      } else {
+        // Desktop
+        if (!isScrubbing && !isHoveringControls) {
+          setControlsVisible(false);
+          setCursorHidden(true);
+        }
       }
       controlsHideTimerRef.current = null;
     }, timeoutMs);
-  }, [isTouchDevice, isScrubbing, isHovering]);
+  }, [isTouchDevice, isScrubbing, isHovering, isHoveringControls]);
 
-  // Global handlers for scrubbing across the document
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       if (!isScrubbing || !progressBarRef.current) return;
@@ -413,14 +594,12 @@ const NJWPlayerComponent = ({
       setScrubPct(pct * 100);
       const t = pct * (duration || 0);
       setHoverTime({ x, t });
+      // Real-time seek while dragging
+      const p = playerInstance.current;
+      if (p && duration) p.seek?.(t);
     };
     const onUp = () => {
       if (!isScrubbing || !progressBarRef.current) return;
-      const rect = progressBarRef.current.getBoundingClientRect();
-      const pct = typeof scrubPct === "number" ? scrubPct / 100 : 0;
-      const sec = Math.max(0, Math.min(duration, pct * duration));
-      const p = playerInstance.current;
-      if (p && duration) p.seek?.(sec);
       setIsScrubbing(false);
     };
     if (isScrubbing) {
@@ -432,28 +611,6 @@ const NJWPlayerComponent = ({
       };
     }
   }, [isScrubbing, duration, scrubPct]);
-
-  useEffect(() => {
-    const handleFsChange = () => {
-      const fs = !!document.fullscreenElement;
-      setIsFullscreen(fs);
-      // Always restore overflow on exit fullscreen (for all devices)
-      if (!fs) {
-        document.documentElement.style.overflow =
-          originalOverflowRef.current !== null
-            ? originalOverflowRef.current
-            : "";
-      }
-      // ask jwplayer to recalc layout
-      try {
-        const p = playerInstance.current;
-        p?.resize?.();
-      } catch {}
-    };
-    document.addEventListener("fullscreenchange", handleFsChange);
-    return () =>
-      document.removeEventListener("fullscreenchange", handleFsChange);
-  }, []);
 
   const toggleFullscreenDom = useCallback(() => {
     const el = containerRef.current as any;
@@ -482,15 +639,18 @@ const NJWPlayerComponent = ({
           (req as Promise<void>).catch(() => {
             const p = playerInstance.current;
             p?.setFullscreen?.(true);
+            setIsFullscreen(true);
           });
         } else if (!req) {
           // requestFullscreen not supported on this element
           const p = playerInstance.current;
           p?.setFullscreen?.(true);
+          setIsFullscreen(true);
         }
       } catch {
         const p = playerInstance.current;
         p?.setFullscreen?.(true);
+        setIsFullscreen(true);
       }
       // Force landscape orientation on mobile/touch devices
       if (isTouchDevice && window.screen?.orientation) {
@@ -514,14 +674,17 @@ const NJWPlayerComponent = ({
           (ex as Promise<void>).catch(() => {
             const p = playerInstance.current;
             p?.setFullscreen?.(false);
+            setIsFullscreen(false);
           });
         } else if (!ex) {
           const p = playerInstance.current;
           p?.setFullscreen?.(false);
+          setIsFullscreen(false);
         }
       } catch {
         const p = playerInstance.current;
         p?.setFullscreen?.(false);
+        setIsFullscreen(false);
       }
     }
   }, [isTouchDevice, isFullscreen]);
@@ -560,10 +723,22 @@ const NJWPlayerComponent = ({
         e.preventDefault();
         const pos = p.getPosition?.() || position;
         p.seek?.(Math.max(0, Math.min(duration, pos - SKIP_SECONDS)));
+        setSeekOverlay({ type: "back", seconds: SKIP_SECONDS });
+        if (seekOverlayTimerRef.current) window.clearTimeout(seekOverlayTimerRef.current);
+        seekOverlayTimerRef.current = window.setTimeout(() => {
+          setSeekOverlay(null);
+          seekOverlayTimerRef.current = null;
+        }, 800);
       } else if (e.code === "ArrowRight") {
         e.preventDefault();
         const pos = p.getPosition?.() || position;
         p.seek?.(Math.max(0, Math.min(duration, pos + SKIP_SECONDS)));
+        setSeekOverlay({ type: "forward", seconds: SKIP_SECONDS });
+        if (seekOverlayTimerRef.current) window.clearTimeout(seekOverlayTimerRef.current);
+        seekOverlayTimerRef.current = window.setTimeout(() => {
+          setSeekOverlay(null);
+          seekOverlayTimerRef.current = null;
+        }, 800);
       } else if (e.key.toLowerCase() === "m") {
         e.preventDefault();
         p.setMute?.(!p.getMute?.());
@@ -591,26 +766,18 @@ const NJWPlayerComponent = ({
     <div
       className={`relative rounded-xl overflow-hidden shadow-2xl ${className}`}
     >
+      {/* Custom loading icon overlay */}
+      {(!isReady || isBuffering) && (
+        <div className="absolute inset-0 z-[999] flex items-center justify-center bg-transparent pointer-events-none">
+          <LoaderPinwheel className="animate-spin h-8 w-8 md:h-16 md:w-16 text-pink-400 drop-shadow-lg" />
+        </div>
+      )}
       <div
         ref={containerRef}
         className={
           isFullscreen
-            ? isTouchDevice
-              ? "fixed inset-0 bg-black flex items-center justify-center z-50 box-border"
-              : "relative w-full h-full bg-black flex items-center justify-center"
+            ? "fixed left-0 top-0 w-[100vw] h-[100vh] bg-black z-50 box-border flex items-center justify-center"
             : "relative w-full aspect-video bg-black"
-        }
-        style={
-          isFullscreen && isTouchDevice
-            ? {
-                width: "100vw",
-                height: "100vh",
-                paddingTop: "env(safe-area-inset-top)",
-                paddingBottom: "env(safe-area-inset-bottom)",
-                paddingLeft: "env(safe-area-inset-left)",
-                paddingRight: "env(safe-area-inset-right)",
-              }
-            : undefined
         }
         onMouseEnter={() => {
           setIsHovering(true);
@@ -633,8 +800,6 @@ const NJWPlayerComponent = ({
         }}
         onTouchStart={() => {
           setIsHovering(true);
-          setControlsVisible(true);
-          scheduleControlsAutohide();
         }}
         onTouchMove={(e) => {
           if (!containerRef.current) return;
@@ -645,17 +810,16 @@ const NJWPlayerComponent = ({
           const bottomZone = y >= rect.height * CONTROLS_REVEAL_Y_FACTOR;
         }}
         onTouchEnd={(e) => {
-          scheduleControlsAutohide();
+          setIsHovering(false);
         }}
       >
         <div
+          id="kana-player"
           ref={playerRef}
           className={
             isFullscreen
-              ? isTouchDevice
-                ? "relative aspect-video w-full max-w-[100vw] max-h-[100vh] z-0"
-                : "relative w-full aspect-video z-0"
-              : "fixed inset-0 z-0"
+              ? "w-[100vw] h-[100vh] z-0"
+              : "relative w-full aspect-video z-0"
           }
         />
 
@@ -666,24 +830,16 @@ const NJWPlayerComponent = ({
           onClick={() => {
             const p = playerInstance.current;
             if (!p) return;
-            // If a double-tap was handled, suppress the synthesized click
+            // Sửa lỗi: suppress single tap UI show if double tap just happened
             if (isTouchDevice && suppressClickRef.current) {
               suppressClickRef.current = false;
               return;
             }
-            // On touch devices: first tap reveals controls; next tap toggles playback
             if (isTouchDevice) {
-              // Single tap on mobile should only reveal UI, not toggle playback
-              if (!controlsVisible) {
-                setControlsVisible(true);
-                scheduleControlsAutohide();
-              } else {
-                // If already visible, just refresh auto-hide timer
-                scheduleControlsAutohide();
-              }
+              setControlsVisible(true);
+              scheduleControlsAutohide();
               return;
             }
-            // Desktop: toggle on single click
             if (!controlsVisible) {
               setControlsVisible(true);
               scheduleControlsAutohide();
@@ -697,6 +853,7 @@ const NJWPlayerComponent = ({
             }
             if (isPlaying) p.pause?.();
             else p.play?.(true);
+            scheduleControlsAutohide();
           }}
           onContextMenu={(e) => {
             e.preventDefault();
@@ -719,78 +876,90 @@ const NJWPlayerComponent = ({
           onDoubleClick={(e) => {
             e.preventDefault();
             const p = playerInstance.current;
-            if (!p) return;
-            toggleFullscreenDom();
-          }}
-          onTouchEnd={(e) => {
-            const p = playerInstance.current;
-            if (!p || !isTouchDevice || !containerRef.current) return;
-            const touch = e.changedTouches && e.changedTouches[0];
-            if (!touch) return;
-
-            const now = Date.now();
-            const dt = now - lastTapTimeRef.current;
+            if (!p || !containerRef.current) return;
+            // Detect double click/tap zone
+            if(!isTouchDevice) return;
+            // Đánh dấu suppressClickRef để suppress single tap
+            suppressClickRef.current = true;
+            setTimeout(() => {
+              suppressClickRef.current = false;
+            }, 350);
             const rect = containerRef.current.getBoundingClientRect();
-            const tapX = touch.clientX - rect.left;
-
-            if (dt > 0 && dt <= DOUBLE_TAP_MS) {
-              // Double tap detected
-              const width = rect.width;
-              const leftZoneEnd = width * DOUBLE_TAP_ZONE_RATIO;
-              const rightZoneStart = width * (1 - DOUBLE_TAP_ZONE_RATIO);
-
-              if (tapX < leftZoneEnd) {
-                // Double tap on left side: seek backward
-                const newPos = Math.max(
-                  0,
-                  Math.min(
-                    duration,
-                    (p.getPosition?.() || position) - SKIP_SECONDS
-                  )
-                );
-                p.seek?.(newPos);
-              } else if (tapX > rightZoneStart) {
-                // Double tap on right side: seek forward
-                const newPos = Math.max(
-                  0,
-                  Math.min(
-                    duration,
-                    (p.getPosition?.() || position) + SKIP_SECONDS
-                  )
-                );
-                p.seek?.(newPos);
-              } else {
-                // Double tap in center: toggle play/pause
-                if (forcedAutoplayMuteRef.current && !muted) {
-                  try {
-                    p.setMute?.(false);
-                  } catch {}
-                  forcedAutoplayMuteRef.current = false;
-                }
-                const state = p.getState?.();
-                if (state === "playing") p.pause?.();
-                else p.play?.(true);
-              }
-
-              suppressClickRef.current = true;
-              window.setTimeout(
-                () => (suppressClickRef.current = false),
-                DOUBLE_TAP_MS + 50
+            const tapX = e.clientX - rect.left;
+            const width = rect.width;
+            const leftZoneEnd = width * DOUBLE_TAP_ZONE_RATIO;
+            const rightZoneStart = width * (1 - DOUBLE_TAP_ZONE_RATIO);
+            if (tapX < leftZoneEnd) {
+              // Double tap/click on left side: seek backward
+              const newPos = Math.max(
+                0,
+                Math.min(
+                  duration,
+                  (p.getPosition?.() || position) - SKIP_SECONDS
+                )
               );
-              lastTapTimeRef.current = 0; // Reset tap timer
-            } else {
-              lastTapTimeRef.current = now;
+              p.seek?.(newPos);
+              setSeekOverlay({ type: "back", seconds: SKIP_SECONDS });
+            } else if (tapX > rightZoneStart) {
+              // Double tap/click on right side: seek forward
+              const newPos = Math.max(
+                0,
+                Math.min(
+                  duration,
+                  (p.getPosition?.() || position) + SKIP_SECONDS
+                )
+              );
+              p.seek?.(newPos);
+              setSeekOverlay({ type: "forward", seconds: SKIP_SECONDS });
             }
+            if (seekOverlayTimerRef.current) window.clearTimeout(seekOverlayTimerRef.current);
+            seekOverlayTimerRef.current = window.setTimeout(() => {
+              setSeekOverlay(null);
+              seekOverlayTimerRef.current = null;
+            }, 800);
+          }}
+          onTouchEnd={() => {
+            setIsHovering(false);
           }}
         />
 
+        {/* Overlay thông báo tua khi double tap hoặc dùng phím */}
+        {seekOverlay && (
+          <>
+            {seekOverlay.type === "back" && (
+              <div
+                className="absolute left-0 top-0 bottom-0 z-[999] flex items-center pl-4 md:pl-8 pointer-events-none"
+              >
+                <div className="flex items-center gap-2 bg-gray-700/80 backdrop-blur-sm text-white text-base md:text-lg font-semibold rounded-lg px-3 py-2 shadow-xl animate-fade">
+                  <Rewind className="h-6 w-6 md:h-8 md:w-8 text-pink-400" />
+                  <span>Lùi {seekOverlay.seconds} giây</span>
+                </div>
+              </div>
+            )}
+            {seekOverlay.type === "forward" && (
+              <div
+                className="absolute right-0 top-0 bottom-0 z-[999] flex items-center justify-end pr-4 md:pr-8 pointer-events-none"
+              >
+                <div className="flex items-center gap-2 bg-gray-700/80 backdrop-blur-sm text-white text-base md:text-lg font-semibold rounded-lg px-3 py-2 shadow-xl animate-fade">
+                  <span>Tiến {seekOverlay.seconds} giây</span>
+                  <FastForward className="h-6 w-6 md:h-8 md:w-8 text-pink-400" />
+                </div>
+              </div>
+            )}
+          </>
+        )}
         {/* Custom right-click about message (desktop) */}
         {!isTouchDevice && showAboutMsg && aboutPos && (
           <div
-            className="absolute z-40 rounded-md bg-gray-900/95 text-white text-xs shadow-xl border border-gray-700/60 px-3 py-2"
+            className="absolute z-40 rounded-md bg-gray-900/95 text-white text-xs shadow-xl border border-gray-700/60 px-3 py-2 whitespace-nowrap"
             style={{
-              left: Math.max(8, aboutPos.x),
               top: Math.max(8, aboutPos.y),
+              left: Math.max(8, aboutPos.x),
+              transform:
+                aboutPos.x >
+                (containerRef.current?.getBoundingClientRect().width || 0) / 2
+                  ? "translateX(-100%)"
+                  : "none",
             }}
             onClick={(e) => {
               e.stopPropagation();
@@ -891,6 +1060,18 @@ const NJWPlayerComponent = ({
           } bg-gradient-to-t from-black/40 to-transparent px-3 pb-[calc(0.2rem+env(safe-area-inset-bottom))]`}
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
+          onMouseEnter={() => setIsHoveringControls(true)}
+          onMouseLeave={() => setIsHoveringControls(false)}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!containerRef.current) return;
+            const rect = containerRef.current.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            setAboutPos({ x, y });
+            setShowAboutMsg(true);
+          }}
         >
           <div
             className="relative cursor-pointer group"
@@ -932,6 +1113,8 @@ const NJWPlayerComponent = ({
               if (!playerInstance.current || !duration) return;
               const sec = Math.max(0, Math.min(duration, pct * duration));
               playerInstance.current.seek?.(sec);
+              // Auto-hide time indicator after click
+              setTimeout(() => setHoverTime(null), 800);
             }}
             onTouchStart={(e) => {
               if (!progressBarRef.current) return;
@@ -963,6 +1146,9 @@ const NJWPlayerComponent = ({
               setScrubPct(pct * 100);
               const t = pct * (duration || 0);
               setHoverTime({ x, t });
+              // Real-time seek while dragging
+              const p = playerInstance.current;
+              if (p && duration) p.seek?.(t);
               e.preventDefault();
               e.stopPropagation();
             }}
@@ -975,6 +1161,8 @@ const NJWPlayerComponent = ({
               if (p && duration) p.seek?.(sec);
               setIsScrubbing(false);
               scheduleControlsAutohide();
+              // Auto-hide time indicator after tap
+              setTimeout(() => setHoverTime(null), 1200);
               e.preventDefault();
               e.stopPropagation();
             }}
@@ -997,21 +1185,55 @@ const NJWPlayerComponent = ({
               }, ABOUT_MESSAGE_TIMEOUT_MS);
             }}
           >
-            <div className="absolute inset-0 bg-gray-600/30 rounded-full transition-all duration-200 group-hover:scale-y-150 origin-center" />
+            <div
+              className="absolute inset-0 bg-gray-600/30 rounded-full transition-all duration-200 group-hover:scale-y-150 origin-center"
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!containerRef.current) return;
+                const rect = containerRef.current.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                setAboutPos({ x, y });
+                setShowAboutMsg(true);
+              }}
+            />
             <div
               className="absolute inset-y-0 left-0 bg-gray-400/40 rounded-full transition-all duration-200"
               style={{ width: `${Math.min(100, bufferedPct)}%` }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!containerRef.current) return;
+                const rect = containerRef.current.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                setAboutPos({ x, y });
+                setShowAboutMsg(true);
+              }}
             />
             <div
               className="absolute inset-y-0 left-0 bg-gradient-to-r from-red-500 to-pink-500 rounded-full transition-all duration-200 group-hover:scale-y-150 origin-center"
               style={{ width: `${Math.min(100, effectivePlayedPct)}%` }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!containerRef.current) return;
+                const rect = containerRef.current.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                setAboutPos({ x, y });
+                setShowAboutMsg(true);
+              }}
             />
             {hoverTime && (
               <div
-                className="absolute -top-8 -translate-x-1/2 bg-gray-900/90 text-white text-xs font-medium rounded-lg px-3 py-1.5 shadow-lg"
-                style={{ left: hoverTime.x }}
+                className={`absolute -top-8 -translate-x-1/2 bg-gray-900/90 text-white text-xs font-medium rounded-lg px-3 py-1.5 shadow-lg pointer-events-none
+                ${hoverTime ? "opacity-100 scale-100" : "opacity-0 scale-95"}
+                transition-all duration-100 ease-in-out`}
+                style={{ left: hoverTime?.x }}
               >
-                {formatTime(hoverTime.t)}
+                {hoverTime && formatTime(hoverTime.t)}
               </div>
             )}
           </div>
@@ -1235,24 +1457,26 @@ const NJWPlayerComponent = ({
                 </button>
               )}
 
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      aria-label="Capture video frame"
-                      onClick={handleCaptureFrame}
-                      className="p-2 rounded-full hover:bg-white/15 transition-colors duration-200"
-                    >
-                      <Rabbit className="h-5 w-5 sm:h-5 sm:w-5 md:h-6 md:w-6" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" sideOffset={15}>
-                    <div className="bg-gray-900 text-white text-xs font-medium rounded-lg px-3 py-1.5 shadow-lg">
-                      {SCREENSHOT_TOOLTIP}
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              {(!isAndroid || (isAndroid && !isFullscreen)) && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        aria-label="Capture video frame"
+                        onClick={handleCaptureFrame}
+                        className="p-2 rounded-full hover:bg-white/15 transition-colors duration-200"
+                      >
+                        <Camera className="h-5 w-5 pb-1 sm:h-5 sm:w-5 md:h-6 md:w-6" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" sideOffset={15}>
+                      <div className="bg-gray-900 text-white text-xs font-medium rounded-lg px-3 py-1.5 shadow-lg">
+                        {SCREENSHOT_TOOLTIP}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
 
               {/* Fullscreen */}
               <button
