@@ -41,14 +41,14 @@ const HLS_TYPE = "hls" as const;
 
 const DEFAULT_VOLUME = 80;
 const AUTOPLAY_RETRY_DELAY_MS = 250;
-const CONTROLS_REVEAL_Y_FACTOR = 0; 
+const CONTROLS_REVEAL_Y_FACTOR = 0;
 const SKIP_SECONDS = 10;
 const BACKWARD_TOOLTIP = "Lùi 10 giây";
 const FORWARD_TOOLTIP = "Tiến 10 giây";
 const NEXT_CHAPTER_TOOLTIP = "Tới mốc tiếp theo";
 const SCREENSHOT_TOOLTIP = "Chụp màn hình";
-const CONTROLS_AUTOHIDE_MS = 2500; 
-const CONTROLS_AUTOHIDE_DESKTOP_MS = 1000; 
+const CONTROLS_AUTOHIDE_MS = 2500;
+const CONTROLS_AUTOHIDE_DESKTOP_MS = 1000;
 const DOUBLE_TAP_ZONE_RATIO = 0.5;
 
 const LABEL_PLAY = "Play";
@@ -60,8 +60,7 @@ const LABEL_FULLSCREEN = "Fullscreen";
 const LABEL_PIP = "Picture-in-Picture";
 const QUALITY_FALLBACK_PREFIX = "Q";
 const LABEL_NEXT_CHAPTER = "Next chapter";
-const ABOUT_MESSAGE_TIMEOUT_MS = 1800; 
-
+const ABOUT_MESSAGE_TIMEOUT_MS = 500; 
 
 const ERR_SCRIPT_LOAD = "Failed to load JWPlayer script";
 const ERR_SETUP = "Player setup error";
@@ -106,9 +105,14 @@ const NJWPlayerComponent = ({
   const scriptLoadingRef = useRef<boolean>(false);
   const isAndroid =
     typeof navigator !== "undefined" && /android/i.test(navigator.userAgent);
+  const isIOS =
+    typeof navigator !== "undefined" &&
+    (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.userAgent.includes("Mac") && "ontouchend" in document));
 
   const protectVideoElement = useCallback((video: HTMLVideoElement) => {
-    if (!video || !(video instanceof HTMLVideoElement) || !video.nodeType) return;
+    if (!video || !(video instanceof HTMLVideoElement) || !video.nodeType)
+      return;
     if (isAndroid) return;
     if ((video as any)._protectedStreamSetup) return;
     (video as any)._protectedStreamSetup = true;
@@ -156,18 +160,33 @@ const NJWPlayerComponent = ({
             configurable: true,
           });
         }
-        const currentSrcDescriptor = Object.getOwnPropertyDescriptor(video, "currentSrc");
-        if (!currentSrcDescriptor || currentSrcDescriptor.configurable !== false) {
+        const currentSrcDescriptor = Object.getOwnPropertyDescriptor(
+          video,
+          "currentSrc"
+        );
+        if (
+          !currentSrcDescriptor ||
+          currentSrcDescriptor.configurable !== false
+        ) {
           Object.defineProperty(video, "currentSrc", {
             get: () => "blob:protected-stream",
             configurable: true,
           });
         }
-        const outerHTMLDescriptor = Object.getOwnPropertyDescriptor(video, "outerHTML");
-        if (!outerHTMLDescriptor || outerHTMLDescriptor.configurable !== false) {
+        const outerHTMLDescriptor = Object.getOwnPropertyDescriptor(
+          video,
+          "outerHTML"
+        );
+        if (
+          !outerHTMLDescriptor ||
+          outerHTMLDescriptor.configurable !== false
+        ) {
           Object.defineProperty(video, "outerHTML", {
             get: function () {
-              const originalOuterHTML = Object.getOwnPropertyDescriptor(HTMLVideoElement.prototype, "outerHTML")?.get;
+              const originalOuterHTML = Object.getOwnPropertyDescriptor(
+                HTMLVideoElement.prototype,
+                "outerHTML"
+              )?.get;
               if (originalOuterHTML) {
                 try {
                   const html = originalOuterHTML.call(this);
@@ -232,7 +251,9 @@ const NJWPlayerComponent = ({
   const [volume, setVolume] = useState(80);
   const [levels, setLevels] = useState<{ label: string; index: number }[]>([]);
   const [currentLevel, setCurrentLevel] = useState<number | null>(null);
-  const [hoverTime, setHoverTime] = useState<{ x: number; t: number } | null>(null);
+  const [hoverTime, setHoverTime] = useState<{ x: number; t: number } | null>(
+    null
+  );
   const [libReady, setLibReady] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(false);
   const [isScrubbing, setIsScrubbing] = useState(false);
@@ -241,10 +262,15 @@ const NJWPlayerComponent = ({
   const [isHoveringControls, setIsHoveringControls] = useState(false);
   const [cursorHidden, setCursorHidden] = useState(false);
   const [showAboutMsg, setShowAboutMsg] = useState(false);
-  const [aboutPos, setAboutPos] = useState<{ x: number; y: number } | null>(null);
+  const [aboutPos, setAboutPos] = useState<{ x: number; y: number } | null>(
+    null
+  );
   const [isInPip, setIsInPip] = useState(false);
   const [pipSupported, setPipSupported] = useState(false);
-  const [seekOverlay, setSeekOverlay] = useState<{ type: "back" | "forward"; seconds: number } | null>(null);
+  const [seekOverlay, setSeekOverlay] = useState<{
+    type: "back" | "forward";
+    seconds: number;
+  } | null>(null);
   const seekOverlayTimerRef = useRef<number | null>(null);
   const initAutoPlayRef = useRef<boolean>(autoPlay);
   const initMutedRef = useRef<boolean>(muted);
@@ -369,7 +395,7 @@ const NJWPlayerComponent = ({
         abouttext: JW_ABOUT_TEXT,
         playsinline: true,
         fullscreenOrientationLock: "landscape",
-        pipIcon: "true",
+        pipIcon: true,
       });
 
       const p = playerInstance.current;
@@ -428,7 +454,11 @@ const NJWPlayerComponent = ({
 
         setTimeout(() => {
           const videoEl = containerRef.current?.querySelector("video");
-          if (videoEl) protectVideoElement(videoEl);
+          if (videoEl) {
+            videoEl.setAttribute("playsinline", "");
+            videoEl.setAttribute("webkit-playsinline", "");
+            protectVideoElement(videoEl);
+          }
         }, 500);
         callbacksRef.current.onLoad?.();
       });
@@ -617,18 +647,37 @@ const NJWPlayerComponent = ({
   const toggleFullscreenDom = useCallback(() => {
     const el = containerRef.current as any;
     if (!el) return;
+    const videoEl = el.querySelector && el.querySelector("video");
 
-    // Force exit browser fullscreen if browser is fullscreen but media is not
+    // iOS: use native video fullscreen (legacy and modern)
+    if (
+      isIOS &&
+      videoEl &&
+      typeof videoEl.webkitEnterFullscreen === "function"
+    ) {
+      // Prevent duplicate calls if already in fullscreen (old iOS will ignore, but be safe)
+      // Only call webkitEnterFullscreen, do not try to exit (not supported on old iOS)
+      videoEl.webkitEnterFullscreen();
+      // Listen for exit to update UI (do not set fake fullscreen state)
+      const onIOSFSChange = () => {
+        setIsFullscreen(false);
+        videoEl.removeEventListener("webkitendfullscreen", onIOSFSChange);
+      };
+      videoEl.addEventListener("webkitendfullscreen", onIOSFSChange);
+      // Do not setIsFullscreen(true) here; let native player handle UI
+      return;
+    }
+
+    // Standard Fullscreen for non-iOS
     if (document.fullscreenElement && !isFullscreen) {
       try {
         document.exitFullscreen();
       } catch (e) {
-        console.error("Failed to exit browser fullscreen:", e);
+        // ignore
       }
-      return; // Exit early after attempting to fix the state
+      return;
     }
 
-    // Only set overflow:hidden for desktop (not touch devices)
     if (!document.fullscreenElement) {
       if (!isTouchDevice) {
         originalOverflowRef.current =
@@ -644,7 +693,6 @@ const NJWPlayerComponent = ({
             setIsFullscreen(true);
           });
         } else if (!req) {
-          // requestFullscreen not supported on this element
           const p = playerInstance.current;
           p?.setFullscreen?.(true);
           setIsFullscreen(true);
@@ -654,17 +702,14 @@ const NJWPlayerComponent = ({
         p?.setFullscreen?.(true);
         setIsFullscreen(true);
       }
-      // Force landscape orientation on mobile/touch devices
       if (isTouchDevice && window.screen?.orientation) {
         try {
           (window.screen.orientation as any).lock?.("landscape");
         } catch {}
       }
     } else {
-      // Always restore overflow on exit
       document.documentElement.style.overflow =
         originalOverflowRef.current !== null ? originalOverflowRef.current : "";
-      // Unlock orientation on mobile/touch devices
       if (isTouchDevice && window.screen?.orientation) {
         try {
           (window.screen.orientation as any).unlock?.();
@@ -689,7 +734,7 @@ const NJWPlayerComponent = ({
         setIsFullscreen(false);
       }
     }
-  }, [isTouchDevice, isFullscreen]);
+  }, [isTouchDevice, isFullscreen, isIOS]);
 
   // Keyboard shortcuts scoped to hover/focus on the player
   useEffect(() => {
@@ -726,7 +771,8 @@ const NJWPlayerComponent = ({
         const pos = p.getPosition?.() || position;
         p.seek?.(Math.max(0, Math.min(duration, pos - SKIP_SECONDS)));
         setSeekOverlay({ type: "back", seconds: SKIP_SECONDS });
-        if (seekOverlayTimerRef.current) window.clearTimeout(seekOverlayTimerRef.current);
+        if (seekOverlayTimerRef.current)
+          window.clearTimeout(seekOverlayTimerRef.current);
         seekOverlayTimerRef.current = window.setTimeout(() => {
           setSeekOverlay(null);
           seekOverlayTimerRef.current = null;
@@ -736,7 +782,8 @@ const NJWPlayerComponent = ({
         const pos = p.getPosition?.() || position;
         p.seek?.(Math.max(0, Math.min(duration, pos + SKIP_SECONDS)));
         setSeekOverlay({ type: "forward", seconds: SKIP_SECONDS });
-        if (seekOverlayTimerRef.current) window.clearTimeout(seekOverlayTimerRef.current);
+        if (seekOverlayTimerRef.current)
+          window.clearTimeout(seekOverlayTimerRef.current);
         seekOverlayTimerRef.current = window.setTimeout(() => {
           setSeekOverlay(null);
           seekOverlayTimerRef.current = null;
@@ -777,7 +824,9 @@ const NJWPlayerComponent = ({
       <div
         ref={containerRef}
         className={
-          isFullscreen
+          isIOS
+            ? "relative w-full aspect-video bg-black"
+            : isFullscreen
             ? "fixed left-0 top-0 w-[100vw] h-[100vh] bg-black z-50 box-border flex items-center justify-center"
             : "relative w-full aspect-video bg-black"
         }
@@ -866,21 +915,13 @@ const NJWPlayerComponent = ({
             const y = e.clientY - rect.top;
             setAboutPos({ x, y });
             setShowAboutMsg(true);
-            if (aboutHideTimerRef.current) {
-              window.clearTimeout(aboutHideTimerRef.current);
-              aboutHideTimerRef.current = null;
-            }
-            aboutHideTimerRef.current = window.setTimeout(() => {
-              setShowAboutMsg(false);
-              aboutHideTimerRef.current = null;
-            }, ABOUT_MESSAGE_TIMEOUT_MS);
           }}
           onDoubleClick={(e) => {
             e.preventDefault();
             const p = playerInstance.current;
             if (!p || !containerRef.current) return;
             // Detect double click/tap zone
-            if(!isTouchDevice) return;
+            if (!isTouchDevice) return;
             // Đánh dấu suppressClickRef để suppress single tap
             suppressClickRef.current = true;
             setTimeout(() => {
@@ -914,7 +955,8 @@ const NJWPlayerComponent = ({
               p.seek?.(newPos);
               setSeekOverlay({ type: "forward", seconds: SKIP_SECONDS });
             }
-            if (seekOverlayTimerRef.current) window.clearTimeout(seekOverlayTimerRef.current);
+            if (seekOverlayTimerRef.current)
+              window.clearTimeout(seekOverlayTimerRef.current);
             seekOverlayTimerRef.current = window.setTimeout(() => {
               setSeekOverlay(null);
               seekOverlayTimerRef.current = null;
@@ -929,9 +971,7 @@ const NJWPlayerComponent = ({
         {seekOverlay && (
           <>
             {seekOverlay.type === "back" && (
-              <div
-                className="absolute left-0 top-0 bottom-0 z-[999] flex items-center pl-4 md:pl-8 pointer-events-none"
-              >
+              <div className="absolute left-0 top-0 bottom-0 z-[999] flex items-center pl-4 md:pl-8 pointer-events-none">
                 <div className="flex items-center gap-2 bg-gray-700/80 backdrop-blur-sm text-white text-base md:text-lg font-semibold rounded-lg px-3 py-2 shadow-xl animate-fade">
                   <Rewind className="h-6 w-6 md:h-8 md:w-8 text-pink-400" />
                   <span>Lùi {seekOverlay.seconds} giây</span>
@@ -939,9 +979,7 @@ const NJWPlayerComponent = ({
               </div>
             )}
             {seekOverlay.type === "forward" && (
-              <div
-                className="absolute right-0 top-0 bottom-0 z-[999] flex items-center justify-end pr-4 md:pr-8 pointer-events-none"
-              >
+              <div className="absolute right-0 top-0 bottom-0 z-[999] flex items-center justify-end pr-4 md:pr-8 pointer-events-none">
                 <div className="flex items-center gap-2 bg-gray-700/80 backdrop-blur-sm text-white text-base md:text-lg font-semibold rounded-lg px-3 py-2 shadow-xl animate-fade">
                   <span>Tiến {seekOverlay.seconds} giây</span>
                   <FastForward className="h-6 w-6 md:h-8 md:w-8 text-pink-400" />
@@ -955,21 +993,30 @@ const NJWPlayerComponent = ({
           <div
             className="absolute z-40 rounded-md bg-gray-900/95 text-white text-xs shadow-xl border border-gray-700/60 px-3 py-2 whitespace-nowrap"
             style={{
-              top: Math.max(8, aboutPos.y),
-              left: Math.max(8, aboutPos.x),
-              transform:
-                aboutPos.x >
-                (containerRef.current?.getBoundingClientRect().width || 0) / 2
-                  ? "translateX(-100%)"
-                  : "none",
+              top: aboutPos.y,
+              left: aboutPos.x,
+              transform: "translate(-50%, -50%)",
             }}
             onClick={(e) => {
               e.stopPropagation();
+              window.open("https://www.youtube.com/watch?v=xLE9RI372LY", "_blank");
               setShowAboutMsg(false);
             }}
             onContextMenu={(e) => e.preventDefault()}
+            onMouseLeave={() => {
+              if (aboutHideTimerRef.current) {
+                window.clearTimeout(aboutHideTimerRef.current);
+                aboutHideTimerRef.current = null;
+              }
+              aboutHideTimerRef.current = window.setTimeout(() => {
+                setShowAboutMsg(false);
+                aboutHideTimerRef.current = null;
+              }, ABOUT_MESSAGE_TIMEOUT_MS);
+            }}
           >
-            <div className="font-semibold mb-0.5">{JW_ABOUT_TEXT}</div>
+            <div className="font-semibold mb-0.5 cursor-pointer select-none whitespace-nowrap">
+              {JW_ABOUT_TEXT}
+            </div>
           </div>
         )}
 
@@ -1177,14 +1224,7 @@ const NJWPlayerComponent = ({
               const y = e.clientY - rect.top;
               setAboutPos({ x, y });
               setShowAboutMsg(true);
-              if (aboutHideTimerRef.current) {
-                window.clearTimeout(aboutHideTimerRef.current);
-                aboutHideTimerRef.current = null;
-              }
-              aboutHideTimerRef.current = window.setTimeout(() => {
-                setShowAboutMsg(false);
-                aboutHideTimerRef.current = null;
-              }, ABOUT_MESSAGE_TIMEOUT_MS);
+              // No auto-hide timer for about message
             }}
           >
             <div
@@ -1252,14 +1292,14 @@ const NJWPlayerComponent = ({
               const y = e.clientY - rect.top;
               setAboutPos({ x, y });
               setShowAboutMsg(true);
-              if (aboutHideTimerRef.current) {
-                window.clearTimeout(aboutHideTimerRef.current);
-                aboutHideTimerRef.current = null;
-              }
-              aboutHideTimerRef.current = window.setTimeout(() => {
-                setShowAboutMsg(false);
-                aboutHideTimerRef.current = null;
-              }, ABOUT_MESSAGE_TIMEOUT_MS);
+              // if (aboutHideTimerRef.current) {
+              //   window.clearTimeout(aboutHideTimerRef.current);
+              //   aboutHideTimerRef.current = null;
+              // }
+              // aboutHideTimerRef.current = window.setTimeout(() => {
+              //   setShowAboutMsg(false);
+              //   aboutHideTimerRef.current = null;
+              // }, ABOUT_MESSAGE_TIMEOUT_MS);
             }}
           >
             <div className="flex items-center gap-1 md:gap-3">
@@ -1486,7 +1526,10 @@ const NJWPlayerComponent = ({
                 onClick={() => toggleFullscreenDom()}
                 className="p-2 rounded-full hover:bg-white/15  transition-colors duration-200"
               >
-                {isFullscreen ? (
+                {/* On iOS, always show the maximize icon, since native player handles exit */}
+                {isIOS ? (
+                  <Maximize2 className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7" />
+                ) : isFullscreen ? (
                   <Minimize2 className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7" />
                 ) : (
                   <Maximize2 className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7" />
