@@ -655,16 +655,12 @@ const NJWPlayerComponent = ({
       videoEl &&
       typeof videoEl.webkitEnterFullscreen === "function"
     ) {
-      // Prevent duplicate calls if already in fullscreen (old iOS will ignore, but be safe)
-      // Only call webkitEnterFullscreen, do not try to exit (not supported on old iOS)
       videoEl.webkitEnterFullscreen();
-      // Listen for exit to update UI (do not set fake fullscreen state)
       const onIOSFSChange = () => {
         setIsFullscreen(false);
         videoEl.removeEventListener("webkitendfullscreen", onIOSFSChange);
       };
       videoEl.addEventListener("webkitendfullscreen", onIOSFSChange);
-      // Do not setIsFullscreen(true) here; let native player handle UI
       return;
     }
 
@@ -1282,7 +1278,7 @@ const NJWPlayerComponent = ({
 
           {/* Bottom control bar */}
           <div
-            className="flex items-center justify-between gap-2 md:gap-4"
+            className="flex items-center justify-between pb-[env(safe-area-inset-bottom)] gap-2 md:gap-4"
             onContextMenu={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -1292,14 +1288,6 @@ const NJWPlayerComponent = ({
               const y = e.clientY - rect.top;
               setAboutPos({ x, y });
               setShowAboutMsg(true);
-              // if (aboutHideTimerRef.current) {
-              //   window.clearTimeout(aboutHideTimerRef.current);
-              //   aboutHideTimerRef.current = null;
-              // }
-              // aboutHideTimerRef.current = window.setTimeout(() => {
-              //   setShowAboutMsg(false);
-              //   aboutHideTimerRef.current = null;
-              // }, ABOUT_MESSAGE_TIMEOUT_MS);
             }}
           >
             <div className="flex items-center gap-1 md:gap-3">
@@ -1528,11 +1516,11 @@ const NJWPlayerComponent = ({
               >
                 {/* On iOS, always show the maximize icon, since native player handles exit */}
                 {isIOS ? (
-                  <Maximize2 className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7" />
+                  <Maximize2 className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
                 ) : isFullscreen ? (
-                  <Minimize2 className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7" />
+                  <Minimize2 className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
                 ) : (
-                  <Maximize2 className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7" />
+                  <Maximize2 className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
                 )}
               </button>
               {/* Temporary image preview overlay */}
