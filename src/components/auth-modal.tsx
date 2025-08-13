@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -326,21 +327,45 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleModalOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        {/* Custom close button for mobile that bypasses backdrop restriction */}
-        <button
-          onClick={handleExplicitClose}
-          className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground z-10"
-          aria-label="Close"
+    <DialogPrimitive.Root open={isOpen} onOpenChange={handleModalOpenChange}>
+      <DialogPrimitive.Portal>
+        {/* Transparent overlay - no dark background */}
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50" />
+        
+        <DialogPrimitive.Content
+          className={cn(
+            "fixed left-[50%] top-[50%] z-50 w-full max-w-[425px] translate-x-[-50%] translate-y-[-50%]",
+            "bg-white/70 dark:bg-gray-900/70 backdrop-blur-md border-white/20 dark:border-gray-700/30",
+            "shadow-2xl rounded-lg p-6 overflow-visible",
+            "data-[state=open]:animate-in data-[state=closed]:animate-out",
+            "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+            "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
+          )}
         >
-          <X className="h-4 w-4" />
-        </button>
-        <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-center">
-            {mode === 'login' ? 'Đăng nhập' : 'Tạo tài khoản'}
-          </DialogTitle>
-        </DialogHeader>
+          {/* Background image with blur - positioned behind form */}
+          <div 
+            className="absolute inset-0 -z-10 rounded-lg overflow-hidden"
+            style={{
+              backgroundImage: 'url(/images/Elaina.jpg)',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              filter: 'blur(12px)'
+            }}
+          />
+          {/* Custom close button */}
+          <button
+            onClick={handleExplicitClose}
+            className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground z-10"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+          </button>
+          
+          <div className="flex flex-col space-y-1.5 text-center sm:text-left">
+            <h2 className="text-xl font-bold text-center text-gray-800 dark:text-white">
+              {mode === 'login' ? 'Đăng nhập' : 'Tạo tài khoản'}
+            </h2>
+          </div>
 
         <div className="relative overflow-hidden px-1">
           <AnimatePresence initial={false} custom={direction} mode="wait">
@@ -357,7 +382,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
               }}
               className="w-full"
             >
-              <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+              <form onSubmit={handleSubmit} className="space-y-4 mt-4 relative z-0">
                 <div className="space-y-2">
                   <Label htmlFor="username">Tên đăng nhập</Label>
                   <div className="relative">
@@ -642,7 +667,8 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
             </motion.div>
           </AnimatePresence>
         </div>
-      </DialogContent>
-    </Dialog>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }

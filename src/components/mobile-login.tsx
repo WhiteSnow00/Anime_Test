@@ -225,13 +225,12 @@ export function MobileLogin({ isOpen, onClose }: MobileLoginProps) {
     <AnimatePresence mode="wait">
       {isOpen && (
         <motion.div 
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm"
+          className="fixed inset-0 z-50 overflow-y-auto"
           initial={{ opacity: 0 }}
           animate={isClosing ? { opacity: 0 } : { opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
         >
-          <div className="fixed inset-0 overflow-y-auto">
             <div className="flex min-h-full items-center justify-center p-4">
               <motion.div
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -243,13 +242,24 @@ export function MobileLogin({ isOpen, onClose }: MobileLoginProps) {
                   damping: 30,
                   duration: 0.2 
                 }}
-                className="relative w-full max-w-md bg-background rounded-xl shadow-2xl border"
+                className="relative w-full max-w-md bg-white/70 dark:bg-gray-900/70 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 dark:border-gray-700/30 overflow-hidden"
               >
+                {/* Background image with blur - inside form container */}
+                <div 
+                  className="absolute inset-0 -z-10"
+                  style={{
+                    backgroundImage: 'url(/images/Elaina.jpg)',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    filter: 'blur(12px)',
+                    transform: 'scale(1.1)'
+                  }}
+                />
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200/50 dark:border-gray-700/50">
               <div className="flex items-center gap-3">
                 <Heart className="w-6 h-6 text-primary" />
-                <h2 className="text-xl font-semibold">
+                <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
                   {mode === 'login' ? 'Đăng nhập' : 'Đăng ký'}
                 </h2>
               </div>
@@ -481,7 +491,6 @@ export function MobileLogin({ isOpen, onClose }: MobileLoginProps) {
             </form>
           </motion.div>
         </div>
-      </div>
       </motion.div>
       )}
     </AnimatePresence>
