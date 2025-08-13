@@ -99,6 +99,10 @@ export function MobileLogin({ isOpen, onClose }: MobileLoginProps) {
   useEffect(() => {
     if (mode === 'register') {
       setPasswordStrength(checkPasswordStrength(password));
+      // Update password match when password changes
+      if (confirmPassword) {
+        setPasswordMatch(password === confirmPassword);
+      }
     }
   }, [password, mode]);
 
@@ -444,14 +448,20 @@ export function MobileLogin({ isOpen, onClose }: MobileLoginProps) {
                 className="w-full h-11 text-base font-medium"
                 disabled={
                   isSubmitting || 
-                  !username.trim() || 
-                  !password.trim() ||
+                  // Login mode: require username and password
+                  (mode === 'login' && (!username.trim() || !password.trim())) ||
+                  // Register mode: check all required fields
                   (mode === 'register' && (
-                    !usernameAvailable || 
+                    !username.trim() || 
+                    !password.trim() || 
+                    !confirmPassword.trim() ||
                     !passwordMatch ||
+                    !usernameAvailable || 
                     checkingUsername ||
                     username.trim().length < 3 ||
-                    password.length < 6
+                    password.length < 6 ||
+                    // If display name is entered, it must be valid
+                    (displayName.trim() && displayName.trim().length > 50)
                   ))
                 }
               >

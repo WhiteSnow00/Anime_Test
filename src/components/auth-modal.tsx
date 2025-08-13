@@ -198,16 +198,19 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     setPassword(value);
     if (mode === 'register') {
       setPasswordStrength(checkPasswordStrength(value));
+      // Update password match when main password changes
+      if (confirmPassword) {
+        setPasswordMatch(value === confirmPassword);
+        setShowPasswordMismatch(value !== confirmPassword);
+      }
     }
   };
 
   const handleConfirmPasswordChange = (value: string) => {
     setConfirmPassword(value);
-    if (confirmPasswordRef.current) clearTimeout(confirmPasswordRef.current);
-    confirmPasswordRef.current = setTimeout(() => {
-      setPasswordMatch(value === password);
-      setShowPasswordMismatch(value !== password);
-    }, 0);
+    // Update password match immediately
+    setPasswordMatch(value === password);
+    setShowPasswordMismatch(value !== password && value !== '');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -639,7 +642,22 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                 <Button
                   type="submit"
                   className="w-full"
-                  disabled={isSubmitting || (mode === 'register' && (!passwordMatch || !usernameAvailable || (username.length > 0 && !isValidUsername(username))))}
+                  disabled={
+                    isSubmitting || 
+                    // Login mode: require username and password
+                    (mode === 'login' && (!username.trim() || !password.trim())) ||
+                    // Register mode: check all required fields
+                    (mode === 'register' && (
+                      !username.trim() || 
+                      !password.trim() || 
+                      !confirmPassword.trim() ||
+                      !passwordMatch || 
+                      !usernameAvailable || 
+                      (username.length > 0 && !isValidUsername(username)) ||
+                      // If display name checkbox is checked, display name must be filled
+                      (showDisplayName && !displayName.trim())
+                    ))
+                  }
                 >
                   {isSubmitting ? (
                     <>
