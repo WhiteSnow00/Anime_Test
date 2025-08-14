@@ -1050,14 +1050,17 @@ const NJWPlayerComponent = ({
                   e.stopPropagation();
                   const p = playerInstance.current;
                   if (!p) return;
+                  const livePos = p.getPosition?.();
+                  const pos = (livePos && livePos > 0) ? livePos : position;
                   const newPos = Math.max(
                     0,
                     Math.min(
                       duration,
-                      (p.getPosition?.() || position) - SKIP_SECONDS
+                      pos - SKIP_SECONDS
                     )
                   );
                   p.seek?.(newPos);
+                  setPosition(newPos);
                   scheduleControlsAutohide();
                 }}
               >
@@ -1177,13 +1180,19 @@ const NJWPlayerComponent = ({
               scheduleControlsAutohide();
             }}
             onClick={() => {
-              if (!progressBarRef.current) return;
+              const p = playerInstance.current;
+              if (!p || !duration || !progressBarRef.current) return;
+
+              if (p.getState() === 'buffering') return;
+
               const rect = progressBarRef.current.getBoundingClientRect();
               const pct =
                 hoverTime && rect.width ? hoverTime.x / rect.width : 0;
-              if (!playerInstance.current || !duration) return;
+              
               const sec = Math.max(0, Math.min(duration, pct * duration));
-              playerInstance.current.seek?.(sec);
+              p.seek?.(sec);
+              setPosition(sec);
+
               // Auto-hide time indicator after click
               setTimeout(() => setHoverTime(null), 800);
               scheduleControlsAutohide();
@@ -1354,14 +1363,18 @@ const NJWPlayerComponent = ({
                         onClick={() => {
                           const p = playerInstance.current;
                           if (!p) return;
+                          if (p.getState() === 'buffering') return;
+                          const livePos = p.getPosition?.();
+                          const pos = (livePos && livePos > 0) ? livePos : position;
                           const newPos = Math.max(
                             0,
                             Math.min(
                               duration,
-                              (p.getPosition?.() || position) - SKIP_SECONDS
+                              pos - SKIP_SECONDS
                             )
                           );
                           p.seek?.(newPos);
+                          setPosition(newPos);
                           scheduleControlsAutohide();
                         }}
                       >
