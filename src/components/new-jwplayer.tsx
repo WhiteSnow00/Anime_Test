@@ -152,12 +152,21 @@ const NJWPlayerComponent = ({
           return originalSetAttribute.call(this, name, value);
         };
         // Only override properties once
-        const srcDescriptor = Object.getOwnPropertyDescriptor(video, "src");
-        if (!srcDescriptor || srcDescriptor.configurable !== false) {
-          Object.defineProperty(video, "src", {
-            get: () => "blob:protected-stream",
-            set: () => {},
-            configurable: true,
+        const srcPropDescriptor = Object.getOwnPropertyDescriptor(HTMLVideoElement.prototype, 'src');
+        if (srcPropDescriptor) {
+          Object.defineProperty(video, 'src', {
+            get: () => {
+              const realSrc = srcPropDescriptor.get?.call(video);
+              return (typeof realSrc === 'string' && realSrc.startsWith('blob:'))
+                ? realSrc
+                : 'blob:protected-stream';
+            },
+            set: (url) => {
+              if (typeof url === 'string' && url.startsWith('blob:')) {
+                srcPropDescriptor.set?.call(video, url);
+              }
+            },
+            configurable: true
           });
         }
         const currentSrcDescriptor = Object.getOwnPropertyDescriptor(
@@ -1304,7 +1313,7 @@ const NJWPlayerComponent = ({
 
           {/* Bottom control bar */}
           <div
-            className="flex items-center justify-between pb-[env(safe-area-inset-bottom)] gap-2 md:gap-4"
+            className="flex items-center justify-between gap-2 md:gap-4"
             onContextMenu={(e) => {
               e.preventDefault();
               e.stopPropagation();
