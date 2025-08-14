@@ -60,7 +60,7 @@ const LABEL_FULLSCREEN = "Fullscreen";
 const LABEL_PIP = "Picture-in-Picture";
 const QUALITY_FALLBACK_PREFIX = "Q";
 const LABEL_NEXT_CHAPTER = "Next chapter";
-const ABOUT_MESSAGE_TIMEOUT_MS = 500; 
+const ABOUT_MESSAGE_TIMEOUT_MS = 500;
 
 const ERR_SCRIPT_LOAD = "Failed to load JWPlayer script";
 const ERR_SETUP = "Player setup error";
@@ -408,6 +408,7 @@ const NJWPlayerComponent = ({
         setIsReady(true);
         setIsMuted(!!p.getMute?.());
         setPipSupported(p.isPipSupported?.() === true);
+        console.log("pip state: ", p.isPipActive?.());
         // If Android, set volume to max
         if (isAndroid) {
           p.setVolume?.(100);
@@ -633,6 +634,7 @@ const NJWPlayerComponent = ({
     const onUp = () => {
       if (!isScrubbing || !progressBarRef.current) return;
       setIsScrubbing(false);
+      scheduleControlsAutohide();
     };
     if (isScrubbing) {
       document.addEventListener("mousemove", onMove);
@@ -846,7 +848,11 @@ const NJWPlayerComponent = ({
           }
         }}
         onTouchStart={() => {
-          setIsHovering(true);
+          if (!isScrubbing) {
+            setIsHovering(true);
+            setControlsVisible(true);
+            scheduleControlsAutohide();
+          }
         }}
         onTouchMove={(e) => {
           if (!containerRef.current) return;
@@ -995,7 +1001,10 @@ const NJWPlayerComponent = ({
             }}
             onClick={(e) => {
               e.stopPropagation();
-              window.open("https://www.youtube.com/watch?v=xLE9RI372LY", "_blank");
+              window.open(
+                "https://www.youtube.com/watch?v=xLE9RI372LY",
+                "_blank"
+              );
               setShowAboutMsg(false);
             }}
             onContextMenu={(e) => e.preventDefault()}
@@ -1119,7 +1128,9 @@ const NJWPlayerComponent = ({
           }}
         >
           <div
-            className="relative cursor-pointer group"
+            className={`relative cursor-pointer group ${
+              controlsVisible ? "" : "pointer-events-none"
+            }`}
             ref={progressBarRef}
             style={{ height: isTouchDevice ? 10 : 5 }}
             onMouseMove={(e) => {
@@ -1150,6 +1161,12 @@ const NJWPlayerComponent = ({
               e.preventDefault();
               e.stopPropagation();
             }}
+            onMouseUp={(e) => {
+              if (!isScrubbing) return;
+              setIsScrubbing(false);
+              setIsHovering(false);
+              scheduleControlsAutohide();
+            }}
             onClick={() => {
               if (!progressBarRef.current) return;
               const rect = progressBarRef.current.getBoundingClientRect();
@@ -1160,6 +1177,7 @@ const NJWPlayerComponent = ({
               playerInstance.current.seek?.(sec);
               // Auto-hide time indicator after click
               setTimeout(() => setHoverTime(null), 800);
+              scheduleControlsAutohide();
             }}
             onTouchStart={(e) => {
               if (!progressBarRef.current) return;
@@ -1205,7 +1223,15 @@ const NJWPlayerComponent = ({
               const p = playerInstance.current;
               if (p && duration) p.seek?.(sec);
               setIsScrubbing(false);
-              scheduleControlsAutohide();
+              setIsHovering(false);
+              if (controlsHideTimerRef.current) {
+                window.clearTimeout(controlsHideTimerRef.current);
+                controlsHideTimerRef.current = null;
+              }
+              controlsHideTimerRef.current = window.setTimeout(() => {
+                setControlsVisible(false);
+                controlsHideTimerRef.current = null;
+              }, CONTROLS_AUTOHIDE_MS);
               // Auto-hide time indicator after tap
               setTimeout(() => setHoverTime(null), 1200);
               e.preventDefault();
@@ -1474,6 +1500,7 @@ const NJWPlayerComponent = ({
               {/* Picture in Picture */}
               {pipSupported && (
                 <button
+                  id="pip-button"
                   aria-label={LABEL_PIP}
                   onClick={() => {
                     const p = playerInstance.current;
