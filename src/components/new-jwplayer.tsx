@@ -1313,7 +1313,7 @@ const NJWPlayerComponent = ({
 
           {/* Bottom control bar */}
           <div
-            className="flex items-center justify-between gap-2 md:gap-4"
+            className={`flex items-center justify-between gap-2 md:gap-4 ${isIOS && "pb-[env(safe-area-inset-bottom)]"}`}
             onContextMenu={(e) => {
               e.preventDefault();
               e.stopPropagation();
