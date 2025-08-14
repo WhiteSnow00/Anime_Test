@@ -1179,19 +1179,19 @@ const NJWPlayerComponent = ({
               setIsHovering(false);
               scheduleControlsAutohide();
             }}
-            onClick={() => {
+            onClick={(e) => {
               const p = playerInstance.current;
               if (!p || !duration || !progressBarRef.current) return;
 
               if (p.getState() === 'buffering') return;
 
               const rect = progressBarRef.current.getBoundingClientRect();
-              const pct =
-                hoverTime && rect.width ? hoverTime.x / rect.width : 0;
-              
+              // Calculate position from click event, not from hover state
+              const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+              const pct = rect.width ? x / rect.width : 0;
+
               const sec = Math.max(0, Math.min(duration, pct * duration));
               p.seek?.(sec);
-              setPosition(sec);
 
               // Auto-hide time indicator after click
               setTimeout(() => setHoverTime(null), 800);
