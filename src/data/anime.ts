@@ -124,5 +124,17 @@ export const animeData: Anime = {
       downloadUrl: 'https://drive.google.com/file/d/10POSQ7pLnmSUqicUhMSYG_wbiwKyLfFh/view?usp=sharing',
       rawDownloadUrl: 'https://drive.google.com/file/d/17nuFongdzfpvYlMx4ReUWduWVT8wH52C/view?usp=sharing'
     },
+	{ 
+      id: 7, 
+      title: 'Episode 7', 
+      videoId: '07',
+      servers: {
+        hls: 'Tập7.m3u8',
+        helvid: 'ec6ea16c9c5e',
+        hydax: 'nc905xM7j'
+      },
+      downloadUrl: '',
+      rawDownloadUrl: 'https://drive.google.com/file/d/1EJJljjpdwCWjiJqXr5QWbwpxZszA-wty/view?usp=sharing'
+    },
   ],
 };
