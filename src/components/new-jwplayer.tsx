@@ -103,6 +103,8 @@ const NJWPlayerComponent = ({
   }>({});
   const scriptLoadedRef = useRef<boolean>(false);
   const scriptLoadingRef = useRef<boolean>(false);
+  const overlayRef = useRef<HTMLDivElement | null>(null);
+
   const isAndroid =
     typeof navigator !== "undefined" && /android/i.test(navigator.userAgent);
   const isIOS =
@@ -152,21 +154,24 @@ const NJWPlayerComponent = ({
           return originalSetAttribute.call(this, name, value);
         };
         // Only override properties once
-        const srcPropDescriptor = Object.getOwnPropertyDescriptor(HTMLVideoElement.prototype, 'src');
+        const srcPropDescriptor = Object.getOwnPropertyDescriptor(
+          HTMLVideoElement.prototype,
+          "src"
+        );
         if (srcPropDescriptor) {
-          Object.defineProperty(video, 'src', {
+          Object.defineProperty(video, "src", {
             get: () => {
               const realSrc = srcPropDescriptor.get?.call(video);
-              return (typeof realSrc === 'string' && realSrc.startsWith('blob:'))
+              return typeof realSrc === "string" && realSrc.startsWith("blob:")
                 ? realSrc
-                : 'blob:protected-stream';
+                : "blob:protected-stream";
             },
             set: (url) => {
-              if (typeof url === 'string' && url.startsWith('blob:')) {
+              if (typeof url === "string" && url.startsWith("blob:")) {
                 srcPropDescriptor.set?.call(video, url);
               }
             },
-            configurable: true
+            configurable: true,
           });
         }
         const currentSrcDescriptor = Object.getOwnPropertyDescriptor(
@@ -247,6 +252,23 @@ const NJWPlayerComponent = ({
       return new URL(rel, window.location.origin).toString();
     return rel;
   }, [isHls, videoId]);
+
+  const handleSurfaceTouchStart = () => {
+    // always show controls on first touch
+    setIsHovering(true);
+    setControlsVisible(true);
+    scheduleControlsAutohide();
+  };
+
+  const handleSurfacePointerDown: React.PointerEventHandler<HTMLDivElement> = (
+    e
+  ) => {
+    if (e.pointerType === "touch") {
+      setIsHovering(true);
+      setControlsVisible(true);
+      scheduleControlsAutohide();
+    }
+  };
 
   // UI state
   const [isReady, setIsReady] = useState(false);
@@ -628,6 +650,20 @@ const NJWPlayerComponent = ({
   }, [isTouchDevice, isScrubbing, isHovering, isHoveringControls]);
 
   useEffect(() => {
+  const el = overlayRef.current;
+  if (!el) return;
+
+  const handler = () => {
+    setIsHovering(true);
+    setControlsVisible(true);
+    scheduleControlsAutohide();
+  };
+
+  el.addEventListener("touchstart", handler, { passive: true });
+  return () => el.removeEventListener("touchstart", handler);
+}, [scheduleControlsAutohide]);
+
+  useEffect(() => {
     const onMove = (e: MouseEvent) => {
       if (!isScrubbing || !progressBarRef.current) return;
       const rect = progressBarRef.current.getBoundingClientRect();
@@ -886,13 +922,19 @@ const NJWPlayerComponent = ({
         />
 
         <div
+          ref={overlayRef}
           className={`absolute inset-0 z-10 ${
             !isTouchDevice && cursorHidden ? "cursor-none" : "cursor-pointer"
           }`}
+          style={{
+            WebkitTapHighlightColor: "transparent",
+            touchAction: "manipulation",
+            backgroundColor: "rgba(0,0,0,0.001)",
+          }}
           onClick={() => {
             const p = playerInstance.current;
             if (!p) return;
-            // Sửa lỗi: suppress single tap UI show if double tap just happened
+
             if (isTouchDevice && suppressClickRef.current) {
               suppressClickRef.current = false;
               return;
@@ -973,6 +1015,8 @@ const NJWPlayerComponent = ({
               seekOverlayTimerRef.current = null;
             }, 800);
           }}
+          onTouchStart={handleSurfaceTouchStart}
+          onPointerDown={handleSurfacePointerDown}
           onTouchEnd={() => {
             setIsHovering(false);
           }}
@@ -1051,13 +1095,10 @@ const NJWPlayerComponent = ({
                   const p = playerInstance.current;
                   if (!p) return;
                   const livePos = p.getPosition?.();
-                  const pos = (livePos && livePos > 0) ? livePos : position;
+                  const pos = livePos && livePos > 0 ? livePos : position;
                   const newPos = Math.max(
                     0,
-                    Math.min(
-                      duration,
-                      pos - SKIP_SECONDS
-                    )
+                    Math.min(duration, pos - SKIP_SECONDS)
                   );
                   p.seek?.(newPos);
                   setPosition(newPos);
@@ -1183,11 +1224,14 @@ const NJWPlayerComponent = ({
               const p = playerInstance.current;
               if (!p || !duration || !progressBarRef.current) return;
 
-              if (p.getState() === 'buffering') return;
+              if (p.getState() === "buffering") return;
 
               const rect = progressBarRef.current.getBoundingClientRect();
               // Calculate position from click event, not from hover state
-              const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+              const x = Math.max(
+                0,
+                Math.min(rect.width, e.clientX - rect.left)
+              );
               const pct = rect.width ? x / rect.width : 0;
 
               const sec = Math.max(0, Math.min(duration, pct * duration));
@@ -1322,7 +1366,9 @@ const NJWPlayerComponent = ({
 
           {/* Bottom control bar */}
           <div
-            className={`flex items-center justify-between gap-2 md:gap-4 ${isIOS && "pb-[env(safe-area-inset-bottom)]"}`}
+            className={`flex items-center justify-between gap-2 md:gap-4 ${
+              isIOS && "pb-[env(safe-area-inset-bottom)]"
+            }`}
             onContextMenu={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -1363,15 +1409,13 @@ const NJWPlayerComponent = ({
                         onClick={() => {
                           const p = playerInstance.current;
                           if (!p) return;
-                          if (p.getState() === 'buffering') return;
+                          if (p.getState() === "buffering") return;
                           const livePos = p.getPosition?.();
-                          const pos = (livePos && livePos > 0) ? livePos : position;
+                          const pos =
+                            livePos && livePos > 0 ? livePos : position;
                           const newPos = Math.max(
                             0,
-                            Math.min(
-                              duration,
-                              pos - SKIP_SECONDS
-                            )
+                            Math.min(duration, pos - SKIP_SECONDS)
                           );
                           p.seek?.(newPos);
                           setPosition(newPos);
