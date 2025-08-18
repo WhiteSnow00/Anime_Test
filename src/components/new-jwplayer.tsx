@@ -260,6 +260,28 @@ const NJWPlayerComponent = ({
     scheduleControlsAutohide();
   };
 
+  useEffect(() => {
+    if (!isIOS) return;
+    const fix = () => {
+      const v = containerRef.current?.querySelector(
+        "video"
+      ) as HTMLVideoElement | null;
+      if (v) {
+        const w = v.style.width;
+        v.style.width = w === "100%" ? "99.9%" : "100%";
+        requestAnimationFrame(() => {
+          v.style.width = "100%";
+        });
+      }
+    };
+    window.addEventListener("orientationchange", fix);
+    window.addEventListener("resize", fix);
+    return () => {
+      window.removeEventListener("orientationchange", fix);
+      window.removeEventListener("resize", fix);
+    };
+  }, [isIOS]);
+
   const handleSurfacePointerDown: React.PointerEventHandler<HTMLDivElement> = (
     e
   ) => {
@@ -310,13 +332,27 @@ const NJWPlayerComponent = ({
   const aboutHideTimerRef = useRef<number | null>(null);
   const suppressClickRef = useRef<boolean>(false);
   const forcedAutoplayMuteRef = useRef<boolean>(false);
+  const [supportsAspectRatio, setSupportsAspectRatio] = useState(true);
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [showImagePreview, setShowImagePreview] = useState(false);
 
   useEffect(() => {
     callbacksRef.current = { onLoad, onError };
   }, [onLoad, onError]);
 
-  const [capturedImage, setCapturedImage] = useState<string | null>(null);
-  const [showImagePreview, setShowImagePreview] = useState(false);
+  useEffect(() => {
+    let ok = true;
+    try {
+      ok =
+        typeof CSS !== "undefined" &&
+        typeof (CSS as any).supports === "function"
+          ? CSS.supports("aspect-ratio: 16/9")
+          : false;
+    } catch {
+      ok = false;
+    }
+    setSupportsAspectRatio(!!ok);
+  }, []);
 
   const handleCaptureFrame = useCallback(() => {
     const videoEl = containerRef.current?.querySelector("video");
@@ -414,13 +450,13 @@ const NJWPlayerComponent = ({
         width: "100%",
         height: "100%",
         primary: PLAYER_PRIMARY,
-        controls: false, // hide default; we render custom UI
-        autostart: autoPlay,
-        mute: initMutedRef.current,
+        controls: false,
+        autostart: isIOS ? !!autoPlay : autoPlay, // same boolean, but…
+        mute: isIOS ? true : initMutedRef.current, // force muted on iOS when autoplay
         key: JW_PLAYER_KEY,
-        hlsjsdefault: true,
-        enableNativeHls: false,
+        hlsjsdefault: !isIOS, // use native HLS on iOS
         safarihlsjs: false,
+        enableNativeHls: isIOS, // safe no-op on non-iOS
         stretching: "uniform",
         playlist: [{ sources }],
         abouttext: JW_ABOUT_TEXT,
@@ -467,19 +503,27 @@ const NJWPlayerComponent = ({
             if (wasPlayingRef.current) p.play?.(true);
           } catch {}
         } else if (initAutoPlayRef.current) {
-          try {
-            p.setMute?.(false);
-            forcedAutoplayMuteRef.current = !initMutedRef.current;
-            p.play?.(true);
-          } catch {}
-          setTimeout(() => {
+          if (isIOS) {
             try {
-              const st = p.getState?.();
-              if (st !== "playing" && st !== "buffering") {
-                p.play?.(true);
-              }
+              p.setMute?.(true);
+              p.play?.(true);
+              forcedAutoplayMuteRef.current = true;
             } catch {}
-          }, AUTOPLAY_RETRY_DELAY_MS);
+          } else {
+            try {
+              p.setMute?.(false);
+              forcedAutoplayMuteRef.current = !initMutedRef.current;
+              p.play?.(true);
+            } catch {}
+            setTimeout(() => {
+              try {
+                const st = p.getState?.();
+                if (st !== "playing" && st !== "buffering") {
+                  p.play?.(true);
+                }
+              } catch {}
+            }, AUTOPLAY_RETRY_DELAY_MS);
+          }
         }
         savedPositionRef.current = 0;
         wasPlayingRef.current = false;
@@ -489,9 +533,28 @@ const NJWPlayerComponent = ({
           if (videoEl) {
             videoEl.setAttribute("playsinline", "");
             videoEl.setAttribute("webkit-playsinline", "");
+            // iOS-only sizing & stacking fixes
+            if (isIOS) {
+              Object.assign(videoEl.style, {
+                position: "absolute",
+                top: "0",
+                left: "0",
+                width: "100%",
+                height: "100%",
+                objectFit: "contain",
+                pointerEvents: "none",
+                WebkitTransform: "translateZ(0)",
+                transform: "translateZ(0)",
+              } as Partial<CSSStyleDeclaration>);
+              if (overlayRef.current) {
+                overlayRef.current.style.transform = "translateZ(0)";
+                overlayRef.current.style.willChange = "transform";
+              }
+            }
             protectVideoElement(videoEl);
           }
         }, 500);
+
         callbacksRef.current.onLoad?.();
       });
       p.on("play", () => {
@@ -650,18 +713,18 @@ const NJWPlayerComponent = ({
   }, [isTouchDevice, isScrubbing, isHovering, isHoveringControls]);
 
   useEffect(() => {
-  const el = overlayRef.current;
-  if (!el) return;
+    const el = overlayRef.current;
+    if (!el) return;
 
-  const handler = () => {
-    setIsHovering(true);
-    setControlsVisible(true);
-    scheduleControlsAutohide();
-  };
+    const handler = () => {
+      setIsHovering(true);
+      setControlsVisible(true);
+      scheduleControlsAutohide();
+    };
 
-  el.addEventListener("touchstart", handler, { passive: true });
-  return () => el.removeEventListener("touchstart", handler);
-}, [scheduleControlsAutohide]);
+    el.addEventListener("touchstart", handler, { passive: true });
+    return () => el.removeEventListener("touchstart", handler);
+  }, [scheduleControlsAutohide]);
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
@@ -840,6 +903,17 @@ const NJWPlayerComponent = ({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [isHovering, duration, position, muted]);
 
+  useEffect(() => {
+    const root = containerRef.current;
+    if (!root) return;
+    const video = root.querySelector("video") as HTMLVideoElement | null;
+    if (!video) return;
+
+    video.setAttribute("playsinline", "");
+    video.setAttribute("webkit-playsinline", "");
+    video.removeAttribute("controls"); // keep native controls off if you show custom
+  }, [isReady]);
+
   if (!isHls) {
     const iframeUrl =
       server === "helvid"
@@ -911,6 +985,9 @@ const NJWPlayerComponent = ({
           setIsHovering(false);
         }}
       >
+        {isIOS && !supportsAspectRatio && (
+          <div style={{ paddingTop: "56.25%" }} />
+        )}
         <div
           id="kana-player"
           ref={playerRef}
@@ -929,7 +1006,6 @@ const NJWPlayerComponent = ({
           style={{
             WebkitTapHighlightColor: "transparent",
             touchAction: "manipulation",
-            backgroundColor: "rgba(0,0,0,0.001)",
           }}
           onClick={() => {
             const p = playerInstance.current;
@@ -1127,11 +1203,13 @@ const NJWPlayerComponent = ({
                   scheduleControlsAutohide();
                 }}
               >
-                {isPlaying ? (
-                  <PauseIcon className="h-8 w-8 text-white" />
-                ) : (
-                  <PlayIcon className="h-8 w-8 pl-1 text-white" />
-                )}
+                <div className="transition-opacity duration-300 ease-in-out">
+                  {isPlaying ? (
+                    <PauseIcon className="h-8 w-8 text-white opacity-100 transition-opacity duration-300" />
+                  ) : (
+                    <PlayIcon className="h-8 w-8 pl-1 text-white opacity-100 transition-opacity duration-300" />
+                  )}
+                </div>
               </button>
 
               {/* Forward 10s */}
@@ -1161,7 +1239,7 @@ const NJWPlayerComponent = ({
 
         <div
           className={`${
-            isFullscreen ? "fixed" : "absolute"
+            isIOS ? "absolute" : isFullscreen ? "fixed" : "absolute"
           } inset-x-0 bottom-0 z-20 flex flex-col gap-2 text-white transition-opacity duration-300 ${
             controlsVisible ? "opacity-100" : "opacity-0"
           } bg-gradient-to-t from-black/40 to-transparent px-3 pb-[calc(0.2rem+env(safe-area-inset-bottom))]`}
@@ -1367,7 +1445,7 @@ const NJWPlayerComponent = ({
           {/* Bottom control bar */}
           <div
             className={`flex items-center justify-between gap-2 md:gap-4 ${
-              isIOS && "pb-[env(safe-area-inset-bottom)]"
+              isIOS && "pb-4"
             }`}
             onContextMenu={(e) => {
               e.preventDefault();
@@ -1382,22 +1460,33 @@ const NJWPlayerComponent = ({
           >
             <div className="flex items-center gap-1 md:gap-3">
               {!isTouchDevice && (
-                <button
-                  aria-label={isPlaying ? LABEL_PAUSE : LABEL_PLAY}
-                  onClick={() => {
-                    const p = playerInstance.current;
-                    if (!p) return;
-                    if (isPlaying) p.pause?.();
-                    else p.play?.(true);
-                  }}
-                  className="p-2 rounded-full hover:bg-white/15 transition-colors duration-200"
-                >
-                  {isPlaying ? (
-                    <PauseIcon className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7" />
-                  ) : (
-                    <PlayIcon className="h-5 w-5 pl-1 sm:h-6 sm:w-6 md:h-7 md:w-7" />
-                  )}
-                </button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        aria-label={isPlaying ? LABEL_PAUSE : LABEL_PLAY}
+                        onClick={() => {
+                          const p = playerInstance.current;
+                          if (!p) return;
+                          if (isPlaying) p.pause?.();
+                          else p.play?.(true);
+                        }}
+                        className="p-2 rounded-full hover:bg-white/15 transition-colors duration-200"
+                      >
+                        {isPlaying ? (
+                          <PauseIcon className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7" />
+                        ) : (
+                          <PlayIcon className="h-5 w-5 pl-1 sm:h-6 sm:w-6 md:h-7 md:w-7" />
+                        )}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" sideOffset={15}>
+                      <div className="bg-gray-900 text-white text-xs font-medium rounded-lg px-3 py-1.5 shadow-lg">
+                        {isPlaying ? LABEL_PAUSE : LABEL_PLAY}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
               {!isTouchDevice && (
                 <TooltipProvider>
@@ -1605,16 +1694,18 @@ const NJWPlayerComponent = ({
               <button
                 aria-label={LABEL_FULLSCREEN}
                 onClick={() => toggleFullscreenDom()}
-                className="p-2 rounded-full hover:bg-white/15  transition-colors duration-200"
+                className="p-2 rounded-full hover:bg-white/15 transition-colors duration-200"
               >
-                {/* On iOS, always show the maximize icon, since native player handles exit */}
-                {isIOS ? (
-                  <Maximize2 className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
-                ) : isFullscreen ? (
-                  <Minimize2 className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
-                ) : (
-                  <Maximize2 className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
-                )}
+                <div className="transition-opacity duration-300 ease-in-out">
+                  {/* On iOS, always show the maximize icon, since native player handles exit */}
+                  {isIOS ? (
+                    <Maximize2 className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
+                  ) : isFullscreen ? (
+                    <Minimize2 className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 opacity-100 transition-opacity duration-300" />
+                  ) : (
+                    <Maximize2 className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 opacity-100 transition-opacity duration-300" />
+                  )}
+                </div>
               </button>
               {/* Temporary image preview overlay */}
               {showImagePreview && capturedImage && (
