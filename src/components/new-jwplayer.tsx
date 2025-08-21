@@ -47,6 +47,7 @@ const BACKWARD_TOOLTIP = "Lùi 10 giây";
 const FORWARD_TOOLTIP = "Tiến 10 giây";
 const NEXT_CHAPTER_TOOLTIP = "Tới mốc tiếp theo";
 const SCREENSHOT_TOOLTIP = "Chụp màn hình";
+const PIP_TOOLTIP = "Chế độ hình trong hình (PiP)";
 const CONTROLS_AUTOHIDE_MS = 2500;
 const CONTROLS_AUTOHIDE_DESKTOP_MS = 1000;
 const DOUBLE_TAP_ZONE_RATIO = 0.5;
@@ -78,6 +79,84 @@ interface JWPlayerProps {
   className?: string;
   chapters?: number[]; // seconds from start
 }
+
+// Đặt ngoài component
+function detectPipSupport(p: any, video: HTMLVideoElement | null): boolean {
+  if (!video) return false;
+
+  // 1) JW API (nếu provider đã sẵn sàng)
+  if (typeof p?.isPipSupported === "function") {
+    try {
+      if (p.isPipSupported() === true) return true;
+    } catch {}
+  }
+
+  // 2) Chuẩn W3C (Chrome/Edge/Opera/Firefox desktop)
+  const supportsStandard =
+    "pictureInPictureEnabled" in document &&
+    // @ts-ignore
+    (document as any).pictureInPictureEnabled === true &&
+    // Một số site vô hiệu hóa PiP trên thẻ video
+    // @ts-ignore
+    (video as any).disablePictureInPicture !== true &&
+    typeof (video as any).requestPictureInPicture === "function";
+
+  // 3) WebKit (Safari/iOS/iPadOS)
+  // @ts-ignore
+  const supportsWebkit =
+    typeof (video as any).webkitSupportsPresentationMode === "function" &&
+    // @ts-ignore
+    (video as any).webkitSupportsPresentationMode("picture-in-picture") ===
+      true;
+
+  return !!(supportsStandard || supportsWebkit);
+}
+
+async function smartTogglePip(p: any, video: HTMLVideoElement | null) {
+  if (!video) return;
+
+  // 1) Thử qua JW trước
+  if (typeof p?.isPipSupported === "function" && typeof p?.pip === "function") {
+    try {
+      if (p.isPipSupported()) {
+        p.pip(); // JW tự toggle
+        return;
+      }
+    } catch {}
+  }
+
+  // 2) Chuẩn W3C
+  // @ts-ignore
+  const docAny = document as any;
+  // @ts-ignore
+  if (
+    "pictureInPictureEnabled" in document &&
+    typeof (video as any).requestPictureInPicture === "function"
+  ) {
+    try {
+      if (docAny.pictureInPictureElement) {
+        await docAny.exitPictureInPicture();
+      } else {
+        // Chrome yêu cầu user gesture (click), đừng gọi từ code tự chạy
+        await (video as any).requestPictureInPicture();
+      }
+      return;
+    } catch {}
+  }
+
+  // 3) WebKit
+  // @ts-ignore
+  if (typeof (video as any).webkitSetPresentationMode === "function") {
+    // @ts-ignore
+    const cur = (video as any).webkitPresentationMode;
+    // @ts-ignore
+    (video as any).webkitSetPresentationMode(
+      cur === "picture-in-picture" ? "inline" : "picture-in-picture"
+    );
+    return;
+  }
+}
+
 const NJWPlayerComponent = ({
   videoId,
   server,
@@ -104,6 +183,7 @@ const NJWPlayerComponent = ({
   const scriptLoadedRef = useRef<boolean>(false);
   const scriptLoadingRef = useRef<boolean>(false);
   const overlayRef = useRef<HTMLDivElement | null>(null);
+  const rafRef = useRef<number | null>(null);
 
   const isAndroid =
     typeof navigator !== "undefined" && /android/i.test(navigator.userAgent);
@@ -254,7 +334,6 @@ const NJWPlayerComponent = ({
   }, [isHls, videoId]);
 
   const handleSurfaceTouchStart = () => {
-    // always show controls on first touch
     setIsHovering(true);
     setControlsVisible(true);
     scheduleControlsAutohide();
@@ -409,10 +488,12 @@ const NJWPlayerComponent = ({
   }, [isHls]);
 
   useEffect(() => {
-    if (!isHls) return;
-    if (!libReady) return;
+    if (!isHls || !libReady || !playerRef.current) return;
+    if (playerInstance.current && prevFileUrlRef.current === fileUrl) {
+      return;
+    }
     const w = window as any;
-    if (!w.jwplayer || !playerRef.current) return;
+    if (!w.jwplayer) return;
 
     const isFullscreen = document.fullscreenElement !== null;
     if (isFullscreen && playerInstance.current) {
@@ -427,10 +508,6 @@ const NJWPlayerComponent = ({
       playerInstance.current._lastFullscreenExit &&
       now - playerInstance.current._lastFullscreenExit < 2000
     ) {
-      return;
-    }
-
-    if (playerInstance.current && prevFileUrlRef.current === fileUrl) {
       return;
     }
 
@@ -474,9 +551,8 @@ const NJWPlayerComponent = ({
       p.on("ready", () => {
         setIsReady(true);
         setIsMuted(!!p.getMute?.());
-        setPipSupported(p.isPipSupported?.() === true);
-        console.log("pip state: ", p.isPipActive?.());
-        // If Android, set volume to max
+        // setPipSupported(p.isPipSupported?.() === true);
+
         if (isAndroid) {
           p.setVolume?.(100);
           setVolume(100);
@@ -528,12 +604,38 @@ const NJWPlayerComponent = ({
         savedPositionRef.current = 0;
         wasPlayingRef.current = false;
 
+        // NEW
+        const videoEl = containerRef.current?.querySelector(
+          "video"
+        ) as HTMLVideoElement | null;
+
+        // TÍNH LẠI hỗ trợ PiP sau khi provider/element sẵn sàng
+        setPipSupported(detectPipSupport(p, videoEl));
+
+        // JW event (nếu JW bật/tắt PiP)
+        p.on("pip", ({ pip }: { pip: boolean }) => setIsInPip(!!pip));
+
+        // DOM events (Chrome)
+        videoEl?.addEventListener("enterpictureinpicture", () =>
+          setIsInPip(true)
+        );
+        videoEl?.addEventListener("leavepictureinpicture", () =>
+          setIsInPip(false)
+        );
+
+        // WebKit (Safari/iOS/iPadOS)
+        // @ts-ignore
+        videoEl?.addEventListener("webkitpresentationmodechanged", () => {
+          // @ts-ignore
+          const mode = (videoEl as any).webkitPresentationMode;
+          setIsInPip(mode === "picture-in-picture");
+        });
+
         setTimeout(() => {
           const videoEl = containerRef.current?.querySelector("video");
           if (videoEl) {
             videoEl.setAttribute("playsinline", "");
             videoEl.setAttribute("webkit-playsinline", "");
-            // iOS-only sizing & stacking fixes
             if (isIOS) {
               Object.assign(videoEl.style, {
                 position: "absolute",
@@ -647,13 +749,36 @@ const NJWPlayerComponent = ({
         callbacksRef.current.onError?.(e?.message || ERR_GENERAL)
       );
 
+      p.on("firstFrame", () => {
+        const pos = savedPositionRef.current;
+        if (pos > 0.2) {
+          try {
+            p.seek(pos);
+          } catch {}
+        }
+        if (wasPlayingRef.current) p.play?.(true);
+        savedPositionRef.current = 0;
+        wasPlayingRef.current = false;
+        const v2 = containerRef.current?.querySelector(
+          "video"
+        ) as HTMLVideoElement | null;
+        setPipSupported(detectPipSupport(p, v2));
+      });
+
+      p.on("providerChanged", () => {
+        const v2 = containerRef.current?.querySelector(
+          "video"
+        ) as HTMLVideoElement | null;
+        setPipSupported(detectPipSupport(p, v2));
+      });
+
       prevFileUrlRef.current = fileUrl;
     } catch (e: any) {
       callbacksRef.current.onError?.(e?.message || ERR_INIT);
     }
 
     return () => {};
-  }, [isHls, fileUrl, libReady, isFullscreen]);
+  }, [isHls, fileUrl, libReady]);
 
   useEffect(() => {
     if (!playerInstance.current) return;
@@ -732,12 +857,17 @@ const NJWPlayerComponent = ({
       const rect = progressBarRef.current.getBoundingClientRect();
       const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
       const pct = rect.width ? x / rect.width : 0;
-      setScrubPct(pct * 100);
       const t = pct * (duration || 0);
+      setScrubPct(pct * 100);
       setHoverTime({ x, t });
-      // Real-time seek while dragging
-      const p = playerInstance.current;
-      if (p && duration) p.seek?.(t);
+
+      if (!playerInstance.current || !duration) return;
+
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(() => {
+        playerInstance.current.seek?.(t);
+        rafRef.current = null;
+      });
     };
     const onUp = () => {
       if (!isScrubbing || !progressBarRef.current) return;
@@ -1104,7 +1234,7 @@ const NJWPlayerComponent = ({
             {seekOverlay.type === "back" && (
               <div className="absolute left-0 top-0 bottom-0 z-[999] flex items-center pl-4 md:pl-8 pointer-events-none">
                 <div className="flex items-center gap-2 bg-gray-700/80 backdrop-blur-sm text-white text-base md:text-lg font-semibold rounded-lg px-3 py-2 shadow-xl animate-fade">
-                  <Rewind className="h-6 w-6 md:h-8 md:w-8 text-pink-400" />
+                  <Rewind className="h-6 w-6 md:h-8 md:w-8 text-pink-400 animate-bounce-left" />
                   <span>Lùi {seekOverlay.seconds} giây</span>
                 </div>
               </div>
@@ -1113,7 +1243,7 @@ const NJWPlayerComponent = ({
               <div className="absolute right-0 top-0 bottom-0 z-[999] flex items-center justify-end pr-4 md:pr-8 pointer-events-none">
                 <div className="flex items-center gap-2 bg-gray-700/80 backdrop-blur-sm text-white text-base md:text-lg font-semibold rounded-lg px-3 py-2 shadow-xl animate-fade">
                   <span>Tiến {seekOverlay.seconds} giây</span>
-                  <FastForward className="h-6 w-6 md:h-8 md:w-8 text-pink-400" />
+                  <FastForward className="h-6 w-6 md:h-8 md:w-8 text-pink-400 animate-bounce-right" />
                 </div>
               </div>
             )}
@@ -1652,23 +1782,6 @@ const NJWPlayerComponent = ({
             </div>
 
             <div className="flex items-center gap-1 md:gap-3">
-              {/* Picture in Picture */}
-              {pipSupported && (
-                <button
-                  id="pip-button"
-                  aria-label={LABEL_PIP}
-                  onClick={() => {
-                    const p = playerInstance.current;
-                    if (!p) return;
-                    p.pip?.();
-                    scheduleControlsAutohide();
-                  }}
-                  className="p-2 rounded-full hover:bg-white/15 transition-colors duration-200"
-                >
-                  <PictureInPicture2 className="h-5 w-5 sm:h-5 sm:w-5 md:h-6 md:w-6" />
-                </button>
-              )}
-
               {(!isAndroid || (isAndroid && !isFullscreen)) && (
                 <TooltipProvider>
                   <Tooltip>
@@ -1689,6 +1802,36 @@ const NJWPlayerComponent = ({
                   </Tooltip>
                 </TooltipProvider>
               )}
+              
+              {/* Picture in Picture */}
+              {pipSupported && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        id="pip-button"
+                        aria-label={LABEL_PIP}
+                        onClick={() => {
+                          const p = playerInstance.current;
+                          const videoEl = containerRef.current?.querySelector(
+                            "video"
+                          ) as HTMLVideoElement | null;
+                          smartTogglePip(p, videoEl);
+                          scheduleControlsAutohide();
+                        }}
+                        className="p-2 rounded-full hover:bg-white/15 transition-colors duration-200"
+                      >
+                        <PictureInPicture2 className="h-5 w-5 sm:h-5 sm:w-5 md:h-6 md:w-6" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" sideOffset={15}>
+                      <div className="bg-gray-900 text-white text-xs font-medium rounded-lg px-3 py-1.5 shadow-lg">
+                        {PIP_TOOLTIP}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
 
               {/* Fullscreen */}
               <button
@@ -1697,7 +1840,6 @@ const NJWPlayerComponent = ({
                 className="p-2 rounded-full hover:bg-white/15 transition-colors duration-200"
               >
                 <div className="transition-opacity duration-300 ease-in-out">
-                  {/* On iOS, always show the maximize icon, since native player handles exit */}
                   {isIOS ? (
                     <Maximize2 className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
                   ) : isFullscreen ? (
@@ -1707,7 +1849,6 @@ const NJWPlayerComponent = ({
                   )}
                 </div>
               </button>
-              {/* Temporary image preview overlay */}
               {showImagePreview && capturedImage && (
                 <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/60">
                   <img
