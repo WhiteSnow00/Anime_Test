@@ -887,92 +887,144 @@ const NJWPlayerComponent = ({
   const toggleFullscreenDom = useCallback(() => {
     const el = containerRef.current as any;
     if (!el) return;
-    const videoEl = el.querySelector && el.querySelector("video");
 
-    // iOS: use native video fullscreen (legacy and modern)
+    const videoEl: any =
+      (el.querySelector && el.querySelector("video")) || null;
+
     if (
       isIOS &&
       videoEl &&
-      typeof videoEl.webkitEnterFullscreen === "function"
+      typeof videoEl.webkitEnterFullscreen === "function" &&
+      !document.fullscreenEnabled
     ) {
-      videoEl.webkitEnterFullscreen();
-      const onIOSFSChange = () => {
-        setIsFullscreen(false);
-        videoEl.removeEventListener("webkitendfullscreen", onIOSFSChange);
-      };
-      videoEl.addEventListener("webkitendfullscreen", onIOSFSChange);
-      return;
-    }
-
-    // Standard Fullscreen for non-iOS
-    if (document.fullscreenElement && !isFullscreen) {
       try {
-        document.exitFullscreen();
-      } catch (e) {
-        // ignore
+        const onBegin = () => {
+          setIsFullscreen(true);
+        };
+        const onEnd = () => {
+          setIsFullscreen(false);
+        };
+
+        videoEl.addEventListener("webkitbeginfullscreen", onBegin);
+        videoEl.addEventListener("webkitendfullscreen", onEnd);
+
+        videoEl.webkitEnterFullscreen();
+
+        const cleanup = () => {
+          try {
+            videoEl.removeEventListener("webkitbeginfullscreen", onBegin);
+            videoEl.removeEventListener("webkitendfullscreen", onEnd);
+          } catch {}
+        };
+
+        setTimeout(cleanup, 60_000); 
+      } catch {
       }
       return;
     }
 
-    if (!document.fullscreenElement) {
+    // ===== Chuẩn DOM Fullscreen (iPadOS & desktop: Safari/Chrome/Edge/Firefox) =====
+    const restoreOverflow = () => {
+      if (originalOverflowRef.current !== null) {
+        document.documentElement.style.overflow = originalOverflowRef.current;
+        originalOverflowRef.current = null;
+      } else {
+        document.documentElement.style.overflow = "";
+      }
+    };
+
+    const enterDomFullscreen = async () => {
       if (!isTouchDevice) {
         originalOverflowRef.current =
           document.documentElement.style.overflow || "";
         document.documentElement.style.overflow = "hidden";
       }
+
       try {
-        const req = el.requestFullscreen?.();
-        if (req && typeof (req as any).catch === "function") {
-          (req as Promise<void>).catch(() => {
-            const p = playerInstance.current;
-            p?.setFullscreen?.(true);
-            setIsFullscreen(true);
-          });
-        } else if (!req) {
+        setIsFullscreen(true);
+        const prom = el.requestFullscreen?.();
+        if (prom && typeof (prom as any).catch === "function") {
+          await prom;
+        }
+      } catch {
+        try {
           const p = playerInstance.current;
           p?.setFullscreen?.(true);
           setIsFullscreen(true);
-        }
-      } catch {
-        const p = playerInstance.current;
-        p?.setFullscreen?.(true);
-        setIsFullscreen(true);
-      }
-      if (isTouchDevice && window.screen?.orientation) {
-        try {
-          (window.screen.orientation as any).lock?.("landscape");
         } catch {}
+      } finally {
       }
-    } else {
-      document.documentElement.style.overflow =
-        originalOverflowRef.current !== null ? originalOverflowRef.current : "";
-      if (isTouchDevice && window.screen?.orientation) {
-        try {
-          (window.screen.orientation as any).unlock?.();
-        } catch {}
-      }
-      try {
-        const ex = document.exitFullscreen?.();
-        if (ex && typeof (ex as any).catch === "function") {
-          (ex as Promise<void>).catch(() => {
-            const p = playerInstance.current;
-            p?.setFullscreen?.(false);
-            setIsFullscreen(false);
-          });
-        } else if (!ex) {
-          const p = playerInstance.current;
-          p?.setFullscreen?.(false);
-          setIsFullscreen(false);
-        }
-      } catch {
-        const p = playerInstance.current;
-        p?.setFullscreen?.(false);
-        setIsFullscreen(false);
-      }
-    }
-  }, [isTouchDevice, isFullscreen, isIOS]);
+    };
 
-  // Keyboard shortcuts scoped to hover/focus on the player
+    const exitDomFullscreen = async () => {
+      try {
+        if (document.fullscreenElement) {
+          const prom = document.exitFullscreen?.();
+          if (prom && typeof (prom as any).catch === "function") {
+            await prom;
+          }
+        } else {
+          // Fallback JW
+          playerInstance.current?.setFullscreen?.(false);
+        }
+      } finally {
+        setIsFullscreen(false);
+        restoreOverflow();
+        if (isTouchDevice && (window as any).screen?.orientation) {
+          try {
+            (window as any).screen.orientation.unlock?.();
+          } catch {}
+        }
+      }
+    };
+
+    if (document.fullscreenElement) {
+      void exitDomFullscreen();
+      return;
+    }
+
+    void enterDomFullscreen().then(() => {
+      if (isTouchDevice && (window as any).screen?.orientation) {
+        try {
+          (window as any).screen.orientation.lock?.("landscape");
+        } catch {}
+      }
+    });
+  }, [isIOS, isTouchDevice]);
+
+  useEffect(() => {
+  const onFsChange = () => {
+    const isFs = !!document.fullscreenElement;
+    setIsFullscreen(isFs);
+
+    if (!isFs) {
+      if (originalOverflowRef.current !== null) {
+        document.documentElement.style.overflow = originalOverflowRef.current;
+        originalOverflowRef.current = null;
+      } else {
+        document.documentElement.style.overflow = "";
+      }
+
+      try {
+        playerInstance.current?.setFullscreen?.(false);
+      } catch {}
+    }
+  };
+
+  document.addEventListener("fullscreenchange", onFsChange);
+  document.addEventListener("webkitfullscreenchange", onFsChange as any);
+
+  return () => {
+    document.removeEventListener("fullscreenchange", onFsChange);
+    document.removeEventListener("webkitfullscreenchange", onFsChange as any);
+    if (originalOverflowRef.current !== null) {
+      document.documentElement.style.overflow = originalOverflowRef.current;
+      originalOverflowRef.current = null;
+    }
+  };
+}, []);
+
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!isHovering) return;
@@ -986,7 +1038,7 @@ const NJWPlayerComponent = ({
           forcedAutoplayMuteRef.current = false;
         }
       };
-      // Avoid when typing in inputs
+
       const target = e.target as HTMLElement | null;
       if (
         target &&
@@ -1774,7 +1826,7 @@ const NJWPlayerComponent = ({
                 )}
               </div>
 
-              <div className="flex items-center gap-1 md:gap-2 text-xs sm:text-sm font-medium text-white/90">
+              <div className="flex items-center gap-1 md:gap-2 text-xs sm:text-sm font-medium text-white/90 select-none">
                 <span>{formatTime(position)}</span>
                 <span className="text-white/50">/</span>
                 <span className="text-white/70">{formatTime(duration)}</span>
@@ -1802,7 +1854,7 @@ const NJWPlayerComponent = ({
                   </Tooltip>
                 </TooltipProvider>
               )}
-              
+
               {/* Picture in Picture */}
               {pipSupported && (
                 <TooltipProvider>
