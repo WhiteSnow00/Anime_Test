@@ -1,6 +1,4 @@
 "use client";
-import { consoleProtection } from "../lib/console-protection";
-
 import React, {
   useCallback,
   useEffect,
@@ -8,6 +6,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { Slider } from "@/components/ui/slider";
 import {
   Volume2,
   Flag,
@@ -21,142 +20,243 @@ import {
   FastForward,
   Rewind,
 } from "lucide-react";
-import { Slider } from "@/components/ui/slider";
+import { Tooltip, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
+import { TooltipContent } from "@radix-ui/react-tooltip";
 import {
   BackwardIcon,
   ForwardIcon,
   PauseIcon,
   PlayIcon,
 } from "./ui/player-icon";
-import { Tooltip, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
-import { TooltipContent } from "@radix-ui/react-tooltip";
+import { consoleProtection } from "../lib/console-protection";
+import { createFullscreenController } from "@/lib/fullscreen-controller";
+import { createPipController } from "@/lib/pip-controller";
 
-const JW_PLAYER_VERSION = "8.38.3" as const;
+/* =====================================================================================
+ * CONFIG – tweak here without touching logic below
+ * ===================================================================================*/
+const CONFIG = {
+  JW_PLAYER_VERSION: "8.38.3",
+  JW_PLAYER_KEY: "cLGMn8T20tGvW+0eXPhq4NNmLB57TrscPjd1IyJF84o=",
+  JW_ABOUT_TEXT: "Được Tạo Bởi KanaFansub",
+  PLAYER_PRIMARY: "html5" as const,
+  HLS_TYPE: "hls" as const,
+  DEFAULT_VOLUME: 80,
+  AUTOPLAY_RETRY_DELAY_MS: 250,
+  CONTROLS_AUTOHIDE_MS_TOUCH: 2500,
+  CONTROLS_AUTOHIDE_MS_DESKTOP: 1000,
+  DOUBLE_TAP_ZONE_RATIO: 0.5,
+  SKIP_SECONDS: 10,
+  LABELS: {
+    PLAY: "Play",
+    PAUSE: "Pause",
+    MUTE: "Mute",
+    FULLSCREEN: "Fullscreen",
+    PIP: "Picture-in-Picture",
+    BACK_X: (x: number) => `Back ${x} seconds`,
+    FORWARD_X: (x: number) => `Forward ${x} seconds`,
+    NEXT_CHAPTER: "Next chapter",
+  },
+  TOOLTIPS: {
+    BACKWARD: "Lùi 10 giây",
+    FORWARD: "Tiến 10 giây",
+    NEXT_CHAPTER: "Tới mốc tiếp theo",
+    SCREENSHOT: "Chụp màn hình",
+    PIP: "Chế độ hình trong hình (PiP)",
+  },
+  ERRORS: {
+    SCRIPT_LOAD: "Failed to load JWPlayer script",
+    SETUP: "Player setup error",
+    GENERAL: "Player error",
+    INIT: "Failed to initialize player",
+  },
+  ABOUT_MESSAGE_TIMEOUT_MS: 500,
+};
+
 const JW_PLAYER_SCRIPT_SRC =
-  `https://ssl.p.jwpcdn.com/player/v/${JW_PLAYER_VERSION}/jwplayer.js` as const;
-const JW_PLAYER_KEY = "cLGMn8T20tGvW+0eXPhq4NNmLB57TrscPjd1IyJF84o=" as const;
-const JW_ABOUT_TEXT = "Được Tạo Bởi KanaFansub" as const;
-const PLAYER_PRIMARY = "html5" as const;
-const HLS_TYPE = "hls" as const;
+  `https://ssl.p.jwpcdn.com/player/v/${CONFIG.JW_PLAYER_VERSION}/jwplayer.js` as const;
 
-const DEFAULT_VOLUME = 80;
-const AUTOPLAY_RETRY_DELAY_MS = 250;
-const CONTROLS_REVEAL_Y_FACTOR = 0;
-const SKIP_SECONDS = 10;
-const BACKWARD_TOOLTIP = "Lùi 10 giây";
-const FORWARD_TOOLTIP = "Tiến 10 giây";
-const NEXT_CHAPTER_TOOLTIP = "Tới mốc tiếp theo";
-const SCREENSHOT_TOOLTIP = "Chụp màn hình";
-const PIP_TOOLTIP = "Chế độ hình trong hình (PiP)";
-const CONTROLS_AUTOHIDE_MS = 2500;
-const CONTROLS_AUTOHIDE_DESKTOP_MS = 1000;
-const DOUBLE_TAP_ZONE_RATIO = 0.5;
-
-const LABEL_PLAY = "Play";
-const LABEL_PAUSE = "Pause";
-const LABEL_BACK_X_SECONDS = (x: number) => `Back ${x} seconds`;
-const LABEL_FORWARD_X_SECONDS = (x: number) => `Forward ${x} seconds`;
-const LABEL_MUTE = "Mute";
-const LABEL_FULLSCREEN = "Fullscreen";
-const LABEL_PIP = "Picture-in-Picture";
-const QUALITY_FALLBACK_PREFIX = "Q";
-const LABEL_NEXT_CHAPTER = "Next chapter";
-const ABOUT_MESSAGE_TIMEOUT_MS = 500;
-
-const ERR_SCRIPT_LOAD = "Failed to load JWPlayer script";
-const ERR_SETUP = "Player setup error";
-const ERR_GENERAL = "Player error";
-const ERR_INIT = "Failed to initialize player";
-
+/* =====================================================================================
+ * TYPES
+ * ===================================================================================*/
 interface JWPlayerProps {
   videoId: string;
   server: "hls" | "helvid" | "hydax";
   autoPlay?: boolean;
   muted?: boolean;
-  controls?: boolean;
+  controls?: boolean; // kept for parity, UI is custom
   onLoad?: () => void;
   onError?: (error: string) => void;
   className?: string;
   chapters?: number[]; // seconds from start
 }
 
-// Đặt ngoài component
+/* =====================================================================================
+ * UTILS
+ * ===================================================================================*/
+const isAndroidUA = () =>
+  typeof navigator !== "undefined" && /android/i.test(navigator.userAgent);
+const isIOSUA = () =>
+  typeof navigator !== "undefined" &&
+  (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.userAgent.includes("Mac") && "ontouchend" in document));
+
+function formatTime(seconds: number) {
+  if (!isFinite(seconds) || seconds < 0) seconds = 0;
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  const mm = h > 0 ? String(m).padStart(2, "0") : String(m);
+  const ss = String(s).padStart(2, "0");
+  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
 function detectPipSupport(p: any, video: HTMLVideoElement | null): boolean {
   if (!video) return false;
-
-  // 1) JW API (nếu provider đã sẵn sàng)
+  // JW API
   if (typeof p?.isPipSupported === "function") {
     try {
       if (p.isPipSupported() === true) return true;
     } catch {}
   }
-
-  // 2) Chuẩn W3C (Chrome/Edge/Opera/Firefox desktop)
+  // Standard
   const supportsStandard =
     "pictureInPictureEnabled" in document &&
-    // @ts-ignore
     (document as any).pictureInPictureEnabled === true &&
-    // Một số site vô hiệu hóa PiP trên thẻ video
-    // @ts-ignore
     (video as any).disablePictureInPicture !== true &&
     typeof (video as any).requestPictureInPicture === "function";
-
-  // 3) WebKit (Safari/iOS/iPadOS)
-  // @ts-ignore
+  // WebKit
   const supportsWebkit =
     typeof (video as any).webkitSupportsPresentationMode === "function" &&
-    // @ts-ignore
     (video as any).webkitSupportsPresentationMode("picture-in-picture") ===
       true;
-
   return !!(supportsStandard || supportsWebkit);
 }
 
-async function smartTogglePip(p: any, video: HTMLVideoElement | null) {
-  if (!video) return;
-
-  // 1) Thử qua JW trước
-  if (typeof p?.isPipSupported === "function" && typeof p?.pip === "function") {
-    try {
-      if (p.isPipSupported()) {
-        p.pip(); // JW tự toggle
-        return;
-      }
-    } catch {}
-  }
-
-  // 2) Chuẩn W3C
-  // @ts-ignore
-  const docAny = document as any;
-  // @ts-ignore
+function protectVideoElement(video: HTMLVideoElement, isAndroid: boolean) {
   if (
-    "pictureInPictureEnabled" in document &&
-    typeof (video as any).requestPictureInPicture === "function"
-  ) {
-    try {
-      if (docAny.pictureInPictureElement) {
-        await docAny.exitPictureInPicture();
-      } else {
-        // Chrome yêu cầu user gesture (click), đừng gọi từ code tự chạy
-        await (video as any).requestPictureInPicture();
-      }
-      return;
-    } catch {}
-  }
-
-  // 3) WebKit
-  // @ts-ignore
-  if (typeof (video as any).webkitSetPresentationMode === "function") {
-    // @ts-ignore
-    const cur = (video as any).webkitPresentationMode;
-    // @ts-ignore
-    (video as any).webkitSetPresentationMode(
-      cur === "picture-in-picture" ? "inline" : "picture-in-picture"
-    );
+    !video ||
+    !(video instanceof HTMLVideoElement) ||
+    (video as any)._protectedStreamSetup
+  )
     return;
-  }
+  if (isAndroid) return; // skip on Android to avoid vendor quirks
+  (video as any)._protectedStreamSetup = true;
+  try {
+    consoleProtection.start({
+      showWarning: true,
+      allowPatterns: [
+        /^JWPlayer ready$/,
+        /^Initializing JWPlayer/,
+        /^Video playback completed$/,
+      ],
+    });
+    consoleProtection.detectConsoleAccess();
+  } catch {}
+  const applyProtection = () => {
+    const originalGetAttribute = video.getAttribute;
+    video.getAttribute = function (this: HTMLVideoElement, name: string) {
+      if (name === "src") return "blob:protected-stream";
+      return originalGetAttribute.call(this, name);
+    } as any;
+    const originalSetAttribute = video.setAttribute;
+    video.setAttribute = function (
+      this: HTMLVideoElement,
+      name: string,
+      value: string
+    ) {
+      if (name === "src" && value.includes("blob:"))
+        return originalSetAttribute.call(this, name, value);
+      return originalSetAttribute.call(this, name, value);
+    } as any;
+    const srcDesc = Object.getOwnPropertyDescriptor(
+      HTMLVideoElement.prototype,
+      "src"
+    );
+    if (srcDesc) {
+      Object.defineProperty(video, "src", {
+        get: () => {
+          const realSrc = srcDesc.get?.call(video);
+          return typeof realSrc === "string" && realSrc.startsWith("blob:")
+            ? realSrc
+            : "blob:protected-stream";
+        },
+        set: (url) => {
+          if (typeof url === "string" && url.startsWith("blob:"))
+            srcDesc.set?.call(video, url);
+        },
+        configurable: true,
+      });
+    }
+    const csDesc = Object.getOwnPropertyDescriptor(video, "currentSrc");
+    if (!csDesc || csDesc.configurable !== false) {
+      Object.defineProperty(video, "currentSrc", {
+        get: () => "blob:protected-stream",
+        configurable: true,
+      });
+    }
+    const ohDesc = Object.getOwnPropertyDescriptor(video, "outerHTML");
+    if (!ohDesc || ohDesc.configurable !== false) {
+      Object.defineProperty(video, "outerHTML", {
+        get: function () {
+          const g = Object.getOwnPropertyDescriptor(
+            HTMLVideoElement.prototype,
+            "outerHTML"
+          )?.get;
+          try {
+            const html = g?.call(this);
+            return typeof html === "string"
+              ? html.replace(/blob:[^"\s]+/g, "blob:protected-stream")
+              : (html as any);
+          } catch {
+            return "<video>Protected Video Element</video>";
+          }
+        },
+        configurable: true,
+      });
+    }
+  };
+  video.addEventListener("play", applyProtection, { once: true });
 }
 
+/* =====================================================================================
+ * HOOKS – loader & player setup
+ * ===================================================================================*/
+function useJWScript(onError?: (msg: string) => void) {
+  const [ready, setReady] = useState(false);
+  const loadingRef = useRef(false);
+  const loadedRef = useRef(false);
+
+  useEffect(() => {
+    const w = window as any;
+    if (loadedRef.current || loadingRef.current) return setReady(!!w.jwplayer);
+    if (w.jwplayer) {
+      loadedRef.current = true;
+      setReady(true);
+      return;
+    }
+    loadingRef.current = true;
+    const s = document.createElement("script");
+    s.src = JW_PLAYER_SCRIPT_SRC;
+    s.async = true;
+    s.onload = () => {
+      loadedRef.current = true;
+      loadingRef.current = false;
+      setReady(true);
+    };
+    s.onerror = () => {
+      loadingRef.current = false;
+      onError?.(CONFIG.ERRORS.SCRIPT_LOAD);
+    };
+    document.head.appendChild(s);
+  }, [onError]);
+
+  return ready;
+}
+
+/* =====================================================================================
+ * COMPONENT
+ * ===================================================================================*/
 const NJWPlayerComponent = ({
   videoId,
   server,
@@ -168,162 +268,8 @@ const NJWPlayerComponent = ({
   className = "",
   chapters = [],
 }: JWPlayerProps) => {
-  const playerRef = useRef<HTMLDivElement | null>(null);
-  const playerInstance = useRef<any>(null);
-  const progressBarRef = useRef<HTMLDivElement | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const originalOverflowRef = useRef<string | null>(null);
-  const prevFileUrlRef = useRef<string | null>(null);
-  const savedPositionRef = useRef<number>(0);
-  const wasPlayingRef = useRef<boolean>(false);
-  const callbacksRef = useRef<{
-    onLoad?: () => void;
-    onError?: (e: string) => void;
-  }>({});
-  const scriptLoadedRef = useRef<boolean>(false);
-  const scriptLoadingRef = useRef<boolean>(false);
-  const overlayRef = useRef<HTMLDivElement | null>(null);
-  const rafRef = useRef<number | null>(null);
-
-  const isAndroid =
-    typeof navigator !== "undefined" && /android/i.test(navigator.userAgent);
-  const isIOS =
-    typeof navigator !== "undefined" &&
-    (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
-      (navigator.userAgent.includes("Mac") && "ontouchend" in document));
-
-  const protectVideoElement = useCallback((video: HTMLVideoElement) => {
-    if (!video || !(video instanceof HTMLVideoElement) || !video.nodeType)
-      return;
-    if (isAndroid) return;
-    if ((video as any)._protectedStreamSetup) return;
-    (video as any)._protectedStreamSetup = true;
-    let cleanupObserver: MutationObserver | null = null;
-    try {
-      // Console protection: activate when player is ready
-      if (typeof window !== "undefined") {
-        consoleProtection.start({
-          showWarning: true,
-          allowPatterns: [
-            /^JWPlayer ready$/,
-            /^Initializing JWPlayer/,
-            /^Video playback completed$/,
-            /^First frame loaded$/,
-            /^Quality levels available$/,
-            /^Playback progress:/,
-            /^Player buffering/,
-            /^Bắt đầu phát video$/,
-          ],
-        });
-        consoleProtection.detectConsoleAccess();
-      }
-      // Delay property overrides until video is playing
-      const applyProtection = () => {
-        // Override getAttribute for 'src'
-        const originalGetAttribute = video.getAttribute;
-        video.getAttribute = function (name: string) {
-          if (name === "src") return "blob:protected-stream";
-          return originalGetAttribute.call(this, name);
-        };
-        // Override setAttribute for 'src'
-        const originalSetAttribute = video.setAttribute;
-        video.setAttribute = function (name: string, value: string) {
-          if (name === "src" && value.includes("blob:")) {
-            return originalSetAttribute.call(this, name, value);
-          }
-          return originalSetAttribute.call(this, name, value);
-        };
-        // Only override properties once
-        const srcPropDescriptor = Object.getOwnPropertyDescriptor(
-          HTMLVideoElement.prototype,
-          "src"
-        );
-        if (srcPropDescriptor) {
-          Object.defineProperty(video, "src", {
-            get: () => {
-              const realSrc = srcPropDescriptor.get?.call(video);
-              return typeof realSrc === "string" && realSrc.startsWith("blob:")
-                ? realSrc
-                : "blob:protected-stream";
-            },
-            set: (url) => {
-              if (typeof url === "string" && url.startsWith("blob:")) {
-                srcPropDescriptor.set?.call(video, url);
-              }
-            },
-            configurable: true,
-          });
-        }
-        const currentSrcDescriptor = Object.getOwnPropertyDescriptor(
-          video,
-          "currentSrc"
-        );
-        if (
-          !currentSrcDescriptor ||
-          currentSrcDescriptor.configurable !== false
-        ) {
-          Object.defineProperty(video, "currentSrc", {
-            get: () => "blob:protected-stream",
-            configurable: true,
-          });
-        }
-        const outerHTMLDescriptor = Object.getOwnPropertyDescriptor(
-          video,
-          "outerHTML"
-        );
-        if (
-          !outerHTMLDescriptor ||
-          outerHTMLDescriptor.configurable !== false
-        ) {
-          Object.defineProperty(video, "outerHTML", {
-            get: function () {
-              const originalOuterHTML = Object.getOwnPropertyDescriptor(
-                HTMLVideoElement.prototype,
-                "outerHTML"
-              )?.get;
-              if (originalOuterHTML) {
-                try {
-                  const html = originalOuterHTML.call(this);
-                  return typeof html === "string"
-                    ? html.replace(/blob:[^"\s]+/g, "blob:protected-stream")
-                    : html;
-                } catch (e) {
-                  return "<video>Protected Video Element</video>";
-                }
-              }
-              return "<video>Protected Video Element</video>";
-            },
-            configurable: true,
-          });
-        }
-      };
-      // Listen for play event to apply protection
-      video.addEventListener("play", applyProtection, { once: true });
-      // Setup cleanup observer for video removal
-      cleanupObserver = new MutationObserver((mutations) => {
-        try {
-          mutations.forEach((mutation) => {
-            mutation.removedNodes.forEach((node) => {
-              if (node && node.nodeType === Node.ELEMENT_NODE) {
-                if (node === video || (node as Element).contains(video)) {
-                  if (cleanupObserver) cleanupObserver.disconnect();
-                }
-              }
-            });
-          });
-        } catch (observerError) {
-          if (cleanupObserver) cleanupObserver.disconnect();
-        }
-      });
-      cleanupObserver.observe(document.body, {
-        childList: true,
-        subtree: true,
-      });
-    } catch (e) {
-      // Video protection error
-    }
-  }, []);
-
+  const isAndroid = isAndroidUA();
+  const isIOS = isIOSUA();
   const isHls = server === "hls";
   const fileUrl = useMemo(() => {
     if (!isHls) return "";
@@ -333,45 +279,28 @@ const NJWPlayerComponent = ({
     return rel;
   }, [isHls, videoId]);
 
-  const handleSurfaceTouchStart = () => {
-    setIsHovering(true);
-    setControlsVisible(true);
-    scheduleControlsAutohide();
-  };
+  const playerRef = useRef<HTMLDivElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const progressBarRef = useRef<HTMLDivElement | null>(null);
+  const overlayRef = useRef<HTMLDivElement | null>(null);
+  const playerInstance = useRef<any>(null);
+  const prevFileUrlRef = useRef<string | null>(null);
+  const savedPositionRef = useRef(0);
+  const wasPlayingRef = useRef(false);
+  const controlsHideTimerRef = useRef<number | null>(null);
+  const aboutHideTimerRef = useRef<number | null>(null);
+  const seekOverlayTimerRef = useRef<number | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const suppressClickRef = useRef(false);
+  const forcedAutoplayMuteRef = useRef(false);
+  const controllerRef = useRef<ReturnType<
+    typeof createFullscreenController
+  > | null>(null);
+  const pipCtrlRef = useRef<ReturnType<typeof createPipController> | null>(
+    null
+  );
 
-  useEffect(() => {
-    if (!isIOS) return;
-    const fix = () => {
-      const v = containerRef.current?.querySelector(
-        "video"
-      ) as HTMLVideoElement | null;
-      if (v) {
-        const w = v.style.width;
-        v.style.width = w === "100%" ? "99.9%" : "100%";
-        requestAnimationFrame(() => {
-          v.style.width = "100%";
-        });
-      }
-    };
-    window.addEventListener("orientationchange", fix);
-    window.addEventListener("resize", fix);
-    return () => {
-      window.removeEventListener("orientationchange", fix);
-      window.removeEventListener("resize", fix);
-    };
-  }, [isIOS]);
-
-  const handleSurfacePointerDown: React.PointerEventHandler<HTMLDivElement> = (
-    e
-  ) => {
-    if (e.pointerType === "touch") {
-      setIsHovering(true);
-      setControlsVisible(true);
-      scheduleControlsAutohide();
-    }
-  };
-
-  // UI state
+  const [libReady, setLibReady] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -380,13 +309,11 @@ const NJWPlayerComponent = ({
   const [duration, setDuration] = useState(0);
   const [position, setPosition] = useState(0);
   const [buffer, setBuffer] = useState(0);
-  const [volume, setVolume] = useState(80);
   const [levels, setLevels] = useState<{ label: string; index: number }[]>([]);
   const [currentLevel, setCurrentLevel] = useState<number | null>(null);
   const [hoverTime, setHoverTime] = useState<{ x: number; t: number } | null>(
     null
   );
-  const [libReady, setLibReady] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(false);
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [scrubPct, setScrubPct] = useState<number | null>(null);
@@ -399,174 +326,195 @@ const NJWPlayerComponent = ({
   );
   const [isInPip, setIsInPip] = useState(false);
   const [pipSupported, setPipSupported] = useState(false);
-  const [seekOverlay, setSeekOverlay] = useState<{
-    type: "back" | "forward";
-    seconds: number;
-  } | null>(null);
-  const seekOverlayTimerRef = useRef<number | null>(null);
-  const initAutoPlayRef = useRef<boolean>(autoPlay);
-  const initMutedRef = useRef<boolean>(muted);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
-  const controlsHideTimerRef = useRef<number | null>(null);
-  const aboutHideTimerRef = useRef<number | null>(null);
-  const suppressClickRef = useRef<boolean>(false);
-  const forcedAutoplayMuteRef = useRef<boolean>(false);
   const [supportsAspectRatio, setSupportsAspectRatio] = useState(true);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [showImagePreview, setShowImagePreview] = useState(false);
 
+  const jwReady = useJWScript(onError);
   useEffect(() => {
-    callbacksRef.current = { onLoad, onError };
-  }, [onLoad, onError]);
+    setLibReady(jwReady);
+  }, [jwReady]);
 
+  // env feature detects
   useEffect(() => {
-    let ok = true;
+    setIsTouchDevice(
+      typeof window !== "undefined" &&
+        ("ontouchstart" in window || navigator.maxTouchPoints > 0)
+    );
     try {
-      ok =
+      const ok =
         typeof CSS !== "undefined" &&
         typeof (CSS as any).supports === "function"
           ? CSS.supports("aspect-ratio: 16/9")
           : false;
+      setSupportsAspectRatio(!!ok);
     } catch {
-      ok = false;
+      setSupportsAspectRatio(false);
     }
-    setSupportsAspectRatio(!!ok);
   }, []);
 
-  const handleCaptureFrame = useCallback(() => {
-    const videoEl = containerRef.current?.querySelector("video");
-    if (!videoEl) return;
-    const canvas = document.createElement("canvas");
-    canvas.width = videoEl.videoWidth;
-    canvas.height = videoEl.videoHeight;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL("image/png");
-    setCapturedImage(dataUrl);
-    setShowImagePreview(true);
-    const a = document.createElement("a");
-    a.href = dataUrl;
-    a.download = `frame-${Date.now()}.png`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => setShowImagePreview(false), 2000);
-  }, []);
-
-  // Load JW script once
   useEffect(() => {
-    try {
-      const hasTouch =
-        typeof window !== "undefined" &&
-        ("ontouchstart" in window || navigator.maxTouchPoints > 0);
-      setIsTouchDevice(!!hasTouch);
-    } catch {}
+    if (!containerRef.current) return;
 
-    if (!isHls) return;
-    if (scriptLoadedRef.current || scriptLoadingRef.current) return;
-    const w = window as any;
-    if (w.jwplayer) {
-      scriptLoadedRef.current = true;
-      setLibReady(true);
-      return;
-    }
-    scriptLoadingRef.current = true;
-    const script = document.createElement("script");
-    script.src = JW_PLAYER_SCRIPT_SRC;
-    script.async = true;
-    script.onload = () => {
-      scriptLoadedRef.current = true;
-      scriptLoadingRef.current = false;
-      setLibReady(true);
-    };
-    script.onerror = () => {
-      scriptLoadingRef.current = false;
-      callbacksRef.current.onError?.(ERR_SCRIPT_LOAD);
-    };
-    document.head.appendChild(script);
-  }, [isHls]);
+    controllerRef.current = createFullscreenController({
+      container: containerRef.current,
+      getVideo: () =>
+        (containerRef.current?.querySelector(
+          "video"
+        ) as HTMLVideoElement | null) ?? null,
+      getPlayer: () => playerInstance.current ?? null,
+      onEnter: () => {
+        (document.documentElement as any).__prevOverflow =
+          document.documentElement.style.overflow || "";
+        document.documentElement.style.overflow = "hidden";
+        setIsFullscreen(true);
+        scheduleControlsAutohide();
+      },
+      onExit: () => {
+        setIsFullscreen(false);
+        const prev = (document.documentElement as any).__prevOverflow ?? "";
+        document.documentElement.style.overflow = prev;
+        delete (document.documentElement as any).__prevOverflow;
+      },
+    });
 
+    return () => {
+      controllerRef.current = null;
+    };
+    // chú ý: KHÔNG đưa scheduleControlsAutohide vào deps để tránh recreate controller không cần thiết
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [containerRef.current]);
+
+  useEffect(() => {
+    const v = containerRef.current?.querySelector(
+      "video"
+    ) as HTMLVideoElement | null;
+    const p = playerInstance.current;
+
+    const onEnter = () => setIsInPip(true);
+    const onLeave = () => setIsInPip(false);
+    const onWK = () => {
+      const vv = v as any;
+      setIsInPip(vv?.webkitPresentationMode === "picture-in-picture");
+    };
+
+    v?.addEventListener("enterpictureinpicture", onEnter);
+    v?.addEventListener("leavepictureinpicture", onLeave);
+    v?.addEventListener("webkitpresentationmodechanged", onWK as any);
+    p?.on?.("pip", ({ pip }: { pip: boolean }) => setIsInPip(!!pip));
+
+    return () => {
+      v?.removeEventListener("enterpictureinpicture", onEnter);
+      v?.removeEventListener("leavepictureinpicture", onLeave);
+      v?.removeEventListener("webkitpresentationmodechanged", onWK as any);
+    };
+  }, [libReady, isReady]);
+
+  useEffect(() => {
+    pipCtrlRef.current = createPipController({
+      getVideo: () => containerRef.current?.querySelector("video") ?? null,
+      getPlayer: () => playerInstance.current ?? null,
+      onEnter: () => setIsInPip(true),
+      onExit: () => setIsInPip(false),
+    });
+    return () => {
+      pipCtrlRef.current = null;
+    };
+  }, []);
+
+  // iOS resize/orientation fix
+  useEffect(() => {
+    if (!isIOS) return;
+    const fix = () => {
+      const v = containerRef.current?.querySelector(
+        "video"
+      ) as HTMLVideoElement | null;
+      if (!v) return;
+      const w = v.style.width;
+      v.style.width = w === "100%" ? "99.9%" : "100%";
+      requestAnimationFrame(() => {
+        v.style.width = "100%";
+      });
+    };
+    window.addEventListener("orientationchange", fix);
+    window.addEventListener("resize", fix);
+    return () => {
+      window.removeEventListener("orientationchange", fix);
+      window.removeEventListener("resize", fix);
+    };
+  }, [isIOS]);
+
+  // JW setup / reload on file change
   useEffect(() => {
     if (!isHls || !libReady || !playerRef.current) return;
-    if (playerInstance.current && prevFileUrlRef.current === fileUrl) {
-      return;
-    }
     const w = window as any;
     if (!w.jwplayer) return;
 
-    const isFullscreen = document.fullscreenElement !== null;
-    if (isFullscreen && playerInstance.current) {
-      return;
-    }
-    if (playerInstance.current && playerInstance.current._isFullscreen) {
-      return;
-    }
+    if (playerInstance.current && prevFileUrlRef.current === fileUrl) return;
+
+    // avoid reinit during/after fs transitions
+    if (document.fullscreenElement) return;
+    if (playerInstance.current?._isFullscreen) return;
     const now = Date.now();
     if (
-      playerInstance.current &&
-      playerInstance.current._lastFullscreenExit &&
+      playerInstance.current?._lastFullscreenExit &&
       now - playerInstance.current._lastFullscreenExit < 2000
-    ) {
+    )
       return;
-    }
 
+    // carry over pos + play state
     if (playerInstance.current) {
       try {
         const p = playerInstance.current;
         savedPositionRef.current = p.getPosition?.() || 0;
-        const state = p.getState?.();
-        wasPlayingRef.current = state === "playing" || state === "buffering";
+        wasPlayingRef.current = ["playing", "buffering"].includes(
+          p.getState?.()
+        );
         p.remove?.();
       } catch {}
     }
 
     try {
-      const sources = [{ file: fileUrl, type: HLS_TYPE, default: true }];
+      const sources = [{ file: fileUrl, type: CONFIG.HLS_TYPE, default: true }];
       playerInstance.current = w.jwplayer(playerRef.current).setup({
         width: "100%",
         height: "100%",
-        primary: PLAYER_PRIMARY,
+        primary: CONFIG.PLAYER_PRIMARY,
         controls: false,
-        autostart: isIOS ? !!autoPlay : autoPlay, // same boolean, but…
-        mute: isIOS ? true : initMutedRef.current, // force muted on iOS when autoplay
-        key: JW_PLAYER_KEY,
-        hlsjsdefault: !isIOS, // use native HLS on iOS
+        autostart: isIOS ? !!autoPlay : autoPlay,
+        mute: isIOS ? true : !!muted,
+        key: CONFIG.JW_PLAYER_KEY,
+        hlsjsdefault: !isIOS,
         safarihlsjs: false,
-        enableNativeHls: isIOS, // safe no-op on non-iOS
+        enableNativeHls: isIOS,
         stretching: "uniform",
         playlist: [{ sources }],
-        abouttext: JW_ABOUT_TEXT,
+        abouttext: CONFIG.JW_ABOUT_TEXT,
         playsinline: true,
         fullscreenOrientationLock: "landscape",
         pipIcon: true,
       });
 
       const p = playerInstance.current;
-
-      // Store fullscreen state for reload prevention
       p._isFullscreen = false;
       p._lastFullscreenExit = 0;
 
       p.on("ready", () => {
         setIsReady(true);
         setIsMuted(!!p.getMute?.());
-        // setPipSupported(p.isPipSupported?.() === true);
-
         if (isAndroid) {
           p.setVolume?.(100);
-          setVolume(100);
         } else {
           const vol = p.getVolume?.();
-          setVolume(typeof vol === "number" ? vol : DEFAULT_VOLUME);
+          setVolumeState(typeof vol === "number" ? vol : CONFIG.DEFAULT_VOLUME);
         }
         const d = p.getDuration?.() ?? 0;
         setDuration(isFinite(d) ? d : 0);
-
         const qls = p.getQualityLevels?.() || [];
         setLevels(
           qls.map((q: any, idx: number) => ({
-            label: q.label || `${QUALITY_FALLBACK_PREFIX}${idx + 1}`,
+            label: q.label || `Q${idx + 1}`,
             index: idx,
           }))
         );
@@ -578,7 +526,7 @@ const NJWPlayerComponent = ({
             p.seek?.(savedPositionRef.current);
             if (wasPlayingRef.current) p.play?.(true);
           } catch {}
-        } else if (initAutoPlayRef.current) {
+        } else if (autoPlay) {
           if (isIOS) {
             try {
               p.setMute?.(true);
@@ -587,57 +535,47 @@ const NJWPlayerComponent = ({
             } catch {}
           } else {
             try {
-              p.setMute?.(false);
-              forcedAutoplayMuteRef.current = !initMutedRef.current;
+              p.setMute?.(!!muted === false ? false : !!muted);
+              forcedAutoplayMuteRef.current = !muted;
               p.play?.(true);
             } catch {}
             setTimeout(() => {
               try {
                 const st = p.getState?.();
-                if (st !== "playing" && st !== "buffering") {
-                  p.play?.(true);
-                }
+                if (!["playing", "buffering"].includes(st)) p.play?.(true);
               } catch {}
-            }, AUTOPLAY_RETRY_DELAY_MS);
+            }, CONFIG.AUTOPLAY_RETRY_DELAY_MS);
           }
         }
         savedPositionRef.current = 0;
         wasPlayingRef.current = false;
 
-        // NEW
         const videoEl = containerRef.current?.querySelector(
           "video"
         ) as HTMLVideoElement | null;
-
-        // TÍNH LẠI hỗ trợ PiP sau khi provider/element sẵn sàng
         setPipSupported(detectPipSupport(p, videoEl));
-
-        // JW event (nếu JW bật/tắt PiP)
         p.on("pip", ({ pip }: { pip: boolean }) => setIsInPip(!!pip));
-
-        // DOM events (Chrome)
         videoEl?.addEventListener("enterpictureinpicture", () =>
           setIsInPip(true)
         );
         videoEl?.addEventListener("leavepictureinpicture", () =>
           setIsInPip(false)
         );
-
-        // WebKit (Safari/iOS/iPadOS)
-        // @ts-ignore
-        videoEl?.addEventListener("webkitpresentationmodechanged", () => {
-          // @ts-ignore
-          const mode = (videoEl as any).webkitPresentationMode;
-          setIsInPip(mode === "picture-in-picture");
-        });
+        videoEl?.addEventListener("webkitpresentationmodechanged", () =>
+          setIsInPip(
+            (videoEl as any).webkitPresentationMode === "picture-in-picture"
+          )
+        );
 
         setTimeout(() => {
-          const videoEl = containerRef.current?.querySelector("video");
-          if (videoEl) {
-            videoEl.setAttribute("playsinline", "");
-            videoEl.setAttribute("webkit-playsinline", "");
+          const v = containerRef.current?.querySelector(
+            "video"
+          ) as HTMLVideoElement | null;
+          if (v) {
+            v.setAttribute("playsinline", "");
+            v.setAttribute("webkit-playsinline", "");
             if (isIOS) {
-              Object.assign(videoEl.style, {
+              Object.assign(v.style, {
                 position: "absolute",
                 top: "0",
                 left: "0",
@@ -653,75 +591,61 @@ const NJWPlayerComponent = ({
                 overlayRef.current.style.willChange = "transform";
               }
             }
-            protectVideoElement(videoEl);
+            protectVideoElement(v, isAndroid);
           }
         }, 500);
 
-        callbacksRef.current.onLoad?.();
+        onLoad?.();
       });
+
       p.on("play", () => {
         setIsPlaying(true);
+        setIsBuffering(false);
         if (isAndroid) {
-          const videoEl = containerRef.current?.querySelector("video");
-          if (videoEl) {
-            videoEl.style.display = "";
-            videoEl.style.visibility = "visible";
-            videoEl.style.opacity = "1";
+          const v = containerRef.current?.querySelector(
+            "video"
+          ) as HTMLVideoElement | null;
+          if (v) {
+            v.style.display = "";
+            v.style.visibility = "visible";
+            v.style.opacity = "1";
           }
         }
       });
       p.on("pause", () => setIsPlaying(false));
       p.on("time", (e: any) => {
         setPosition(e?.position || 0);
-        setDuration((prev) =>
-          typeof e?.duration === "number" ? e.duration : prev
-        );
-      });
-      p.on("resize", (e: any) => {
-        console.log("Player resized:", e.width, "x", e.height);
-        setIsFullscreen(document.fullscreenElement !== null);
+        if (typeof e?.duration === "number") setDuration(e.duration);
       });
       p.on("buffer", (e: any) => {
         setIsBuffering(true);
-        if (e && typeof e.bufferPercent === "number") {
+        if (typeof e?.bufferPercent === "number") {
           const dur = p.getDuration?.() || 0;
           setBuffer((e.bufferPercent / 100) * dur);
         }
       });
-      p.on("play", () => {
-        setIsPlaying(true);
-        setIsBuffering(false);
-        if (isAndroid) {
-          const videoEl = containerRef.current?.querySelector("video");
-          if (videoEl) {
-            videoEl.style.display = "";
-            videoEl.style.visibility = "visible";
-            videoEl.style.opacity = "1";
-          }
-        }
-      });
       p.on("volume", (e: any) =>
-        setVolume(typeof e?.volume === "number" ? e.volume : DEFAULT_VOLUME)
+        setVolumeState(
+          typeof e?.volume === "number" ? e.volume : CONFIG.DEFAULT_VOLUME
+        )
       );
       p.on("mute", (e: any) => setIsMuted(!!e?.mute));
       p.on("fullscreen", (e: any) => {
         setIsFullscreen(!!e.fullscreen);
-        if (e.fullscreen) {
-          p._isFullscreen = true;
-        } else {
+        if (e.fullscreen) p._isFullscreen = true;
+        else {
           p._lastFullscreenExit = Date.now();
           setTimeout(() => {
-            if (playerInstance.current) {
-              playerInstance.current._isFullscreen = false;
-              if (isAndroid) {
-                const videoEl = containerRef.current?.querySelector("video");
-                if (videoEl) {
-                  videoEl.style.display = "";
-                  videoEl.style.visibility = "visible";
-                  videoEl.style.opacity = "1";
-                  // Force reflow
-                  videoEl.src = videoEl.src;
-                }
+            p._isFullscreen = false;
+            if (isAndroid) {
+              const v = containerRef.current?.querySelector(
+                "video"
+              ) as HTMLVideoElement | null;
+              if (v) {
+                v.style.display = "";
+                v.style.visibility = "visible";
+                v.style.opacity = "1";
+                v.src = v.src;
               }
             }
           }, 1000);
@@ -731,7 +655,7 @@ const NJWPlayerComponent = ({
         const q = p.getQualityLevels?.() || [];
         setLevels(
           q.map((lv: any, idx: number) => ({
-            label: lv.label || `${QUALITY_FALLBACK_PREFIX}${idx + 1}`,
+            label: lv.label || `Q${idx + 1}`,
             index: idx,
           }))
         );
@@ -740,15 +664,6 @@ const NJWPlayerComponent = ({
         const cq = p.getCurrentQuality?.();
         setCurrentLevel(typeof cq === "number" ? cq : null);
       });
-      p.on("pip", ({ pip }: { pip: boolean }) => setIsInPip(pip));
-
-      p.on("setupError", (e: any) =>
-        callbacksRef.current.onError?.(e?.message || ERR_SETUP)
-      );
-      p.on("error", (e: any) =>
-        callbacksRef.current.onError?.(e?.message || ERR_GENERAL)
-      );
-
       p.on("firstFrame", () => {
         const pos = savedPositionRef.current;
         if (pos > 0.2) {
@@ -759,44 +674,64 @@ const NJWPlayerComponent = ({
         if (wasPlayingRef.current) p.play?.(true);
         savedPositionRef.current = 0;
         wasPlayingRef.current = false;
-        const v2 = containerRef.current?.querySelector(
+        const v = containerRef.current?.querySelector(
           "video"
         ) as HTMLVideoElement | null;
-        setPipSupported(detectPipSupport(p, v2));
+        setPipSupported(detectPipSupport(p, v));
       });
-
       p.on("providerChanged", () => {
-        const v2 = containerRef.current?.querySelector(
+        const v = containerRef.current?.querySelector(
           "video"
         ) as HTMLVideoElement | null;
-        setPipSupported(detectPipSupport(p, v2));
+        setPipSupported(detectPipSupport(p, v));
       });
+      p.on("setupError", (e: any) =>
+        onError?.(e?.message || CONFIG.ERRORS.SETUP)
+      );
+      p.on("error", (e: any) => onError?.(e?.message || CONFIG.ERRORS.GENERAL));
 
       prevFileUrlRef.current = fileUrl;
     } catch (e: any) {
-      callbacksRef.current.onError?.(e?.message || ERR_INIT);
+      onError?.(e?.message || CONFIG.ERRORS.INIT);
     }
 
     return () => {};
-  }, [isHls, fileUrl, libReady]);
+  }, [
+    isHls,
+    fileUrl,
+    libReady,
+    autoPlay,
+    muted,
+    isAndroid,
+    isIOS,
+    onLoad,
+    onError,
+  ]);
 
   useEffect(() => {
-    if (!playerInstance.current) return;
-    try {
-      playerInstance.current.setMute?.(!!muted);
-      if (autoPlay) {
-        const state = playerInstance.current.getState?.();
-        if (state !== "playing") playerInstance.current.play?.(true);
-      }
-    } catch {}
-  }, [autoPlay, muted]);
+    const v = containerRef.current?.querySelector(
+      "video"
+    ) as HTMLVideoElement | null;
+    if (!v) return;
 
-  useEffect(() => {
-    return () => {
+    const onVol = () => {
+      const vol01 = v.volume ?? 1;
+      const vol100 = Math.round(vol01 * 100);
+      setVolumeState(vol100);
+      setIsMuted(v.muted || vol100 === 0);
+    };
+
+    v.addEventListener("volumechange", onVol);
+    onVol();
+
+    return () => v.removeEventListener("volumechange", onVol);
+  }, [isReady]);
+
+  // teardown
+  useEffect(
+    () => () => {
       try {
-        if (playerInstance.current) {
-          playerInstance.current.remove?.();
-        }
+        playerInstance.current?.remove?.();
       } catch {}
       if (controlsHideTimerRef.current) {
         window.clearTimeout(controlsHideTimerRef.current);
@@ -810,47 +745,134 @@ const NJWPlayerComponent = ({
         window.clearTimeout(seekOverlayTimerRef.current);
         seekOverlayTimerRef.current = null;
       }
-    };
-  }, []);
+    },
+    []
+  );
 
+  // reflect external autoPlay/muted
+  useEffect(() => {
+    const p = playerInstance.current;
+    if (!p) return;
+    try {
+      p.setMute?.(!!muted);
+      if (autoPlay && p.getState?.() !== "playing") p.play?.(true);
+    } catch {}
+  }, [autoPlay, muted]);
+
+  // keyboard shortcuts
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!isFullscreen && !controlsVisible) return;
+      const p = playerInstance.current;
+      if (!p) return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      )
+        return;
+      const unforceMuteIfNeeded = () => {
+        if (forcedAutoplayMuteRef.current && !muted) {
+          try {
+            p.setMute?.(false);
+          } catch {}
+          forcedAutoplayMuteRef.current = false;
+        }
+      };
+      switch (e.code) {
+        case "Space":
+          e.preventDefault();
+          unforceMuteIfNeeded();
+          p.getState?.() === "playing" ? p.pause?.() : p.play?.(true);
+          break;
+        case "ArrowLeft":
+          e.preventDefault();
+          seekBy(-CONFIG.SKIP_SECONDS);
+          break;
+        case "ArrowRight":
+          e.preventDefault();
+          seekBy(CONFIG.SKIP_SECONDS);
+          break;
+        default:
+          if (e.key.toLowerCase() === "m") {
+            e.preventDefault();
+            p.setMute?.(!p.getMute?.());
+          }
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFullscreen, controlsVisible, duration, position, muted]);
+
+  // helpers bound to state
+  const [volume, setVolumeState] = useState(CONFIG.DEFAULT_VOLUME);
   const scheduleControlsAutohide = useCallback(() => {
     if (controlsHideTimerRef.current) {
       window.clearTimeout(controlsHideTimerRef.current);
       controlsHideTimerRef.current = null;
     }
     const timeoutMs = isTouchDevice
-      ? CONTROLS_AUTOHIDE_MS
-      : CONTROLS_AUTOHIDE_DESKTOP_MS;
+      ? CONFIG.CONTROLS_AUTOHIDE_MS_TOUCH
+      : CONFIG.CONTROLS_AUTOHIDE_MS_DESKTOP;
     controlsHideTimerRef.current = window.setTimeout(() => {
-      if (isTouchDevice) {
-        if (!isScrubbing && !isHovering) {
-          setControlsVisible(false);
-        }
-      } else {
-        // Desktop
-        if (!isScrubbing && !isHoveringControls) {
-          setControlsVisible(false);
-          setCursorHidden(true);
-        }
+      const shouldHide = isFullscreen
+        ? !isScrubbing && !isHoveringControls
+        : !isScrubbing && (isTouchDevice ? !isHovering : !isHoveringControls);
+      if (shouldHide) {
+        setControlsVisible(false);
+        if (!isTouchDevice) setCursorHidden(true);
       }
       controlsHideTimerRef.current = null;
     }, timeoutMs);
-  }, [isTouchDevice, isScrubbing, isHovering, isHoveringControls]);
+  }, [
+    isTouchDevice,
+    isScrubbing,
+    isHoveringControls,
+    isFullscreen,
+    isHovering,
+  ]);
 
   useEffect(() => {
     const el = overlayRef.current;
     if (!el) return;
-
     const handler = () => {
       setIsHovering(true);
       setControlsVisible(true);
       scheduleControlsAutohide();
     };
-
     el.addEventListener("touchstart", handler, { passive: true });
     return () => el.removeEventListener("touchstart", handler);
   }, [scheduleControlsAutohide]);
 
+  // global fullscreen listeners (DOM FS API)
+  useEffect(() => {
+    const onFsChange = () => {
+      const fs = !!document.fullscreenElement;
+      setIsFullscreen(fs);
+      if (fs) {
+        scheduleControlsAutohide();
+      } else {
+        const prev = (document.documentElement as any).__prevOverflow ?? "";
+        document.documentElement.style.overflow = prev;
+        delete (document.documentElement as any).__prevOverflow;
+
+        try {
+          playerInstance.current?.setFullscreen?.(false);
+        } catch {}
+      }
+    };
+    document.addEventListener("fullscreenchange", onFsChange);
+    document.addEventListener("webkitfullscreenchange", onFsChange as any);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFsChange);
+      document.removeEventListener("webkitfullscreenchange", onFsChange as any);
+    };
+  }, [scheduleControlsAutohide]);
+
+  // progress bar scrubbing (mouse)
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       if (!isScrubbing || !progressBarRef.current) return;
@@ -860,9 +882,7 @@ const NJWPlayerComponent = ({
       const t = pct * (duration || 0);
       setScrubPct(pct * 100);
       setHoverTime({ x, t });
-
       if (!playerInstance.current || !duration) return;
-
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = requestAnimationFrame(() => {
         playerInstance.current.seek?.(t);
@@ -870,7 +890,7 @@ const NJWPlayerComponent = ({
       });
     };
     const onUp = () => {
-      if (!isScrubbing || !progressBarRef.current) return;
+      if (!isScrubbing) return;
       setIsScrubbing(false);
       scheduleControlsAutohide();
     };
@@ -882,227 +902,74 @@ const NJWPlayerComponent = ({
         document.removeEventListener("mouseup", onUp);
       };
     }
-  }, [isScrubbing, duration, scrubPct]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isScrubbing, duration]);
 
-  const toggleFullscreenDom = useCallback(() => {
-    const el = containerRef.current as any;
-    if (!el) return;
-
-    const videoEl: any =
-      (el.querySelector && el.querySelector("video")) || null;
-
-    if (
-      isIOS &&
-      videoEl &&
-      typeof videoEl.webkitEnterFullscreen === "function" &&
-      !document.fullscreenEnabled
-    ) {
-      try {
-        const onBegin = () => {
-          setIsFullscreen(true);
-        };
-        const onEnd = () => {
-          setIsFullscreen(false);
-        };
-
-        videoEl.addEventListener("webkitbeginfullscreen", onBegin);
-        videoEl.addEventListener("webkitendfullscreen", onEnd);
-
-        videoEl.webkitEnterFullscreen();
-
-        const cleanup = () => {
-          try {
-            videoEl.removeEventListener("webkitbeginfullscreen", onBegin);
-            videoEl.removeEventListener("webkitendfullscreen", onEnd);
-          } catch {}
-        };
-
-        setTimeout(cleanup, 60_000); 
-      } catch {
-      }
-      return;
-    }
-
-    // ===== Chuẩn DOM Fullscreen (iPadOS & desktop: Safari/Chrome/Edge/Firefox) =====
-    const restoreOverflow = () => {
-      if (originalOverflowRef.current !== null) {
-        document.documentElement.style.overflow = originalOverflowRef.current;
-        originalOverflowRef.current = null;
-      } else {
-        document.documentElement.style.overflow = "";
-      }
-    };
-
-    const enterDomFullscreen = async () => {
-      if (!isTouchDevice) {
-        originalOverflowRef.current =
-          document.documentElement.style.overflow || "";
-        document.documentElement.style.overflow = "hidden";
-      }
-
-      try {
-        setIsFullscreen(true);
-        const prom = el.requestFullscreen?.();
-        if (prom && typeof (prom as any).catch === "function") {
-          await prom;
-        }
-      } catch {
-        try {
-          const p = playerInstance.current;
-          p?.setFullscreen?.(true);
-          setIsFullscreen(true);
-        } catch {}
-      } finally {
-      }
-    };
-
-    const exitDomFullscreen = async () => {
-      try {
-        if (document.fullscreenElement) {
-          const prom = document.exitFullscreen?.();
-          if (prom && typeof (prom as any).catch === "function") {
-            await prom;
-          }
-        } else {
-          // Fallback JW
-          playerInstance.current?.setFullscreen?.(false);
-        }
-      } finally {
-        setIsFullscreen(false);
-        restoreOverflow();
-        if (isTouchDevice && (window as any).screen?.orientation) {
-          try {
-            (window as any).screen.orientation.unlock?.();
-          } catch {}
-        }
-      }
-    };
-
-    if (document.fullscreenElement) {
-      void exitDomFullscreen();
-      return;
-    }
-
-    void enterDomFullscreen().then(() => {
-      if (isTouchDevice && (window as any).screen?.orientation) {
-        try {
-          (window as any).screen.orientation.lock?.("landscape");
-        } catch {}
-      }
-    });
-  }, [isIOS, isTouchDevice]);
-
-  useEffect(() => {
-  const onFsChange = () => {
-    const isFs = !!document.fullscreenElement;
-    setIsFullscreen(isFs);
-
-    if (!isFs) {
-      if (originalOverflowRef.current !== null) {
-        document.documentElement.style.overflow = originalOverflowRef.current;
-        originalOverflowRef.current = null;
-      } else {
-        document.documentElement.style.overflow = "";
-      }
-
-      try {
-        playerInstance.current?.setFullscreen?.(false);
-      } catch {}
-    }
+  const seekBy = (sec: number) => {
+    const p = playerInstance.current;
+    if (!p) return;
+    const pos = p.getPosition?.() || position;
+    const newPos = Math.max(0, Math.min(duration, pos + sec));
+    p.seek?.(newPos);
+    setSeekOverlay(
+      sec > 0
+        ? { type: "forward", seconds: Math.abs(sec) }
+        : { type: "back", seconds: Math.abs(sec) }
+    );
+    if (seekOverlayTimerRef.current)
+      window.clearTimeout(seekOverlayTimerRef.current);
+    seekOverlayTimerRef.current = window.setTimeout(() => {
+      setSeekOverlay(null as any);
+      seekOverlayTimerRef.current = null;
+    }, 800);
   };
 
-  document.addEventListener("fullscreenchange", onFsChange);
-  document.addEventListener("webkitfullscreenchange", onFsChange as any);
+  const [seekOverlay, setSeekOverlay] = useState<{
+    type: "back" | "forward";
+    seconds: number;
+  } | null>(null);
 
-  return () => {
-    document.removeEventListener("fullscreenchange", onFsChange);
-    document.removeEventListener("webkitfullscreenchange", onFsChange as any);
-    if (originalOverflowRef.current !== null) {
-      document.documentElement.style.overflow = originalOverflowRef.current;
-      originalOverflowRef.current = null;
-    }
-  };
-}, []);
+  const handleCaptureFrame = useCallback(() => {
+    const videoEl = containerRef.current?.querySelector("video");
+    if (!videoEl) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = (videoEl as HTMLVideoElement).videoWidth;
+    canvas.height = (videoEl as HTMLVideoElement).videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(
+      videoEl as HTMLVideoElement,
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
+    const dataUrl = canvas.toDataURL("image/png");
+    setCapturedImage(dataUrl);
+    setShowImagePreview(true);
+    const a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = `frame-${Date.now()}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => setShowImagePreview(false), 2000);
+  }, []);
 
-
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (!isHovering) return;
-      const p = playerInstance.current;
-      if (!p) return;
-      const unforceMuteIfNeeded = () => {
-        if (forcedAutoplayMuteRef.current && !muted) {
-          try {
-            p.setMute?.(false);
-          } catch {}
-          forcedAutoplayMuteRef.current = false;
-        }
-      };
-
-      const target = e.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.isContentEditable)
-      )
-        return;
-
-      if (e.code === "Space") {
-        e.preventDefault();
-        unforceMuteIfNeeded();
-        const state = p.getState?.();
-        if (state === "playing") p.pause?.();
-        else p.play?.(true);
-      } else if (e.code === "ArrowLeft") {
-        e.preventDefault();
-        const pos = p.getPosition?.() || position;
-        p.seek?.(Math.max(0, Math.min(duration, pos - SKIP_SECONDS)));
-        setSeekOverlay({ type: "back", seconds: SKIP_SECONDS });
-        if (seekOverlayTimerRef.current)
-          window.clearTimeout(seekOverlayTimerRef.current);
-        seekOverlayTimerRef.current = window.setTimeout(() => {
-          setSeekOverlay(null);
-          seekOverlayTimerRef.current = null;
-        }, 800);
-      } else if (e.code === "ArrowRight") {
-        e.preventDefault();
-        const pos = p.getPosition?.() || position;
-        p.seek?.(Math.max(0, Math.min(duration, pos + SKIP_SECONDS)));
-        setSeekOverlay({ type: "forward", seconds: SKIP_SECONDS });
-        if (seekOverlayTimerRef.current)
-          window.clearTimeout(seekOverlayTimerRef.current);
-        seekOverlayTimerRef.current = window.setTimeout(() => {
-          setSeekOverlay(null);
-          seekOverlayTimerRef.current = null;
-        }, 800);
-      } else if (e.key.toLowerCase() === "m") {
-        e.preventDefault();
-        p.setMute?.(!p.getMute?.());
-      }
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [isHovering, duration, position, muted]);
-
+  // native attrs after ready
   useEffect(() => {
     const root = containerRef.current;
     if (!root) return;
     const video = root.querySelector("video") as HTMLVideoElement | null;
     if (!video) return;
-
     video.setAttribute("playsinline", "");
     video.setAttribute("webkit-playsinline", "");
-    video.removeAttribute("controls"); // keep native controls off if you show custom
+    video.removeAttribute("controls");
   }, [isReady]);
 
+  // fallback for non-hls servers (kept for parity – iframe embed outside scope)
   if (!isHls) {
-    const iframeUrl =
-      server === "helvid"
-        ? `https://helvid.net/play/index/${videoId}`
-        : server === "hydax"
-        ? `https://player.hidatv.live/player/?id=${videoId}`
-        : "";
+    // You can embed helvid/hydax here if needed; keeping return wrapper for layout consistency
   }
 
   const playedPct = duration ? (position / duration) * 100 : 0;
@@ -1114,12 +981,13 @@ const NJWPlayerComponent = ({
     <div
       className={`relative rounded-xl overflow-hidden shadow-2xl ${className}`}
     >
-      {/* Custom loading icon overlay */}
+      {/* Loading / buffering overlay */}
       {(!isReady || isBuffering) && (
         <div className="absolute inset-0 z-[999] flex items-center justify-center bg-transparent pointer-events-none">
           <LoaderPinwheel className="animate-spin h-8 w-8 md:h-16 md:w-16 text-pink-400 drop-shadow-lg" />
         </div>
       )}
+
       <div
         ref={containerRef}
         className={
@@ -1129,6 +997,7 @@ const NJWPlayerComponent = ({
             ? "fixed left-0 top-0 w-[100vw] h-[100vh] bg-black z-50 box-border flex items-center justify-center"
             : "relative w-full aspect-video bg-black"
         }
+        tabIndex={0}
         onMouseEnter={() => {
           setIsHovering(true);
           setControlsVisible(true);
@@ -1155,17 +1024,7 @@ const NJWPlayerComponent = ({
             scheduleControlsAutohide();
           }
         }}
-        onTouchMove={(e) => {
-          if (!containerRef.current) return;
-          const touch = e.touches && e.touches[0];
-          if (!touch) return;
-          const rect = containerRef.current.getBoundingClientRect();
-          const y = touch.clientY - rect.top;
-          const bottomZone = y >= rect.height * CONTROLS_REVEAL_Y_FACTOR;
-        }}
-        onTouchEnd={(e) => {
-          setIsHovering(false);
-        }}
+        onTouchEnd={() => setIsHovering(false)}
       >
         {isIOS && !supportsAspectRatio && (
           <div style={{ paddingTop: "56.25%" }} />
@@ -1180,6 +1039,7 @@ const NJWPlayerComponent = ({
           }
         />
 
+        {/* Interaction overlay */}
         <div
           ref={overlayRef}
           className={`absolute inset-0 z-10 ${
@@ -1192,7 +1052,7 @@ const NJWPlayerComponent = ({
           onClick={() => {
             const p = playerInstance.current;
             if (!p) return;
-
+            containerRef.current?.focus?.();
             if (isTouchDevice && suppressClickRef.current) {
               suppressClickRef.current = false;
               return;
@@ -1213,8 +1073,7 @@ const NJWPlayerComponent = ({
               } catch {}
               forcedAutoplayMuteRef.current = false;
             }
-            if (isPlaying) p.pause?.();
-            else p.play?.(true);
+            isPlaying ? p.pause?.() : p.play?.(true);
             scheduleControlsAutohide();
           }}
           onContextMenu={(e) => {
@@ -1231,9 +1090,7 @@ const NJWPlayerComponent = ({
             e.preventDefault();
             const p = playerInstance.current;
             if (!p || !containerRef.current) return;
-            // Detect double click/tap zone
             if (!isTouchDevice) return;
-            // Đánh dấu suppressClickRef để suppress single tap
             suppressClickRef.current = true;
             setTimeout(() => {
               suppressClickRef.current = false;
@@ -1241,51 +1098,31 @@ const NJWPlayerComponent = ({
             const rect = containerRef.current.getBoundingClientRect();
             const tapX = e.clientX - rect.left;
             const width = rect.width;
-            const leftZoneEnd = width * DOUBLE_TAP_ZONE_RATIO;
-            const rightZoneStart = width * (1 - DOUBLE_TAP_ZONE_RATIO);
-            if (tapX < leftZoneEnd) {
-              // Double tap/click on left side: seek backward
-              const newPos = Math.max(
-                0,
-                Math.min(
-                  duration,
-                  (p.getPosition?.() || position) - SKIP_SECONDS
-                )
-              );
-              p.seek?.(newPos);
-              setSeekOverlay({ type: "back", seconds: SKIP_SECONDS });
-            } else if (tapX > rightZoneStart) {
-              // Double tap/click on right side: seek forward
-              const newPos = Math.max(
-                0,
-                Math.min(
-                  duration,
-                  (p.getPosition?.() || position) + SKIP_SECONDS
-                )
-              );
-              p.seek?.(newPos);
-              setSeekOverlay({ type: "forward", seconds: SKIP_SECONDS });
-            }
-            if (seekOverlayTimerRef.current)
-              window.clearTimeout(seekOverlayTimerRef.current);
-            seekOverlayTimerRef.current = window.setTimeout(() => {
-              setSeekOverlay(null);
-              seekOverlayTimerRef.current = null;
-            }, 800);
+            const leftZoneEnd = width * CONFIG.DOUBLE_TAP_ZONE_RATIO;
+            const rightZoneStart = width * (1 - CONFIG.DOUBLE_TAP_ZONE_RATIO);
+            if (tapX < leftZoneEnd) seekBy(-CONFIG.SKIP_SECONDS);
+            else if (tapX > rightZoneStart) seekBy(CONFIG.SKIP_SECONDS);
           }}
-          onTouchStart={handleSurfaceTouchStart}
-          onPointerDown={handleSurfacePointerDown}
-          onTouchEnd={() => {
-            setIsHovering(false);
+          onTouchStart={() => {
+            setIsHovering(true);
+            setControlsVisible(true);
+            scheduleControlsAutohide();
+          }}
+          onPointerDown={(e) => {
+            if (e.pointerType === "touch") {
+              setIsHovering(true);
+              setControlsVisible(true);
+              scheduleControlsAutohide();
+            }
           }}
         />
 
-        {/* Overlay thông báo tua khi double tap hoặc dùng phím */}
+        {/* Seek overlay */}
         {seekOverlay && (
           <>
             {seekOverlay.type === "back" && (
               <div className="absolute left-0 top-0 bottom-0 z-[999] flex items-center pl-4 md:pl-8 pointer-events-none">
-                <div className="flex items-center gap-2 bg-gray-700/80 backdrop-blur-sm text-white text-base md:text-lg font-semibold rounded-lg px-3 py-2 shadow-xl animate-fade">
+                <div className="flex items-center gap-2 bg-gray-700/80 backdrop-blur-sm text-white text-base md:text-lg font-semibold rounded-lg px-3 py-2 shadow-xl animate-fade select-none">
                   <Rewind className="h-6 w-6 md:h-8 md:w-8 text-pink-400 animate-bounce-left" />
                   <span>Lùi {seekOverlay.seconds} giây</span>
                 </div>
@@ -1293,7 +1130,7 @@ const NJWPlayerComponent = ({
             )}
             {seekOverlay.type === "forward" && (
               <div className="absolute right-0 top-0 bottom-0 z-[999] flex items-center justify-end pr-4 md:pr-8 pointer-events-none">
-                <div className="flex items-center gap-2 bg-gray-700/80 backdrop-blur-sm text-white text-base md:text-lg font-semibold rounded-lg px-3 py-2 shadow-xl animate-fade">
+                <div className="flex items-center gap-2 bg-gray-700/80 backdrop-blur-sm text-white text-base md:text-lg font-semibold rounded-lg px-3 py-2 shadow-xl animate-fade select-none">
                   <span>Tiến {seekOverlay.seconds} giây</span>
                   <FastForward className="h-6 w-6 md:h-8 md:w-8 text-pink-400 animate-bounce-right" />
                 </div>
@@ -1301,7 +1138,8 @@ const NJWPlayerComponent = ({
             )}
           </>
         )}
-        {/* Custom right-click about message (desktop) */}
+
+        {/* About popup (desktop) */}
         {!isTouchDevice && showAboutMsg && aboutPos && (
           <div
             className="absolute z-40 rounded-md bg-gray-900/95 text-white text-xs shadow-xl border border-gray-700/60 px-3 py-2 whitespace-nowrap"
@@ -1327,16 +1165,16 @@ const NJWPlayerComponent = ({
               aboutHideTimerRef.current = window.setTimeout(() => {
                 setShowAboutMsg(false);
                 aboutHideTimerRef.current = null;
-              }, ABOUT_MESSAGE_TIMEOUT_MS);
+              }, CONFIG.ABOUT_MESSAGE_TIMEOUT_MS);
             }}
           >
             <div className="font-semibold mb-0.5 cursor-pointer select-none whitespace-nowrap">
-              {JW_ABOUT_TEXT}
+              {CONFIG.JW_ABOUT_TEXT}
             </div>
           </div>
         )}
 
-        {/* Mobile-centered controls (play/pause, back/forward) */}
+        {/* Mobile centered controls */}
         {isTouchDevice && (
           <div
             className={`absolute inset-0 z-30 flex items-center justify-center transition-opacity duration-200 ${
@@ -1344,31 +1182,21 @@ const NJWPlayerComponent = ({
             } pointer-events-none`}
           >
             <div className="pointer-events-auto flex items-center gap-4 sm:gap-6">
-              {/* Backward 10s */}
               <button
-                aria-label={LABEL_BACK_X_SECONDS(SKIP_SECONDS)}
+                aria-label={CONFIG.LABELS.BACK_X(CONFIG.SKIP_SECONDS)}
                 className="flex items-center justify-center p-1 rounded-full bg-white/10 transition-colors duration-200 drop-shadow-lg"
                 onClick={(e) => {
                   e.stopPropagation();
-                  const p = playerInstance.current;
-                  if (!p) return;
-                  const livePos = p.getPosition?.();
-                  const pos = livePos && livePos > 0 ? livePos : position;
-                  const newPos = Math.max(
-                    0,
-                    Math.min(duration, pos - SKIP_SECONDS)
-                  );
-                  p.seek?.(newPos);
-                  setPosition(newPos);
+                  seekBy(-CONFIG.SKIP_SECONDS);
                   scheduleControlsAutohide();
                 }}
               >
                 <BackwardIcon className="h-7 w-7 text-white" />
               </button>
-
-              {/* Play/Pause */}
               <button
-                aria-label={isPlaying ? LABEL_PAUSE : LABEL_PLAY}
+                aria-label={
+                  isPlaying ? CONFIG.LABELS.PAUSE : CONFIG.LABELS.PLAY
+                }
                 className="flex items-center justify-center p-1 rounded-full bg-white/10 transition-colors duration-200 drop-shadow-lg"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -1380,36 +1208,24 @@ const NJWPlayerComponent = ({
                     } catch {}
                     forcedAutoplayMuteRef.current = false;
                   }
-                  if (isPlaying) p.pause?.();
-                  else p.play?.(true);
+                  isPlaying ? p.pause?.() : p.play?.(true);
                   scheduleControlsAutohide();
                 }}
               >
                 <div className="transition-opacity duration-300 ease-in-out">
                   {isPlaying ? (
-                    <PauseIcon className="h-8 w-8 text-white opacity-100 transition-opacity duration-300" />
+                    <PauseIcon className="h-8 w-8 text-white" />
                   ) : (
-                    <PlayIcon className="h-8 w-8 pl-1 text-white opacity-100 transition-opacity duration-300" />
+                    <PlayIcon className="h-8 w-8 pl-1 text-white" />
                   )}
                 </div>
               </button>
-
-              {/* Forward 10s */}
               <button
-                aria-label={LABEL_FORWARD_X_SECONDS(SKIP_SECONDS)}
+                aria-label={CONFIG.LABELS.FORWARD_X(CONFIG.SKIP_SECONDS)}
                 className="flex items-center justify-center p-1 rounded-full bg-white/10 transition-colors duration-200 drop-shadow-lg"
                 onClick={(e) => {
                   e.stopPropagation();
-                  const p = playerInstance.current;
-                  if (!p) return;
-                  const newPos = Math.max(
-                    0,
-                    Math.min(
-                      duration,
-                      (p.getPosition?.() || position) + SKIP_SECONDS
-                    )
-                  );
-                  p.seek?.(newPos);
+                  seekBy(CONFIG.SKIP_SECONDS);
                   scheduleControlsAutohide();
                 }}
               >
@@ -1419,6 +1235,7 @@ const NJWPlayerComponent = ({
           </div>
         )}
 
+        {/* Bottom control bar */}
         <div
           className={`${
             isIOS ? "absolute" : isFullscreen ? "fixed" : "absolute"
@@ -1440,6 +1257,7 @@ const NJWPlayerComponent = ({
             setShowAboutMsg(true);
           }}
         >
+          {/* progress bar */}
           <div
             className={`relative cursor-pointer group ${
               controlsVisible ? "" : "pointer-events-none"
@@ -1474,7 +1292,7 @@ const NJWPlayerComponent = ({
               e.preventDefault();
               e.stopPropagation();
             }}
-            onMouseUp={(e) => {
+            onMouseUp={() => {
               if (!isScrubbing) return;
               setIsScrubbing(false);
               setIsHovering(false);
@@ -1483,27 +1301,21 @@ const NJWPlayerComponent = ({
             onClick={(e) => {
               const p = playerInstance.current;
               if (!p || !duration || !progressBarRef.current) return;
-
-              if (p.getState() === "buffering") return;
-
+              if (p.getState?.() === "buffering") return;
               const rect = progressBarRef.current.getBoundingClientRect();
-              // Calculate position from click event, not from hover state
               const x = Math.max(
                 0,
                 Math.min(rect.width, e.clientX - rect.left)
               );
               const pct = rect.width ? x / rect.width : 0;
-
               const sec = Math.max(0, Math.min(duration, pct * duration));
               p.seek?.(sec);
-
-              // Auto-hide time indicator after click
               setTimeout(() => setHoverTime(null), 800);
               scheduleControlsAutohide();
             }}
             onTouchStart={(e) => {
               if (!progressBarRef.current) return;
-              const touch = e.touches && e.touches[0];
+              const touch = e.touches?.[0];
               if (!touch) return;
               const rect = progressBarRef.current.getBoundingClientRect();
               const x = Math.max(
@@ -1520,7 +1332,7 @@ const NJWPlayerComponent = ({
             }}
             onTouchMove={(e) => {
               if (!isScrubbing || !progressBarRef.current) return;
-              const touch = e.touches && e.touches[0];
+              const touch = e.touches?.[0];
               if (!touch) return;
               const rect = progressBarRef.current.getBoundingClientRect();
               const x = Math.max(
@@ -1531,15 +1343,13 @@ const NJWPlayerComponent = ({
               setScrubPct(pct * 100);
               const t = pct * (duration || 0);
               setHoverTime({ x, t });
-              // Real-time seek while dragging
               const p = playerInstance.current;
               if (p && duration) p.seek?.(t);
               e.preventDefault();
               e.stopPropagation();
             }}
-            onTouchEnd={(e) => {
+            onTouchEnd={() => {
               if (!progressBarRef.current) return;
-              const rect = progressBarRef.current.getBoundingClientRect();
               const pct = typeof scrubPct === "number" ? scrubPct / 100 : 0;
               const sec = Math.max(0, Math.min(duration, pct * duration));
               const p = playerInstance.current;
@@ -1553,92 +1363,36 @@ const NJWPlayerComponent = ({
               controlsHideTimerRef.current = window.setTimeout(() => {
                 setControlsVisible(false);
                 controlsHideTimerRef.current = null;
-              }, CONTROLS_AUTOHIDE_MS);
-              // Auto-hide time indicator after tap
+              }, CONFIG.CONTROLS_AUTOHIDE_MS_TOUCH);
               setTimeout(() => setHoverTime(null), 1200);
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              if (!containerRef.current) return;
-              const rect = containerRef.current.getBoundingClientRect();
-              const x = e.clientX - rect.left;
-              const y = e.clientY - rect.top;
-              setAboutPos({ x, y });
-              setShowAboutMsg(true);
-              // No auto-hide timer for about message
             }}
           >
-            <div
-              className="absolute inset-0 bg-gray-600/30 rounded-full transition-all duration-200 group-hover:scale-y-150 origin-center"
-              onContextMenu={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (!containerRef.current) return;
-                const rect = containerRef.current.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-                setAboutPos({ x, y });
-                setShowAboutMsg(true);
-              }}
-            />
+            <div className="absolute inset-0 bg-gray-600/30 rounded-full transition-all duration-200 group-hover:scale-y-150 origin-center" />
             <div
               className="absolute inset-y-0 left-0 bg-gray-400/40 rounded-full transition-all duration-200"
               style={{ width: `${Math.min(100, bufferedPct)}%` }}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (!containerRef.current) return;
-                const rect = containerRef.current.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-                setAboutPos({ x, y });
-                setShowAboutMsg(true);
-              }}
             />
             <div
               className="absolute inset-y-0 left-0 bg-gradient-to-r from-red-500 to-pink-500 rounded-full transition-all duration-200 group-hover:scale-y-150 origin-center"
               style={{ width: `${Math.min(100, effectivePlayedPct)}%` }}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (!containerRef.current) return;
-                const rect = containerRef.current.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-                setAboutPos({ x, y });
-                setShowAboutMsg(true);
-              }}
             />
             {hoverTime && (
               <div
-                className={`absolute -top-8 -translate-x-1/2 bg-gray-900/90 text-white text-xs font-medium rounded-lg px-3 py-1.5 shadow-lg pointer-events-none
-                ${hoverTime ? "opacity-100 scale-100" : "opacity-0 scale-95"}
-                transition-all duration-100 ease-in-out`}
+                className={`absolute -top-8 -translate-x-1/2 bg-gray-900/90 text-white text-xs font-medium rounded-lg px-3 py-1.5 shadow-lg pointer-events-none ${
+                  hoverTime ? "opacity-100 scale-100" : "opacity-0 scale-95"
+                } transition-all duration-100 ease-in-out`}
                 style={{ left: hoverTime?.x }}
               >
-                {hoverTime && formatTime(hoverTime.t)}
+                {formatTime(hoverTime.t)}
               </div>
             )}
           </div>
 
-          {/* Bottom control bar */}
+          {/* bottom row */}
           <div
             className={`flex items-center justify-between gap-2 md:gap-4 ${
               isIOS && "pb-4"
             }`}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              if (!containerRef.current) return;
-              const rect = containerRef.current.getBoundingClientRect();
-              const x = e.clientX - rect.left;
-              const y = e.clientY - rect.top;
-              setAboutPos({ x, y });
-              setShowAboutMsg(true);
-            }}
           >
             <div className="flex items-center gap-1 md:gap-3">
               {!isTouchDevice && (
@@ -1646,12 +1400,13 @@ const NJWPlayerComponent = ({
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
-                        aria-label={isPlaying ? LABEL_PAUSE : LABEL_PLAY}
+                        aria-label={
+                          isPlaying ? CONFIG.LABELS.PAUSE : CONFIG.LABELS.PLAY
+                        }
                         onClick={() => {
                           const p = playerInstance.current;
                           if (!p) return;
-                          if (isPlaying) p.pause?.();
-                          else p.play?.(true);
+                          isPlaying ? p.pause?.() : p.play?.(true);
                         }}
                         className="p-2 rounded-full hover:bg-white/15 transition-colors duration-200"
                       >
@@ -1664,7 +1419,7 @@ const NJWPlayerComponent = ({
                     </TooltipTrigger>
                     <TooltipContent side="top" sideOffset={15}>
                       <div className="bg-gray-900 text-white text-xs font-medium rounded-lg px-3 py-1.5 shadow-lg">
-                        {isPlaying ? LABEL_PAUSE : LABEL_PLAY}
+                        {isPlaying ? CONFIG.LABELS.PAUSE : CONFIG.LABELS.PLAY}
                       </div>
                     </TooltipContent>
                   </Tooltip>
@@ -1675,21 +1430,10 @@ const NJWPlayerComponent = ({
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
-                        aria-label={LABEL_BACK_X_SECONDS(SKIP_SECONDS)}
+                        aria-label={CONFIG.LABELS.BACK_X(CONFIG.SKIP_SECONDS)}
                         className="p-2 rounded-full hover:bg-white/15 transition-colors duration-200"
                         onClick={() => {
-                          const p = playerInstance.current;
-                          if (!p) return;
-                          if (p.getState() === "buffering") return;
-                          const livePos = p.getPosition?.();
-                          const pos =
-                            livePos && livePos > 0 ? livePos : position;
-                          const newPos = Math.max(
-                            0,
-                            Math.min(duration, pos - SKIP_SECONDS)
-                          );
-                          p.seek?.(newPos);
-                          setPosition(newPos);
+                          seekBy(-CONFIG.SKIP_SECONDS);
                           scheduleControlsAutohide();
                         }}
                       >
@@ -1698,7 +1442,7 @@ const NJWPlayerComponent = ({
                     </TooltipTrigger>
                     <TooltipContent side="top" sideOffset={15}>
                       <div className="bg-gray-900 text-white text-xs font-medium rounded-lg px-3 py-1.5 shadow-lg">
-                        {BACKWARD_TOOLTIP}
+                        {CONFIG.TOOLTIPS.BACKWARD}
                       </div>
                     </TooltipContent>
                   </Tooltip>
@@ -1709,19 +1453,12 @@ const NJWPlayerComponent = ({
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
-                        aria-label={LABEL_FORWARD_X_SECONDS(SKIP_SECONDS)}
-                        className="p-2 rounded-full hover:bg-white/15  transition-colors duration-200"
+                        aria-label={CONFIG.LABELS.FORWARD_X(
+                          CONFIG.SKIP_SECONDS
+                        )}
+                        className="p-2 rounded-full hover:bg-white/15 transition-colors duration-200"
                         onClick={() => {
-                          const p = playerInstance.current;
-                          if (!p) return;
-                          const newPos = Math.max(
-                            0,
-                            Math.min(
-                              duration,
-                              (p.getPosition?.() || position) + SKIP_SECONDS
-                            )
-                          );
-                          p.seek?.(newPos);
+                          seekBy(CONFIG.SKIP_SECONDS);
                           scheduleControlsAutohide();
                         }}
                       >
@@ -1730,20 +1467,19 @@ const NJWPlayerComponent = ({
                     </TooltipTrigger>
                     <TooltipContent side="top" sideOffset={15}>
                       <div className="bg-gray-900 text-white text-xs font-medium rounded-lg px-3 py-1.5 shadow-lg">
-                        {FORWARD_TOOLTIP}
+                        {CONFIG.TOOLTIPS.FORWARD}
                       </div>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               )}
 
-              {/* Next chapter button (if chapters available) */}
               {Array.isArray(chapters) && chapters.length > 0 && (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
-                        aria-label={LABEL_NEXT_CHAPTER}
+                        aria-label={CONFIG.LABELS.NEXT_CHAPTER}
                         onClick={() => {
                           const p = playerInstance.current;
                           if (!p) return;
@@ -1765,24 +1501,24 @@ const NJWPlayerComponent = ({
                             scheduleControlsAutohide();
                           }
                         }}
-                        className="p-2 rounded-full hover:bg-white/15  transition-colors duration-200"
+                        className="p-2 rounded-full hover:bg-white/15 transition-colors duration-200"
                       >
                         <Flag className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7" />
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="top" sideOffset={15}>
                       <div className="bg-gray-900 text-white text-xs font-medium rounded-lg px-3 py-1.5 shadow-lg">
-                        {NEXT_CHAPTER_TOOLTIP}
+                        {CONFIG.TOOLTIPS.NEXT_CHAPTER}
                       </div>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               )}
 
-              {/* Volume control (desktop: show slider on hover) */}
+              {/* Volume */}
               <div className="group relative flex items-center">
                 <button
-                  aria-label={LABEL_MUTE}
+                  aria-label={CONFIG.LABELS.MUTE}
                   onClick={() => {
                     const p = playerInstance.current;
                     if (!p) return;
@@ -1799,7 +1535,6 @@ const NJWPlayerComponent = ({
                     <Volume1 className="h-5 w-5 sm:h-5 sm:w-5 md:h-6 md:w-6 text-white" />
                   )}
                 </button>
-                {/* Only show slider on desktop (not touch devices) */}
                 {!isTouchDevice && (
                   <div className="pl-2 left-12 w-0 group-hover:w-28 opacity-0 group-hover:opacity-100 transition-all duration-300 items-center hidden sm:flex">
                     <Slider
@@ -1818,7 +1553,7 @@ const NJWPlayerComponent = ({
                         p.setVolume?.(v);
                         if (v === 0 && !isMuted) p.setMute?.(true);
                         if (v > 0 && isMuted) p.setMute?.(false);
-                        setVolume(v);
+                        setVolumeState(v);
                         scheduleControlsAutohide();
                       }}
                     />
@@ -1848,28 +1583,22 @@ const NJWPlayerComponent = ({
                     </TooltipTrigger>
                     <TooltipContent side="top" sideOffset={15}>
                       <div className="bg-gray-900 text-white text-xs font-medium rounded-lg px-3 py-1.5 shadow-lg">
-                        {SCREENSHOT_TOOLTIP}
+                        {CONFIG.TOOLTIPS.SCREENSHOT}
                       </div>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               )}
 
-              {/* Picture in Picture */}
               {pipSupported && (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
                         id="pip-button"
-                        aria-label={LABEL_PIP}
+                        aria-label={CONFIG.LABELS.PIP}
                         onClick={() => {
-                          const p = playerInstance.current;
-                          const videoEl = containerRef.current?.querySelector(
-                            "video"
-                          ) as HTMLVideoElement | null;
-                          smartTogglePip(p, videoEl);
-                          scheduleControlsAutohide();
+                          pipCtrlRef.current?.toggle();
                         }}
                         className="p-2 rounded-full hover:bg-white/15 transition-colors duration-200"
                       >
@@ -1878,7 +1607,7 @@ const NJWPlayerComponent = ({
                     </TooltipTrigger>
                     <TooltipContent side="top" sideOffset={15}>
                       <div className="bg-gray-900 text-white text-xs font-medium rounded-lg px-3 py-1.5 shadow-lg">
-                        {PIP_TOOLTIP}
+                        {CONFIG.TOOLTIPS.PIP}
                       </div>
                     </TooltipContent>
                   </Tooltip>
@@ -1887,22 +1616,24 @@ const NJWPlayerComponent = ({
 
               {/* Fullscreen */}
               <button
-                aria-label={LABEL_FULLSCREEN}
-                onClick={() => toggleFullscreenDom()}
+                aria-label={CONFIG.LABELS.FULLSCREEN}
+                onClick={() => controllerRef.current?.toggle()}
                 className="p-2 rounded-full hover:bg-white/15 transition-colors duration-200"
               >
                 <div className="transition-opacity duration-300 ease-in-out">
                   {isIOS ? (
                     <Maximize2 className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
                   ) : isFullscreen ? (
-                    <Minimize2 className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 opacity-100 transition-opacity duration-300" />
+                    <Minimize2 className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
                   ) : (
-                    <Maximize2 className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 opacity-100 transition-opacity duration-300" />
+                    <Maximize2 className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
                   )}
                 </div>
               </button>
+
               {showImagePreview && capturedImage && (
                 <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/60">
+                  {/* eslint-disable-next-line */}
                   <img
                     src={capturedImage}
                     alt="Captured frame"
@@ -1917,15 +1648,5 @@ const NJWPlayerComponent = ({
     </div>
   );
 };
-
-function formatTime(seconds: number) {
-  if (!isFinite(seconds) || seconds < 0) seconds = 0;
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  const mm = h > 0 ? String(m).padStart(2, "0") : String(m);
-  const ss = String(s).padStart(2, "0");
-  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
-}
 
 export default NJWPlayerComponent;
