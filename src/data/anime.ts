@@ -136,5 +136,17 @@ export const animeData: Anime = {
       downloadUrl: 'https://drive.google.com/file/d/1u_hvxNd6kWtJluCuYwR-tNrNiOIKMKRn/view?usp=sharing',
       rawDownloadUrl: 'https://drive.google.com/file/d/1EJJljjpdwCWjiJqXr5QWbwpxZszA-wty/view?usp=sharing'
     },
+      {
+          id: 8,
+          title: 'Episode 8',
+          videoId: '08',
+          servers: {
+              hls: 'Tập8.m3u8',
+              helvid: 'b7bf8f6a1904',
+              hydax: '5JzCVvQaO'
+          },
+          downloadUrl: 'https://drive.google.com/file/d/1ClZN-3_xruecanTx9KZBpMGCkY8MwvL6/view?usp=sharing',
+          rawDownloadUrl: 'https://drive.google.com/file/d/1F5y7-Z0yMePOvY1JY6va4AEn5JPqw_Gp/view?usp=sharing'
+      },
   ],
 };
