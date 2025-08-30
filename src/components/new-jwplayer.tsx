@@ -32,6 +32,14 @@ import { consoleProtection } from "../lib/console-protection";
 import { createFullscreenController } from "@/lib/fullscreen-controller";
 import { createPipController } from "@/lib/pip-controller";
 
+function useSyncedRef<T>(value: T) {
+  const ref = useRef(value);
+  useEffect(() => {
+    ref.current = value;
+  }, [value]);
+  return ref;
+}
+
 /* =====================================================================================
  * CONFIG – tweak here without touching logic below
  * ===================================================================================*/
@@ -331,6 +339,12 @@ const NJWPlayerComponent = ({
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [showImagePreview, setShowImagePreview] = useState(false);
 
+  const isScrubbingRef = useSyncedRef(isScrubbing);
+  const isHoveringRef = useSyncedRef(isHovering);
+  const isHoveringControlsRef = useSyncedRef(isHoveringControls);
+  const isFullscreenRef = useSyncedRef(isFullscreen);
+  const isTouchDeviceRef = useSyncedRef(isTouchDevice);
+
   const jwReady = useJWScript(onError);
   useEffect(() => {
     setLibReady(jwReady);
@@ -453,7 +467,7 @@ const NJWPlayerComponent = ({
       try {
         v.crossOrigin = "anonymous";
       } catch {}
-      v.setAttribute("playsinline", ""); // bạn đã có
+      v.setAttribute("playsinline", "");
       v.setAttribute("webkit-playsinline", "");
     };
 
@@ -835,45 +849,52 @@ const NJWPlayerComponent = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFullscreen, controlsVisible, duration, position, muted]);
 
-  // helpers bound to state
   const [volume, setVolumeState] = useState(CONFIG.DEFAULT_VOLUME);
   const scheduleControlsAutohide = useCallback(() => {
     if (controlsHideTimerRef.current) {
       window.clearTimeout(controlsHideTimerRef.current);
       controlsHideTimerRef.current = null;
     }
-    const timeoutMs = isTouchDevice
+
+    const timeoutMs = isTouchDeviceRef.current
       ? CONFIG.CONTROLS_AUTOHIDE_MS_TOUCH
       : CONFIG.CONTROLS_AUTOHIDE_MS_DESKTOP;
-    controlsHideTimerRef.current = window.setTimeout(() => {
-      const shouldHide = isFullscreen
-        ? !isScrubbing && !isHoveringControls
-        : !isScrubbing && (isTouchDevice ? !isHovering : !isHoveringControls);
+
+    controlsHideTimerRef.current = window.setTimeout(function tick() {
+      const isFS = isFullscreenRef.current;
+      const scrubbing = isScrubbingRef.current;
+      const hovering = isHoveringRef.current;
+      const hoveringCtl = isHoveringControlsRef.current;
+      const isTouch = isTouchDeviceRef.current;
+
+      const shouldHide = isFS
+        ? !scrubbing && !hoveringCtl
+        : !scrubbing && (isTouch ? !hovering : !hovering && !hoveringCtl);
+
       if (shouldHide) {
         setControlsVisible(false);
-        if (!isTouchDevice) setCursorHidden(true);
+        if (!isTouch) setCursorHidden(true);
+        controlsHideTimerRef.current = null;
+      } else {
+        controlsHideTimerRef.current = window.setTimeout(tick, timeoutMs);
       }
-      controlsHideTimerRef.current = null;
     }, timeoutMs);
   }, [
-    isTouchDevice,
-    isScrubbing,
-    isHoveringControls,
-    isFullscreen,
-    isHovering,
+    isTouchDeviceRef,
+    isFullscreenRef,
+    isScrubbingRef,
+    isHoveringRef,
+    isHoveringControlsRef,
   ]);
 
   useEffect(() => {
-    const el = overlayRef.current;
-    if (!el) return;
-    const handler = () => {
-      setIsHovering(true);
-      setControlsVisible(true);
+    if (controlsVisible) {
       scheduleControlsAutohide();
-    };
-    el.addEventListener("touchstart", handler, { passive: true });
-    return () => el.removeEventListener("touchstart", handler);
-  }, [scheduleControlsAutohide]);
+    } else if (controlsHideTimerRef.current) {
+      window.clearTimeout(controlsHideTimerRef.current);
+      controlsHideTimerRef.current = null;
+    }
+  }, [controlsVisible, scheduleControlsAutohide]);
 
   // global fullscreen listeners (DOM FS API)
   useEffect(() => {
@@ -1268,7 +1289,7 @@ const NJWPlayerComponent = ({
           className={`${
             isIOS ? "absolute" : isFullscreen ? "fixed" : "absolute"
           } inset-x-0 bottom-0 z-20 flex flex-col gap-2 text-white transition-opacity duration-300 ${
-            controlsVisible ? "opacity-100" : "opacity-0"
+            controlsVisible ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
           } bg-gradient-to-t from-black/40 to-transparent px-3 pb-[calc(0.2rem+env(safe-area-inset-bottom))]`}
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
