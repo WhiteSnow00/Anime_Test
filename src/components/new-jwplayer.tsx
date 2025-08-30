@@ -445,6 +445,29 @@ const NJWPlayerComponent = ({
     };
   }, [isIOS]);
 
+  useEffect(() => {
+    const root = containerRef.current;
+    if (!root) return;
+
+    const apply = (v: HTMLVideoElement) => {
+      try {
+        v.crossOrigin = "anonymous";
+      } catch {}
+      v.setAttribute("playsinline", ""); // bạn đã có
+      v.setAttribute("webkit-playsinline", "");
+    };
+
+    const trySet = () => {
+      const v = root.querySelector("video") as HTMLVideoElement | null;
+      if (v) apply(v);
+    };
+
+    trySet();
+    const mo = new MutationObserver(trySet);
+    mo.observe(root, { subtree: true, childList: true });
+    return () => mo.disconnect();
+  }, []);
+
   // JW setup / reload on file change
   useEffect(() => {
     if (!isHls || !libReady || !playerRef.current) return;
@@ -486,6 +509,11 @@ const NJWPlayerComponent = ({
         mute: isIOS ? true : !!muted,
         key: CONFIG.JW_PLAYER_KEY,
         hlsjsdefault: !isIOS,
+        hlsjsconfig: {
+          xhrSetup: (xhr: XMLHttpRequest) => {
+            xhr.withCredentials = false;
+          },
+        },
         safarihlsjs: false,
         enableNativeHls: isIOS,
         stretching: "uniform",
