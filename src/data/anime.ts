@@ -148,5 +148,17 @@ export const animeData: Anime = {
           downloadUrl: 'https://drive.google.com/file/d/1ClZN-3_xruecanTx9KZBpMGCkY8MwvL6/view?usp=sharing',
           rawDownloadUrl: 'https://drive.google.com/file/d/1F5y7-Z0yMePOvY1JY6va4AEn5JPqw_Gp/view?usp=sharing'
       },
+	  {
+          id: 9,
+          title: 'Episode 9',
+          videoId: '09',
+          servers: {
+              hls: 'Tập9.m3u8',
+              helvid: 'ce53e6d3d73d',
+              hydax: 'YGIB7e96h'
+          },
+          downloadUrl: 'https://drive.google.com/file/d/1V6NYHaH6kftqr8R1aSGnGnSivEMeV1EW/view?usp=sharing',
+          rawDownloadUrl: 'https://drive.google.com/file/d/1e16SGgcepqkMx-tUh6qqi8XhLVRSM4tB/view?usp=sharing'
+      },
   ],
 };
