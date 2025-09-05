@@ -804,7 +804,10 @@ const NJWPlayerComponent = ({
   // keyboard shortcuts
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (!isFullscreen && !controlsVisible) return;
+      const container = containerRef.current;
+      const hasFocus =
+        !!container && container.contains(document.activeElement);
+      if (!isFullscreen && !hasFocus) return;
       const p = playerInstance.current;
       if (!p) return;
       const target = e.target as HTMLElement | null;
@@ -847,7 +850,7 @@ const NJWPlayerComponent = ({
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFullscreen, controlsVisible, duration, position, muted]);
+  }, [isFullscreen, duration, position, muted]);
 
   const [volume, setVolumeState] = useState(CONFIG.DEFAULT_VOLUME);
   const scheduleControlsAutohide = useCallback(() => {
@@ -1098,6 +1101,9 @@ const NJWPlayerComponent = ({
             WebkitTapHighlightColor: "transparent",
             touchAction: "manipulation",
           }}
+          onMouseDown={() => {
+            containerRef.current?.focus?.();
+          }}
           onClick={() => {
             const p = playerInstance.current;
             if (!p) return;
@@ -1289,7 +1295,9 @@ const NJWPlayerComponent = ({
           className={`${
             isIOS ? "absolute" : isFullscreen ? "fixed" : "absolute"
           } inset-x-0 bottom-0 z-20 flex flex-col gap-2 text-white transition-opacity duration-300 ${
-            controlsVisible ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+            controlsVisible
+              ? "opacity-100 pointer-events-auto"
+              : "opacity-0 pointer-events-none"
           } bg-gradient-to-t from-black/40 to-transparent px-3 pb-[calc(0.2rem+env(safe-area-inset-bottom))]`}
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
