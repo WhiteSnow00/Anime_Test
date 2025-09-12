@@ -160,5 +160,17 @@ export const animeData: Anime = {
           downloadUrl: 'https://drive.google.com/file/d/1V6NYHaH6kftqr8R1aSGnGnSivEMeV1EW/view?usp=sharing',
           rawDownloadUrl: 'https://drive.google.com/file/d/1e16SGgcepqkMx-tUh6qqi8XhLVRSM4tB/view?usp=sharing'
       },
+	  {
+          id: 10,
+          title: 'Episode 10',
+          videoId: '10',
+          servers: {
+              hls: 'Tập10.m3u8',
+              helvid: 'cc9f4c5d0931',
+              hydax: 'INm7KujW9'
+          },
+          downloadUrl: 'https://drive.google.com/file/d/1aOlCrnsNgn3kzU8H9VNoPlHjxzACRiPy/view?usp=sharing',
+          rawDownloadUrl: 'https://drive.google.com/file/d/1sAZ_J3V1LY5JA13V3E-nudtsKrz7IAQL/view?usp=sharing'
+      },
   ],
 };
