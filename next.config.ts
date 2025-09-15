@@ -1,4 +1,5 @@
 import type {NextConfig} from 'next';
+import withLinaria from 'next-with-linaria';
 
 const nextConfig: NextConfig = {
   typescript: {
@@ -31,6 +32,16 @@ const nextConfig: NextConfig = {
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
     loader: 'default',
   },
+  // Linaria configuration
+  linaria: {
+    displayName: process.env.NODE_ENV !== 'production',
+    sourceMap: process.env.NODE_ENV !== 'production',
+    classNameSlug: '[title]_[hash]',
+    babelOptions: {
+      presets: ['next/babel'],
+    },
+  },
 };
 
-export default nextConfig;
+// Apply Linaria wrapper to existing config
+export default withLinaria(nextConfig);
