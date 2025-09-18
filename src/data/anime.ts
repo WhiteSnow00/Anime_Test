@@ -172,5 +172,17 @@ export const animeData: Anime = {
           downloadUrl: 'https://drive.google.com/file/d/1aOlCrnsNgn3kzU8H9VNoPlHjxzACRiPy/view?usp=sharing',
           rawDownloadUrl: 'https://drive.google.com/file/d/1sAZ_J3V1LY5JA13V3E-nudtsKrz7IAQL/view?usp=sharing'
       },
+	  {
+          id: 11,
+          title: 'Episode 11',
+          videoId: '11',
+          servers: {
+              hls: 'Tập11.m3u8',
+              helvid: '32aa60dde20e',
+              hydax: 'jTvmkTdw9'
+          },
+          downloadUrl: 'https://drive.google.com/file/d/1Eqbq2AEWG_OsQkbNTrux2BbpSBsUPfqR/view?usp=sharing',
+          rawDownloadUrl: 'https://drive.google.com/file/d/1fW3MrcBYSztxezJ-g-_DTCFU8n4-azk0/view?usp=sharing'
+      },
   ],
 };
