@@ -1044,10 +1044,10 @@ const NJWPlayerComponent = ({
         ref={containerRef}
         className={
           isIOS
-            ? "relative w-full aspect-video bg-black"
+            ? "relative w-full aspect-video bg-black [transform:translateZ(0)]"
             : isFullscreen
             ? "fixed left-0 top-0 w-[100vw] h-[100vh] bg-black z-50 box-border flex items-center justify-center"
-            : "relative w-full aspect-video bg-black"
+            : "relative w-full aspect-video bg-black [transform:translateZ(0)]"
         }
         tabIndex={0}
         onMouseEnter={() => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,6 +31,21 @@ export function NotificationHeader({ className }: NotificationHeaderProps) {
   const [showAdblockGuide, setShowAdblockGuide] = useState(false);
   const [deviceType, setDeviceType] = useState<'desktop' | 'android' | 'ios'>('desktop');
   const adblockRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [dropdownPos, setDropdownPos] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
+
+  const updateDropdownPosition = () => {
+    const trigger = adblockRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const top = rect.bottom + window.scrollY + 8; // 8px gap
+    const left = rect.right + window.scrollX; // align right edge
+    setDropdownPos({ top, left, width: rect.width });
+  };
 
   // Detect device type (desktop, android, ios)
   useEffect(() => {
@@ -54,17 +70,27 @@ export function NotificationHeader({ className }: NotificationHeaderProps) {
     return () => window.removeEventListener('resize', checkDeviceType);
   }, []);
 
-  // Close dropdown when clicking outside
+  // Close dropdown when clicking outside (supports portal dropdown)
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (adblockRef.current && !adblockRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      const insideTrigger = adblockRef.current?.contains(target) ?? false;
+      const insideDropdown = dropdownRef.current?.contains(target) ?? false;
+      if (!insideTrigger && !insideDropdown) {
         setShowAdblockGuide(false);
       }
     }
 
     if (showAdblockGuide) {
       document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
+      window.addEventListener('resize', updateDropdownPosition);
+      window.addEventListener('scroll', updateDropdownPosition, { passive: true });
+      updateDropdownPosition();
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+        window.removeEventListener('resize', updateDropdownPosition);
+        window.removeEventListener('scroll', updateDropdownPosition);
+      };
     }
   }, [showAdblockGuide]);
 
@@ -223,52 +249,58 @@ export function NotificationHeader({ className }: NotificationHeaderProps) {
                         <ChevronDown className={`h-3 w-3 md:ml-1 transition-transform duration-200 ${showAdblockGuide ? 'rotate-180' : ''}`} />
                       </Button>
                       
-                      {showAdblockGuide && (
-                        <div className="absolute top-full right-0 mt-2 z-50 w-fit max-w-80 bg-white dark:bg-gray-900 border border-green-300 dark:border-green-700 rounded-lg shadow-2xl p-4 animate-fadeIn"> {/* Thêm animation cho dropdown */}
-                          <div className="text-sm space-y-3">
-                            <div className="flex items-center gap-2 pb-2 border-b border-green-200 dark:border-green-700">
-                              <Shield className="h-4 w-4 text-green-700 dark:text-green-300" />
-                              <span className="font-medium text-green-800 dark:text-green-300">
-                                Hướng dẫn cài Adblock (PC)
-                              </span>
-                            </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground mb-3">
-                                Cài đặt trình chặn quảng cáo để xem anime không bị quảng cáo làm phiền:
-                              </p>
-                              <div className="space-y-2">
-                                <a href="https://chromewebstore.google.com/detail/ublock-origin/cjpalhdlnbpafiamejdnhcphjbkeiagm?hl=vi" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 bg-red-100 dark:bg-red-800/30 rounded-lg border border-red-300 dark:border-red-700 hover:bg-red-200 dark:hover:bg-red-800/40 transition-colors">
-                                  <div className="w-8 h-8 bg-red-600 rounded flex items-center justify-center flex-shrink-0">
-                                    <span className="text-xs font-bold text-white">C</span>
-                                  </div>
-                                  <div className="flex-1">
-                                    <p className="text-xs font-medium text-red-800 dark:text-red-200">Google Chrome</p>
-                                  </div>
-                                  <ExternalLink className="h-3 w-3 text-red-700 dark:text-red-300" />
-                                </a>
-                                <a href="https://addons.mozilla.org/vi/firefox/addon/ublock-origin/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 bg-orange-100 dark:bg-orange-800/30 rounded-lg border border-orange-300 dark:border-orange-700 hover:bg-orange-200 dark:hover:bg-orange-800/40 transition-colors">
-                                  <div className="w-8 h-8 bg-orange-600 rounded flex items-center justify-center flex-shrink-0">
-                                    <span className="text-xs font-bold text-white">F</span>
-                                  </div>
-                                  <div className="flex-1">
-                                    <p className="text-xs font-medium text-orange-800 dark:text-orange-200">Mozilla Firefox</p>
-                                  </div>
-                                  <ExternalLink className="h-3 w-3 text-orange-700 dark:text-orange-300" />
-                                </a>
-                                <a href="https://microsoftedge.microsoft.com/addons/detail/ublock-origin/odfafepnkmbhccpbejgmiehpchacaeak" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 bg-blue-100 dark:bg-blue-800/30 rounded-lg border border-blue-300 dark:border-blue-700 hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors">
-                                  <div className="w-8 h-8 bg-blue-700 rounded flex items-center justify-center flex-shrink-0">
-                                    <span className="text-xs font-bold text-white">E</span>
-                                  </div>
-                                  <div className="flex-1">
-                                    <p className="text-xs font-medium text-blue-800 dark:text-blue-200">Microsoft Edge</p>
-                                  </div>
-                                  <ExternalLink className="h-3 w-3 text-blue-700 dark:text-blue-300" />
-                                </a>
+                      {showAdblockGuide && dropdownPos && typeof document !== 'undefined' &&
+                        createPortal(
+                          <div
+                            ref={dropdownRef}
+                            className="fixed z-[999999] bg-white dark:bg-gray-900 border border-green-300 dark:border-green-700 rounded-lg shadow-2xl p-4 animate-fadeIn box-border"
+                            style={{ top: dropdownPos.top, left: dropdownPos.left, transform: 'translateX(-100%)', width: dropdownPos.width }}
+                          >
+                            <div className="text-sm space-y-2">
+                              <div className="flex items-center gap-2 pb-2 border-b border-green-200 dark:border-green-700">
+                                <Shield className="h-4 w-4 text-green-700 dark:text-green-300" />
+                                <span className="font-medium text-green-800 dark:text-green-300">
+                                  Hướng dẫn cài Adblock (PC)
+                                </span>
+                              </div>
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-3">
+                                  Cài đặt trình chặn quảng cáo để xem anime không bị quảng cáo làm phiền:
+                                </p>
+                                <div className="space-y-2">
+                                  <a href="https://chromewebstore.google.com/detail/ublock-origin/cjpalhdlnbpafiamejdnhcphjbkeiagm?hl=vi" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 bg-red-100 dark:bg-red-800/30 rounded-lg border border-red-300 dark:border-red-700 hover:bg-red-200 dark:hover:bg-red-800/40 transition-colors">
+                                    <div className="w-8 h-8 bg-red-600 rounded flex items-center justify-center flex-shrink-0">
+                                      <span className="text-xs font-bold text-white">C</span>
+                                    </div>
+                                    <div className="flex-1">
+                                      <p className="text-xs font-medium text-red-800 dark:text-red-200">Google Chrome</p>
+                                    </div>
+                                    <ExternalLink className="h-3 w-3 text-red-700 dark:text-red-300" />
+                                  </a>
+                                  <a href="https://addons.mozilla.org/vi/firefox/addon/ublock-origin/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 bg-orange-100 dark:bg-orange-800/30 rounded-lg border border-orange-300 dark:border-orange-700 hover:bg-orange-200 dark:hover:bg-orange-800/40 transition-colors">
+                                    <div className="w-8 h-8 bg-orange-600 rounded flex items-center justify-center flex-shrink-0">
+                                      <span className="text-xs font-bold text-white">F</span>
+                                    </div>
+                                    <div className="flex-1">
+                                      <p className="text-xs font-medium text-orange-800 dark:text-orange-200">Mozilla Firefox</p>
+                                    </div>
+                                    <ExternalLink className="h-3 w-3 text-orange-700 dark:text-orange-300" />
+                                  </a>
+                                  <a href="https://microsoftedge.microsoft.com/addons/detail/ublock-origin/odfafepnkmbhccpbejgmiehpchacaeak" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 bg-blue-100 dark:bg-blue-800/30 rounded-lg border border-blue-300 dark:border-blue-700 hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors">
+                                    <div className="w-8 h-8 bg-blue-700 rounded flex items-center justify-center flex-shrink-0">
+                                      <span className="text-xs font-bold text-white">E</span>
+                                    </div>
+                                    <div className="flex-1">
+                                      <p className="text-xs font-medium text-blue-800 dark:text-blue-200">Microsoft Edge</p>
+                                    </div>
+                                    <ExternalLink className="h-3 w-3 text-blue-700 dark:text-blue-300" />
+                                  </a>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </div>
-                      )}
+                          </div>,
+                          document.body
+                        )}
                     </>
                   )}
                 </div>
