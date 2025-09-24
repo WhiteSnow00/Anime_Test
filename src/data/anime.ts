@@ -184,5 +184,17 @@ export const animeData: Anime = {
           downloadUrl: 'https://drive.google.com/file/d/1lK9cKKkn95DKV9zHp7XSOSiqiJExy4Vj/view?usp=sharing',
           rawDownloadUrl: 'https://drive.google.com/file/d/1fW3MrcBYSztxezJ-g-_DTCFU8n4-azk0/view?usp=sharing'
       },
+	  {
+          id: 12,
+          title: 'Episode 12',
+          videoId: '12',
+          servers: {
+              hls: 'Tập12.m3u8',
+              helvid: '74304b540215',
+              hydax: 'kF3bfa3Td'
+          },
+          downloadUrl: 'https://drive.google.com/file/d/180ZW6goyB3w71jpa_Xgc-boGPVt8tWmH/view?usp=sharing',
+          rawDownloadUrl: 'https://drive.google.com/file/d/1AETNDIjkcmcfqE5ux5nD5wtdcE49yGVN/view?usp=sharing'
+      },
   ],
 };
