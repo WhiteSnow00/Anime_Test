@@ -52,7 +52,7 @@ export const animeData: Anime = {
   studio: 'CloverWorks',
   rating: 5,
   duration: '24 phút/tập',
-  dropboxFolderUrl: '',
+  dropboxFolderUrl: 'https://www.dropbox.com/scl/fo/v44zfdqxh7qhkvh96osrh/AB-sI4VBpE1VqnEcCSJsFec?rlkey=l33dpsfwue2uxkih85sfzl1le&st=ydxka8aa&dl=0',
   episodes: [
     { 
       id: 1, 
@@ -63,8 +63,8 @@ export const animeData: Anime = {
         helvid: '8c8edb8924a8',
         hydax: 'AkqMUVl6B'
       },
-      downloadUrl: 'https://drive.google.com/file/d/1OODRq70CsWpMVid6hejrNzIRb0l7RXEA/view?usp=sharing',
-      rawDownloadUrl: 'https://drive.google.com/file/d/1CHh6EMCr2Lg2q76NHnUSyYClA3si0SO2/view?usp=sharing'
+      downloadUrl: 'https://www.dropbox.com/scl/fi/dapvcn5dhedgn9500hsxb/Kanasub-KaoruHana-01-S01e01-Webrip-1080P-H264-E-Ac-3.mp4?rlkey=utik5zhhc4lgg5wdn6lotmsnh&st=ogc821mq&dl=0',
+      rawDownloadUrl: 'https://www.dropbox.com/scl/fi/h20a3aq0rmtakzfdf3at6/Kaoru-Hana-wa-Rin-to-Saku-Raw-T-p-1.mkv?rlkey=iuatcvtk3hzgohiv5q10y6w1m&st=8fg9ea0l&dl=0'
     },
     { 
       id: 2, 
@@ -75,8 +75,8 @@ export const animeData: Anime = {
         helvid: 'f2daff898ca2',
         hydax: '7iGNIKWEk'
       },
-      downloadUrl: 'https://drive.google.com/file/d/19dd9pWCaARRVs1kvO21-Bw5BDePiq2Kd/view?usp=sharing',
-      rawDownloadUrl: 'https://drive.google.com/file/d/1fgCgQPckMHU1kDyUaS5DG_kVayL_dsth/view?usp=sharing'
+      downloadUrl: 'https://www.dropbox.com/scl/fi/0rjdyv86i0ka3n9dfykg3/Kanasub-KaoruHana-02-S01e02-Webrip-1080P-H265-E-Ac-3.mp4?rlkey=o8aq59lysaubhliezb9qxwvwb&st=h06r6o5o&dl=0',
+      rawDownloadUrl: 'https://www.dropbox.com/scl/fi/4zowypovzygk2rjyk928g/Kaoru-Hana-wa-Rin-to-Saku-Raw-T-p-2.mkv?rlkey=30r0mpbe1fq86j70g3r6mjrqb&st=3avwyhx8&dl=0'
     },
     { 
       id: 3, 
@@ -87,8 +87,8 @@ export const animeData: Anime = {
         helvid: '50909806cf25',
         hydax: 'dibBTjuqH'
       },
-      downloadUrl: 'https://drive.google.com/file/d/1tTj9xwr8Rs2KDFPMhgrBn6qj1qcY3mw_/view?usp=sharing',
-      rawDownloadUrl: 'https://drive.google.com/file/d/1JoWzKRWLnpvwhokC_uWGjflTu9KONrfL/view?usp=sharing'
+      downloadUrl: 'https://www.dropbox.com/scl/fi/phwx97d4euxgfczyiw7yq/Kanasub-KaoruHana-03-S01e03-Webrip-1080P-H265-E-Ac-3.mp4?rlkey=1xfrllu27onwqslcr7zudrj3h&st=j557pw92&dl=0',
+      rawDownloadUrl: 'https://www.dropbox.com/scl/fi/6a517jx34no5uwizoeot1/Kaoru-Hana-wa-Rin-to-Saku-Raw-T-p-3.mkv?rlkey=yaqvfuoc1gytbxw8r64w3jnsb&st=gczc637l&dl=0'
     },
     { 
       id: 4, 
@@ -99,8 +99,8 @@ export const animeData: Anime = {
         helvid: '28b0a006506a',
         hydax: 'p_BMmjguS'
       },
-      downloadUrl: 'https://drive.google.com/file/d/1EnWQNbCZvtDkB8vdvBwSsclJ4jgsjzj5/view?usp=sharing',
-      rawDownloadUrl: 'https://drive.google.com/file/d/1n5j15eQR2umkpIW48yYz0Y5Wkm0uWNqw/view?usp=sharing'
+      downloadUrl: 'https://www.dropbox.com/scl/fi/isy4mo2tuovpes6joathk/Kanasub-KaoruHana-04-S01e04-Webrip-1080P-H265-E-Ac-3.mp4?rlkey=s58em2xdidndwsu2pzuugq9gm&st=ihsornkp&dl=0',
+      rawDownloadUrl: 'https://www.dropbox.com/scl/fi/ma6ksc19y1xg671nhvylx/Kaoru-Hana-wa-Rin-to-Saku-Raw-T-p-4.mkv?rlkey=3x61lx2z7p59aqo01ed90li3x&st=cas0zh5t&dl=0'
     },
     { 
       id: 5, 
@@ -111,8 +111,8 @@ export const animeData: Anime = {
         helvid: '136aa79ac114',
         hydax: 'cN3EniKSx'
       },
-      downloadUrl: 'https://drive.google.com/file/d/18xbLTX3hUO9KvahZ9UWCRqdntZurlwm3/view?usp=sharing',
-      rawDownloadUrl: 'https://drive.google.com/file/d/13KCpzY2jDfPxtGqE87ZuaJxL-XupXzwu/view?usp=sharing'
+      downloadUrl: 'https://www.dropbox.com/scl/fi/e3rm1o3rrob3x57epac0e/Kanasub-KaoruHana-05-S01e05-Webrip-1080P-H265-E-Ac-3.mp4?rlkey=vghxasg3bxx3h9uppd2plo4dg&st=2spp5t8d&dl=0',
+      rawDownloadUrl: 'https://www.dropbox.com/scl/fi/9rxci8zmo47yg9k5zdbuw/Kaoru-Hana-wa-Rin-to-Saku-Raw-T-p-5.mkv?rlkey=60ix06xhxavpathtospmwt3gb&st=kptoxz3j&dl=0'
     },
     { 
       id: 6, 
@@ -123,8 +123,8 @@ export const animeData: Anime = {
         helvid: 'ae8e488008c8',
         hydax: 'GDFMakAV5'
       },
-      downloadUrl: 'https://drive.google.com/file/d/10POSQ7pLnmSUqicUhMSYG_wbiwKyLfFh/view?usp=sharing',
-      rawDownloadUrl: 'https://drive.google.com/file/d/17nuFongdzfpvYlMx4ReUWduWVT8wH52C/view?usp=sharing'
+      downloadUrl: 'https://www.dropbox.com/scl/fi/jy868htx9hxc7wov1bb7b/Kanasub-KaoruHana-06-S01e06-Webrip-1080P-H265-E-Ac-3.mp4?rlkey=1qbktirqj2ndkuqj4hww73ewh&st=vnclf1vf&dl=0',
+      rawDownloadUrl: 'https://www.dropbox.com/scl/fi/ac05tgc3wdfajkpojnxo4/Kaoru-Hana-wa-Rin-to-Saku-Raw-T-p-6.mkv?rlkey=9drluq7iaiugtu3tiuwu9b7zc&st=sgo4xzle&dl=0'
     },
 	{ 
       id: 7, 
@@ -135,8 +135,8 @@ export const animeData: Anime = {
         helvid: '3d35b127f164',
         hydax: '-dOrUWexxF'
       },
-      downloadUrl: 'https://drive.google.com/file/d/1u_hvxNd6kWtJluCuYwR-tNrNiOIKMKRn/view?usp=sharing',
-      rawDownloadUrl: 'https://drive.google.com/file/d/1EJJljjpdwCWjiJqXr5QWbwpxZszA-wty/view?usp=sharing'
+      downloadUrl: 'https://www.dropbox.com/scl/fi/z6lcyhorm54hnv6863h6p/Kanasub-Kaoruhana-07-S01e07-Webrip-1080P-H265-E-Ac-3-1.mp4?rlkey=iupvxav1k9e16mizp314p5k0w&st=2e2oi5rg&dl=0',
+      rawDownloadUrl: 'https://www.dropbox.com/scl/fi/yhvclzk5je7w1azmv9tdn/Kaoru-Hana-wa-Rin-to-Saku-Raw-T-p-7.mkv?rlkey=272ilzre03604d4vp9iuuu804&st=vlqrd96l&dl=0'
     },
       {
           id: 8,
@@ -147,8 +147,8 @@ export const animeData: Anime = {
               helvid: 'b7bf8f6a1904',
               hydax: '5JzCVvQaO'
           },
-          downloadUrl: 'https://drive.google.com/file/d/1ClZN-3_xruecanTx9KZBpMGCkY8MwvL6/view?usp=sharing',
-          rawDownloadUrl: 'https://drive.google.com/file/d/1F5y7-Z0yMePOvY1JY6va4AEn5JPqw_Gp/view?usp=sharing'
+          downloadUrl: 'https://www.dropbox.com/scl/fi/gta7tqabpafeck4yazkde/Kanasub-KaoruHana-08-S01e08-Webrip-1080P-H265-E-Ac-3.mp4?rlkey=r3rfzbku3m1ssvsag1kn7f067&st=d8yt9eqp&dl=0',
+          rawDownloadUrl: 'https://www.dropbox.com/scl/fi/ifpx9rt56icdw7hvd6ksm/Kaoru-Hana-wa-Rin-to-Saku-Raw-T-p-8.mkv?rlkey=8krec4ra751k4hyglmdnle78z&st=kr390s2j&dl=0'
       },
 	  {
           id: 9,
@@ -159,8 +159,8 @@ export const animeData: Anime = {
               helvid: 'ce53e6d3d73d',
               hydax: 'YGIB7e96h'
           },
-          downloadUrl: 'https://drive.google.com/file/d/1V6NYHaH6kftqr8R1aSGnGnSivEMeV1EW/view?usp=sharing',
-          rawDownloadUrl: 'https://drive.google.com/file/d/1e16SGgcepqkMx-tUh6qqi8XhLVRSM4tB/view?usp=sharing'
+          downloadUrl: 'https://www.dropbox.com/scl/fi/h3fpx7n9gq26ptyp2p92o/Kanasub-KaoruHana-09-S01e09-Webrip-1080P-H265-E-Ac-3.mp4?rlkey=t9rord6orwe6h4njhx73b2b95&st=cyvfmwal&dl=0',
+          rawDownloadUrl: 'https://www.dropbox.com/scl/fi/aszmujhbsreid7bwdqdxy/Kaoru-Hana-wa-Rin-to-Saku-Raw-T-p-9.mkv?rlkey=4bn7d7huoiwzjyhlzqjfb543f&st=w44e16h2&dl=0'
       },
 	  {
           id: 10,
@@ -171,8 +171,8 @@ export const animeData: Anime = {
               helvid: 'cc9f4c5d0931',
               hydax: 'INm7KujW9'
           },
-          downloadUrl: 'https://drive.google.com/file/d/1aOlCrnsNgn3kzU8H9VNoPlHjxzACRiPy/view?usp=sharing',
-          rawDownloadUrl: 'https://drive.google.com/file/d/1sAZ_J3V1LY5JA13V3E-nudtsKrz7IAQL/view?usp=sharing'
+          downloadUrl: 'https://www.dropbox.com/scl/fi/663lkbn8zuyiy2iotjvkk/Kanasub-KaoruHana-10-S01e10-Webrip-1080P-H265-E-Ac-3.mp4?rlkey=3uehpsvvp31g61sen7ucf939z&st=vtgv4ksr&dl=0',
+          rawDownloadUrl: 'https://www.dropbox.com/scl/fi/3iq0jlou7hyh7z3kzialj/Kaoru-Hana-wa-Rin-to-Saku-Raw-T-p-10.mkv?rlkey=wbff2p94dy87b3isj6q6u7zc6&st=e7c3kwdk&dl=0'
       },
 	  {
           id: 11,
@@ -183,8 +183,8 @@ export const animeData: Anime = {
               helvid: 'bb2fee1d6943',
               hydax: '8m8i7ojXo'
           },
-          downloadUrl: 'https://drive.google.com/file/d/1lK9cKKkn95DKV9zHp7XSOSiqiJExy4Vj/view?usp=sharing',
-          rawDownloadUrl: 'https://drive.google.com/file/d/1fW3MrcBYSztxezJ-g-_DTCFU8n4-azk0/view?usp=sharing'
+          downloadUrl: 'https://www.dropbox.com/scl/fi/n8fu66paqgbcx7zkvgyg1/Kanasub-KaoruHana-11-S01e11-Webrip-1080P-H265-E-Ac-3.mp4?rlkey=wejg8vqxin8wcvlb7sjx6rmpm&st=vq4ovh75&dl=0',
+          rawDownloadUrl: 'https://www.dropbox.com/scl/fi/13wz8fpenk8s868p7myr2/Kaoru-Hana-wa-Rin-to-Saku-Raw-T-p-11.mkv?rlkey=0bgmorbvw8kzz4km1r738qfxc&st=tbyykp4k&dl=0'
       },
 	  {
           id: 12,
@@ -195,8 +195,8 @@ export const animeData: Anime = {
               helvid: '74304b540215',
               hydax: 'kF3bfa3Td'
           },
-          downloadUrl: 'https://drive.google.com/file/d/180ZW6goyB3w71jpa_Xgc-boGPVt8tWmH/view?usp=sharing',
-          rawDownloadUrl: 'https://drive.google.com/file/d/1AETNDIjkcmcfqE5ux5nD5wtdcE49yGVN/view?usp=sharing'
+          downloadUrl: 'https://www.dropbox.com/scl/fi/0u2i809eva2z59y1gbvok/Kanasub-KaoruHana-12-S01e12-Webrip-1080P-H265-E-Ac-3.mp4?rlkey=jmdzva4pe3y0fsp5c8kn2pfe0&st=ah4nnxwx&dl=0',
+          rawDownloadUrl: 'https://www.dropbox.com/scl/fi/i7g17ntz95w46odxt6pyo/Kaoru-Hana-wa-Rin-to-Saku-Raw-T-p-12.mkv?rlkey=kejwydghdjnh1756j1var0jwe&st=a6kuyog7&dl=0'
       },
   ],
 };
