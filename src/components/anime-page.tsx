@@ -86,7 +86,7 @@ const { state, actions, computed } = useAnimeState(animeData);
     }
   }, [currentEpisode]);
 
-const handleServerError = useCallback((error: string) => {
+  const handleServerError = useCallback((error: string) => {
     console.error('Server error:', error);
     if (!error.includes('Failed to load video:')) {
       return;
@@ -95,14 +95,14 @@ const handleServerError = useCallback((error: string) => {
       if (error.includes('hls') && (error.includes('404') || error.includes('network'))) {
         const helvidId = currentEpisode.servers.helvid;
         if (helvidId) {
-          console.log('HLS server failed with critical error, falling back to Helvid');
+          console.warn('HLS server failed with critical error, falling back to Helvid');
           setCurrentServer('helvid');
           return;
         }
       }
     }
     if (currentServer === 'helvid' || currentServer === 'hydax') {
-      console.log(`${currentServer} failed - user should manually switch back to HLS main server`);
+      console.warn(`${currentServer} failed - user should manually switch back to HLS main server`);
       return;
     }
     console.error('Server error for episode:', currentEpisode?.id, error);
@@ -145,46 +145,38 @@ const handleServerError = useCallback((error: string) => {
 
   const episodeOps = useMemo(
     () => utils.createEpisodeOperations(animeData.episodes),
-    [animeData.episodes]
+    []
   );
 
-  const handleSelectEpisode = useCallback(
-    fp.compose(
-      utils.performance.measure,
-      (episode: Episode) => {
-        actions.setEpisode(episode);
-        scrollActions.scrollToTop();
-        
-        // Set server based on device type and availability  
-        if (viewport.isActualMobile) {
-          // For actual mobile devices, prefer HLS as the primary server
-          if (episode.servers.hls) {
-            setCurrentServer('hls');
-          } else if (episode.servers.helvid) {
-            setCurrentServer('helvid');
-          } else if (episode.servers.hydax) {
-            setCurrentServer('hydax');
-          }
-        } else if (viewport.isDesktop && episode.servers.hls) {
-          setCurrentServer('hls');
-        } else if (episode.servers.helvid) {
-          setCurrentServer('helvid');
-        } else if (episode.servers.hydax) {
-          setCurrentServer('hydax');
-        }
-        
-        console.log(`Episode changed to ${episode.id}, server set based on availability`);
-        
-        return episode;
+  const handleSelectEpisode = useCallback((episode: Episode) => {
+    actions.setEpisode(episode);
+    scrollActions.scrollToTop();
+
+    // Set server based on device type and availability  
+    if (viewport.isActualMobile) {
+      // For actual mobile devices, prefer HLS as the primary server
+      if (episode.servers.hls) {
+        setCurrentServer('hls');
+      } else if (episode.servers.helvid) {
+        setCurrentServer('helvid');
+      } else if (episode.servers.hydax) {
+        setCurrentServer('hydax');
       }
-    ),
-    [actions.setEpisode, scrollActions.scrollToTop, viewport.isActualMobile, viewport.isDesktop]
-  );
+    } else if (viewport.isDesktop && episode.servers.hls) {
+      setCurrentServer('hls');
+    } else if (episode.servers.helvid) {
+      setCurrentServer('helvid');
+    } else if (episode.servers.hydax) {
+      setCurrentServer('hydax');
+    }
+
+    console.warn(`Episode changed to ${episode.id}, server set based on availability`);
+  }, [actions, scrollActions, viewport.isActualMobile, viewport.isDesktop]);
 
   const handleNavigate = useCallback((section: string) => {
     actions.setSection(section);
     scrollActions.scrollToSection(section);
-  }, [actions.setSection, scrollActions.scrollToSection]);
+  }, [actions, scrollActions]);
 
   const handlePreviousEpisode = useCallback(() => {
     const currentEpisode = state.currentEpisode;
@@ -259,7 +251,7 @@ const layoutConfig = useMemo(() => {
             autoPlay={true}
             muted={false}
             onError={handleServerError}
-            onLoad={() => console.log(`Mobile HLS Episode ${currentEpisode.id} loaded successfully on JWPlayer`)}
+            onLoad={() => console.warn(`Mobile HLS Episode ${currentEpisode.id} loaded successfully on JWPlayer`)}
           />
         );
       }
@@ -283,10 +275,10 @@ const layoutConfig = useMemo(() => {
         autoPlay={true}
         muted={false}
         onError={handleServerError}
-        onLoad={() => console.log(`Episode ${currentEpisode.id} loaded successfully on ${currentServer}`)}
+        onLoad={() => console.warn(`Episode ${currentEpisode.id} loaded successfully on ${currentServer}`)}
       />
     );
-  }, [isHydrated, viewport.isActualMobile, currentServer, currentEpisode, handleServerError]);
+  }, [isHydrated, viewport.isActualMobile, currentServer, currentEpisode, handleServerError, getCurrentVideoId]);
 
   // Switch to mobile server selector for actual mobile devices
   const serverSelectorComponent = useMemo(() => {
@@ -314,6 +306,7 @@ const layoutConfig = useMemo(() => {
           currentEpisode={currentEpisode}
           onDownload={handleMobileDownload}
           onRawDownload={handleMobileRawDownload}
+          dropboxFolderUrl={animeDetails.dropboxFolderUrl}
         />
       );
     }
@@ -323,9 +316,10 @@ const layoutConfig = useMemo(() => {
         currentServer={currentServer}
         onServerChange={handleServerChange}
         currentEpisode={currentEpisode}
+        dropboxFolderUrl={animeDetails.dropboxFolderUrl}
       />
     );
-  }, [isHydrated, viewport.isActualMobile, currentServer, currentEpisode, handleServerChange, handleMobileServerChange, handleMobileDownload, handleMobileRawDownload]);
+  }, [isHydrated, viewport.isActualMobile, currentServer, currentEpisode, handleServerChange, handleMobileServerChange, handleMobileDownload, handleMobileRawDownload, animeDetails.dropboxFolderUrl]);
 
   const episodeStats = useMemo(() => episodeOps.getStats(), [episodeOps]);
 

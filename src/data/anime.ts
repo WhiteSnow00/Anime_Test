@@ -26,6 +26,7 @@ export interface Anime {
   studio: string;
   rating: number; 
   duration: string;
+  dropboxFolderUrl?: string;
   episodes: Episode[];
 }
 
@@ -51,6 +52,7 @@ export const animeData: Anime = {
   studio: 'CloverWorks',
   rating: 5,
   duration: '24 phút/tập',
+  dropboxFolderUrl: '',
   episodes: [
     { 
       id: 1, 

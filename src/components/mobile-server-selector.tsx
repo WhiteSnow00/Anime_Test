@@ -4,7 +4,7 @@ import React, { useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Play, AlertCircle, Download } from 'lucide-react';
+import { Play, AlertCircle, Download, CloudDownload, PackageOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { SimpleMobileServerType } from './simple-mobile-player';
 import type { Episode } from '@/data/anime';
@@ -19,6 +19,7 @@ interface MobileServerSelectorProps {
   className?: string;
   onDownload: (url: string, filename: string) => void;
   onRawDownload: (url: string, filename: string) => void;
+  dropboxFolderUrl?: string;
 }
 
 const MOBILE_SERVER_CONFIG = {
@@ -51,7 +52,8 @@ export function MobileServerSelector({
   currentEpisode,
   className,
   onDownload,
-  onRawDownload
+  onRawDownload,
+  dropboxFolderUrl
 }: MobileServerSelectorProps) {
   const allServers: MobileServerType[] = ['hls', 'helvid', 'hydax'];
 
@@ -139,7 +141,7 @@ export function MobileServerSelector({
             onClick={handleDownload}
             aria-label="Tải về anime sub"
           >
-            <Download className="h-4 w-4" />
+            <PackageOpen className="h-4 w-4" />
             <span>Tải về (Sub)</span>
           </Button>
         )}
@@ -154,7 +156,21 @@ export function MobileServerSelector({
             <span>Tải về (RAW)</span>
           </Button>
         )}
-
+        {/* Always-visible Dropbox Folder button */}
+        <Button
+          variant="outline"
+          className="w-full mt-2 mb-3 flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700 border-blue-600"
+          onClick={() => {
+            if (!dropboxFolderUrl) return;
+            try { window.open(dropboxFolderUrl, '_blank', 'noopener,noreferrer'); } catch {}
+          }}
+          aria-label="Mở thư mục Dropbox chứa tất cả tập"
+          disabled={!dropboxFolderUrl}
+          title={dropboxFolderUrl ? 'Mở thư mục Dropbox' : 'Chưa có link Dropbox'}
+        >
+          <PackageOpen className="h-4 w-4" />
+          <span>Tải về (Dropbox - toàn bộ)</span>
+        </Button>
         {/* <div className="mt-3 text-xs text-muted-foreground text-center">
           <p>Chỉ dành cho thiết bị di động. Sử dụng PC để có thêm tùy chọn server.</p>
         </div> */}

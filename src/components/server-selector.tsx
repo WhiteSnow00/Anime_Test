@@ -4,7 +4,7 @@ import { memo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { Server, Play, Download, AlertCircle, CheckCircle } from 'lucide-react';
+import { Server, Play, Download, AlertCircle, CheckCircle, PackageOpen } from 'lucide-react';
 import { withPerformanceOptimization } from '@/lib/higher-order-components';
 import { triggerDownload, isValidDownloadUrl, openGoogleDriveLink } from '@/lib/download-utils';
 import type { Episode } from '@/data/anime';
@@ -18,6 +18,7 @@ interface ServerSelectorProps {
   currentEpisode?: Episode; 
   className?: string;
   serverStatus?: Record<string, ServerStatus>;
+  dropboxFolderUrl?: string;
 }
 
 const serverConfig = {
@@ -44,6 +45,7 @@ function ServerSelectorComponent({
   currentEpisode,
   className,
   serverStatus,
+  dropboxFolderUrl,
 }: ServerSelectorProps) {
   const handleServerSelect = useCallback((server: ServerType) => {
     onServerChange(server);
@@ -162,7 +164,7 @@ function ServerSelectorComponent({
             );
           })}
 
-          {/* Download Button */}
+          {/* Per-episode Download Button */}
           {currentEpisode?.downloadUrl && (
             <Button
               variant="outline"
@@ -177,10 +179,10 @@ function ServerSelectorComponent({
               onClick={handleDownload}
               aria-label="Mở link Google Drive để tải về"
             >
-              <Download className="w-3 h-3 sm:w-4 sm:h-4" />
+              <PackageOpen className="w-3 h-3 sm:w-4 sm:h-4" />
               <div className="flex flex-col items-start">
                 <span className="text-xs sm:text-sm font-semibold">Tải về</span>
-                <span className="text-xs opacity-75 hidden sm:block">Google Drive</span>
+                <span className="text-xs opacity-75 hidden sm:block">Dropbox</span>
               </div>
             </Button>
           )}
@@ -207,6 +209,35 @@ function ServerSelectorComponent({
               </div>
             </Button>
           )}
+          {/* Always-visible Dropbox Folder Button */}
+          <Button
+            variant="outline"
+            className={cn(
+              "flex items-center gap-2 font-medium transition-all duration-200",
+              "hover:scale-105 active:scale-95 touch-manipulation",
+              "focus:ring-2 focus:ring-primary focus:ring-offset-2",
+              "text-xs sm:text-sm",
+              "px-3 py-2 sm:px-4 sm:py-2",
+              "bg-blue-600 text-white hover:bg-blue-700 border-blue-600"
+            )}
+            onClick={() => {
+              if (!dropboxFolderUrl) return;
+              try {
+                window.open(dropboxFolderUrl, '_blank', 'noopener,noreferrer');
+              } catch (e) {
+                console.error('Failed to open Dropbox folder', e);
+              }
+            }}
+            aria-label="Mở thư mục Dropbox chứa tất cả tập"
+            disabled={!dropboxFolderUrl}
+            title={dropboxFolderUrl ? 'Mở thư mục Dropbox' : 'Chưa có link Dropbox'}
+          >
+            <PackageOpen className="w-3 h-3 sm:w-4 sm:h-4" />
+            <div className="flex flex-col items-start">
+              <span className="text-xs sm:text-sm font-semibold">Tải về</span>
+              <span className="text-xs opacity-75 hidden sm:block">Dropbox (toàn bộ)</span>
+            </div>
+          </Button>
         </div>
       </CardContent>
     </Card>
