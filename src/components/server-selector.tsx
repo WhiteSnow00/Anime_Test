@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Server, Play, Download, AlertCircle, CheckCircle, PackageOpen } from 'lucide-react';
 import { withPerformanceOptimization } from '@/lib/higher-order-components';
-import { triggerDownload, isValidDownloadUrl, openDropboxLink } from '@/lib/download-utils';
+import { triggerDownload, isValidDownloadUrl, openDropboxLink, openDropboxFolder } from '@/lib/download-utils';
 import type { Episode } from '@/data/anime';
 import { getServerStatus, ServerStatus, validateEpisodeServers, getServerReliabilityScore } from '@/lib/video-server-utils';
 
@@ -220,14 +220,7 @@ function ServerSelectorComponent({
               "px-3 py-2 sm:px-4 sm:py-2",
               "bg-blue-600 text-white hover:bg-blue-700 border-blue-600"
             )}
-            onClick={() => {
-              if (!dropboxFolderUrl) return;
-              try {
-                window.open(dropboxFolderUrl, '_blank', 'noopener,noreferrer');
-              } catch (e) {
-                console.error('Failed to open Dropbox folder', e);
-              }
-            }}
+            onClick={() => { if (dropboxFolderUrl) openDropboxFolder(dropboxFolderUrl, 'Dropbox (toàn bộ)'); }}
             aria-label="Mở thư mục Dropbox chứa tất cả tập"
             disabled={!dropboxFolderUrl}
             title={dropboxFolderUrl ? 'Mở thư mục Dropbox' : 'Chưa có link Dropbox'}

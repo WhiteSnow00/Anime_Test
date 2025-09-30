@@ -16,17 +16,29 @@ import {
 } from '@/lib/video-server-utils';
 import { animeData } from '@/data/anime';
 import NJWPlayerComponent from './new-jwplayer';
+import JWPlayerWithResume from './jwplayer-with-resume';
+import { isFeatureEnabled } from '@/lib/feature-flags';
 
 export type ServerType = 'hls' | 'helvid' | 'hydax';
 
-// Helper function to get episode data by videoId or episode number
-const getEpisodeData = (videoId: string) => {
-  return animeData.episodes.find(ep => 
-    ep.videoId === videoId || 
-    ep.id.toString().padStart(2, '0') === videoId ||
-    ep.servers.helvid === videoId ||
-    ep.servers.hydax === videoId
+// Helper function to get episode data by various identifiers, including HLS filenames
+const getEpisodeData = (idOrUrl: string) => {
+  // direct matches: internal id, zero-padded id, or alt servers
+  let ep = animeData.episodes.find(ep =>
+    ep.videoId === idOrUrl ||
+    ep.id.toString().padStart(2, '0') === idOrUrl ||
+    ep.servers.helvid === idOrUrl ||
+    ep.servers.hydax === idOrUrl
   );
+  if (ep) return ep;
+
+  // HLS filename match (e.g., 'Tập5.m3u8' or path that ends with it)
+  if (idOrUrl.includes('.m3u8')) {
+    const basename = idOrUrl.split('/').pop() || idOrUrl;
+    ep = animeData.episodes.find(e => e.servers.hls === idOrUrl || e.servers.hls === basename);
+    if (ep) return ep;
+  }
+  return undefined;
 };
 
 // Utility functions for debouncing and throttling
@@ -90,7 +102,7 @@ function VideoPlayerComponent({
     
     const episodeData = getEpisodeData(inputVideoId);
     if (episodeData?.servers.hls) {
-      console.log(`Found HLS for ${inputVideoId}: ${episodeData.servers.hls}`);
+  console.warn(`Found HLS for ${inputVideoId}: ${episodeData.servers.hls}`);
       return episodeData.servers.hls;
     }
     
@@ -112,7 +124,7 @@ function VideoPlayerComponent({
 
   useEffect(() => {
     if (server !== serverPropRef.current && !isInternalServerChange.current) {
-      console.log(`VideoPlayer: Switching server from ${currentServer} to ${server}`);
+  console.warn(`VideoPlayer: Switching server from ${currentServer} to ${server}`);
       serverPropRef.current = server;
       
       setLoadError(null);
@@ -130,7 +142,7 @@ function VideoPlayerComponent({
       }
     }
     isInternalServerChange.current = false;
-  }, [server, currentServer, transitionActions]);
+  }, [server, currentServer, transitionActions, videoId]);
 
   useEffect(() => {
     setIsHydrated(true);
@@ -150,34 +162,27 @@ function VideoPlayerComponent({
       videoUrl = `https://short.icu/${serverId}`;
     }
     
-    console.log(`Generated iframe URL for ${currentServer}: ${videoUrl}`);
+  console.warn(`Generated iframe URL for ${currentServer}: ${videoUrl}`);
     return videoUrl;
   }, [transitionComputed.currentVideoId, currentServer, videoId]);
 
   // Advanced iframe load handler with transition state management
-  const handleIframeLoad = useCallback(
-    debounce(() => {
-      if (iframeRef.current) {
-        setLoadError(null);
-        onLoad?.();
-        if (transitionState.isTransitioning) {
-          setTimeout(() => transitionActions.completeTransition(), 100);
-        }
+  const handleIframeLoad = useMemo(() => debounce(() => {
+    if (iframeRef.current) {
+      setLoadError(null);
+      onLoad?.();
+      if (transitionState.isTransitioning) {
+        setTimeout(() => transitionActions.completeTransition(), 100);
       }
-    }, 200),
-    [transitionComputed.currentVideoId, transitionState.isTransitioning, transitionActions, onLoad]
-  );
+    }
+  }, 200), [transitionState.isTransitioning, transitionActions, onLoad]);
 
-  const handleIframeError = useCallback(
-    throttle((error: string) => {
-      console.error(`Video player error: ${error}`);
-      
-      setLoadError(error);
-      onError?.(error);
-      transitionActions.resetTransition();
-    }, 1000),
-    [onError, transitionActions]
-  );
+  const handleIframeError = useMemo(() => throttle((error: string) => {
+    console.error(`Video player error: ${error}`);
+    setLoadError(error);
+    onError?.(error);
+    transitionActions.resetTransition();
+  }, 1000), [onError, transitionActions]);
 
   const iframeDimensions = useMemo(() => {
     if (isHydrated && viewport.width > 0) {
@@ -230,12 +235,12 @@ function VideoPlayerComponent({
       recordServerError(errorDetails);
 
       const userErrorMessage = getErrorMessage(errorDetails);
-      console.log('Video load error:', userErrorMessage);
+  console.warn('Video load error:', userErrorMessage);
 
       const timeoutId = setTimeout(async () => {
         const nextServer = getNextFallbackServer(currentServer, triedServers);
         if (nextServer) {
-          console.log(`Switching from ${currentServer} to ${nextServer} due to error`);
+          console.warn(`Switching from ${currentServer} to ${nextServer} due to error`);
           const newTriedServers = [...triedServers, currentServer];
           setTriedServers(newTriedServers);
           isInternalServerChange.current = true;
@@ -257,7 +262,7 @@ function VideoPlayerComponent({
     setRetryCount(0);
     setLoadError(null);
     if (server !== currentServer) {
-      console.log(`Episode/Server changed: Resetting server to ${server}`);
+  console.warn(`Episode/Server changed: Resetting server to ${server}`);
       setCurrentServer(server);
       serverPropRef.current = server;
     }
@@ -413,28 +418,49 @@ function VideoPlayerComponent({
         )}
         
         {currentServer === 'hls' ? (
-          // <JWPlayerComponent
-          //   key={`${currentServer}-${transitionComputed.currentVideoId}`}
-          //   videoId={getHLSVideoId(transitionComputed.currentVideoId || videoId)}
-          //   server={currentServer}
-          //   autoPlay={autoPlay}
-          //   muted={muted}
-          //   controls={controls}
-          //   onLoad={handleIframeLoad}
-          //   onError={handleIframeError}
-          //   className="w-full h-full"
-          // />
-          <NJWPlayerComponent
-            key={`${currentServer}-${transitionComputed.currentVideoId}`}
-            videoId={getHLSVideoId(transitionComputed.currentVideoId || videoId)}
-            server={currentServer}
-            autoPlay={autoPlay}
-            muted={muted}
-            controls={controls}
-            onLoad={handleIframeLoad}
-            onError={handleIframeError}
-            className="w-full h-full"
-          />
+          (() => {
+            const currentVideoId = transitionComputed.currentVideoId || videoId;
+            const hlsVideoId = getHLSVideoId(currentVideoId);
+            // Resolve episode data robustly: try current id first, then HLS id
+            const episodeData = getEpisodeData(currentVideoId) || getEpisodeData(hlsVideoId || '') || undefined;
+            const resumeEnabled = isFeatureEnabled('RESUME_FEATURE_ENABLED');
+
+            console.warn('📺 VIDEO-PLAYER: HLS rendering decision', {
+              currentServer,
+              currentVideoId,
+              episodeId: episodeData?.id,
+              resumeEnabled,
+              componentChoice: resumeEnabled ? 'JWPlayerWithResume' : 'NJWPlayerComponent'
+            });
+
+            return resumeEnabled ? (
+              <JWPlayerWithResume
+                key={`resume-${currentServer}-${currentVideoId}`}
+                videoId={hlsVideoId}
+                server={currentServer}
+                episodeId={(episodeData?.id ?? Number.parseInt(currentVideoId)) || 0}
+                episodeNumber={(episodeData?.id ?? Number.parseInt(currentVideoId)) || 0}
+                autoPlay={autoPlay}
+                muted={muted}
+                controls={controls}
+                onLoad={handleIframeLoad}
+                onError={handleIframeError}
+                className="w-full h-full"
+              />
+            ) : (
+              <NJWPlayerComponent
+                key={`${currentServer}-${currentVideoId}`}
+                videoId={hlsVideoId}
+                server={currentServer}
+                autoPlay={autoPlay}
+                muted={muted}
+                controls={controls}
+                onLoad={handleIframeLoad}
+                onError={handleIframeError}
+                className="w-full h-full"
+              />
+            );
+          })()
         ) : (
           iframeUrl && (
             <iframe 

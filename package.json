@@ -15,6 +15,7 @@
     "analyze": "cross-env ANALYZE=true next build",
     "clean": "rimraf .next out",
     "test": "echo \"No tests specified\" && exit 0",
+    "test:resume": "node scripts/test-resume-feature.js",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "setup-db": "node scripts/setup-database.js",

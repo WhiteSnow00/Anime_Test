@@ -19,7 +19,7 @@ export default function DownloadRedirectContent() {
   const type = searchParams.get('type') || 'download'; 
   const episodeId = parseInt(searchParams.get('episodeId') || '0');
   
-  const isH265 = isH265Episode(episodeId);
+  const isH265 = type === 'folder' ? false : isH265Episode(episodeId);
 
   // Avoid noisy console logs in production
 
@@ -102,11 +102,11 @@ export default function DownloadRedirectContent() {
               Chuẩn Bị Tải Xuống
             </h1>
             <p className="text-sm text-muted-foreground">
-              {type === 'raw' ? 'Phim RAW (Không phụ đề)' : 'Phim có phụ đề'}: {filename}
+              {type === 'raw' ? 'Phim RAW (Không phụ đề)' : type === 'folder' ? 'Thư mục Dropbox' : 'Phim có phụ đề'}: {filename}
             </p>
           </div>
 
-          {isH265Episode(episodeId) && type !== 'raw' && (
+          {isH265 && (
             <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />

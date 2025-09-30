@@ -2,6 +2,15 @@
 
 import { useReducer, useCallback, useMemo, useEffect } from 'react';
 import type { Episode, Anime } from '@/data/anime';
+import { isFeatureEnabled } from '@/lib/feature-flags';
+import {
+  getUserId,
+  getLastEpisode,
+  setLastEpisode,
+  hasSessionRedirected,
+  markSessionRedirected,
+  cleanupOldProgress,
+} from '@/lib/resume-storage';
 
 // Action types
 export type AnimeAction =
@@ -183,7 +192,7 @@ function animeReducer(state: AnimeState, action: AnimeAction): AnimeState {
 }
 
 // Hook
-export function useAnimeState(initialAnime?: Anime) {
+export function useAnimeState(initialAnime?: Anime, user?: { id: string } | null) {
   const [state, dispatch] = useReducer(animeReducer, {
     ...initialState,
     anime: initialAnime || null,
@@ -219,10 +228,25 @@ export function useAnimeState(initialAnime?: Anime) {
   // Action creators
   const actions = useMemo(() => ({
     setAnimeData: (anime: Anime) => dispatch({ type: 'SET_ANIME_DATA', payload: anime }),
-    
+
     setEpisode: (episode: Episode) => {
+      console.log('🔄 setEpisode CALLED', { episodeId: episode.id, episodeName: episode.title });
+
       dispatch({ type: 'SET_EPISODE', payload: episode });
       dispatch({ type: 'ADD_TO_HISTORY', payload: episode });
+
+      // Save to resume storage if feature enabled
+      if (isFeatureEnabled('RESUME_FEATURE_ENABLED') && typeof window !== 'undefined') {
+        const userId = getUserId(user);
+        console.log('💾 SAVING last episode to storage', { userId, episodeId: episode.id });
+        setLastEpisode(userId, episode.id, episode.id);
+
+        // Verify it was saved
+        const saved = getLastEpisode(userId);
+        console.log('✅ VERIFIED saved episode:', saved);
+      } else {
+        console.log('❌ NOT SAVING - feature disabled or not in browser');
+      }
     },
     
     setSection: (section: string) => dispatch({ type: 'SET_SECTION', payload: section }),
@@ -258,14 +282,26 @@ export function useAnimeState(initialAnime?: Anime) {
       if (episode) {
         dispatch({ type: 'SET_EPISODE', payload: episode });
         dispatch({ type: 'ADD_TO_HISTORY', payload: episode });
+
+        // Save to resume storage if feature enabled
+        if (isFeatureEnabled('RESUME_FEATURE_ENABLED') && typeof window !== 'undefined') {
+          const userId = getUserId(user);
+          setLastEpisode(userId, episode.id, episode.id);
+        }
       }
     },
-    
+
     goToEpisodeByIndex: (index: number) => {
       const episode = state.anime?.episodes[index];
       if (episode) {
         dispatch({ type: 'SET_EPISODE', payload: episode });
         dispatch({ type: 'ADD_TO_HISTORY', payload: episode });
+
+        // Save to resume storage if feature enabled
+        if (isFeatureEnabled('RESUME_FEATURE_ENABLED') && typeof window !== 'undefined') {
+          const userId = getUserId(user);
+          setLastEpisode(userId, episode.id, episode.id);
+        }
       }
     },
     
@@ -288,7 +324,7 @@ export function useAnimeState(initialAnime?: Anime) {
         }
       });
     },
-  }), [computedValues, state.anime, state.currentEpisode]);
+  }), [computedValues, state.anime, state.currentEpisode, user]);
 
   // Side effects for persistence
   useEffect(() => {
@@ -297,6 +333,7 @@ export function useAnimeState(initialAnime?: Anime) {
     }
   }, [state.preferences]);
 
+  // Legacy localStorage support (kept for backward compatibility)
   useEffect(() => {
     if (typeof window !== 'undefined' && state.currentEpisode) {
       localStorage.setItem('last-episode', JSON.stringify(state.currentEpisode));
@@ -320,9 +357,53 @@ export function useAnimeState(initialAnime?: Anime) {
 
   // Restore saved episode position after hydration to avoid SSR mismatch
   useEffect(() => {
+    console.log('🔍 EPISODE RESTORATION EFFECT RUNNING', {
+      hasWindow: typeof window !== 'undefined',
+      hasAnime: !!state.anime,
+      animeTitle: state.anime?.title,
+    });
+
     if (typeof window !== 'undefined' && state.anime) {
+      const resumeEnabled = isFeatureEnabled('RESUME_FEATURE_ENABLED');
+      const autoNavigateEnabled = isFeatureEnabled('RESUME_AUTO_NAVIGATE_ENABLED');
+      const hasRedirected = hasSessionRedirected();
+
+      console.log('🔍 RESTORATION CHECK:', {
+        resumeEnabled,
+        autoNavigateEnabled,
+        hasRedirected,
+        currentEpisode: state.currentEpisode?.id,
+      });
+
       try {
-        // First check for download position (most recent user action)
+        // Priority 1: Resume storage (new system)
+        if (resumeEnabled && autoNavigateEnabled && !hasSessionRedirected()) {
+          const userId = getUserId(user);
+          const lastEpisode = getLastEpisode(userId);
+
+          if (process.env.NODE_ENV === 'development') {
+            console.info('[use-anime-state] Checking resume storage:', { userId, lastEpisode });
+          }
+
+          if (lastEpisode) {
+            const episodeExists = state.anime.episodes.find(
+              ep => ep.id === lastEpisode.episodeId
+            );
+            if (episodeExists) {
+              if (process.env.NODE_ENV === 'development') {
+                console.info('[use-anime-state] Restoring episode from resume storage:', episodeExists.id);
+              }
+              dispatch({ type: 'SET_EPISODE', payload: episodeExists });
+              markSessionRedirected();
+
+              // Cleanup old progress data
+              cleanupOldProgress(userId);
+              return;
+            }
+          }
+        }
+
+        // Priority 2: Download position (legacy)
         const downloadPosition = localStorage.getItem('last-episode-download');
         if (downloadPosition) {
           const episodeId = parseInt(downloadPosition, 10);
@@ -332,8 +413,8 @@ export function useAnimeState(initialAnime?: Anime) {
             return;
           }
         }
-        
-        // Fallback to general last episode
+
+        // Priority 3: General last episode (legacy)
         const savedEpisode = localStorage.getItem('last-episode');
         if (savedEpisode) {
           const parsedEpisode = JSON.parse(savedEpisode);
@@ -346,7 +427,7 @@ export function useAnimeState(initialAnime?: Anime) {
         console.warn('Failed to restore saved episode position:', error);
       }
     }
-  }, [state.anime]); // Run when anime data is available 
+  }, [state.anime, user]); // Run when anime data or user changes
   
   return {
     state,

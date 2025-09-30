@@ -160,10 +160,9 @@ export function MobileServerSelector({
         <Button
           variant="outline"
           className="w-full mt-2 mb-3 flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700 border-blue-600"
-          onClick={() => {
-            if (!dropboxFolderUrl) return;
-            try { window.open(dropboxFolderUrl, '_blank', 'noopener,noreferrer'); } catch {}
-          }}
+          onClick={() => { if (dropboxFolderUrl) {
+            try { window.location.href = `/download-redirect?${new URLSearchParams({ url: dropboxFolderUrl, filename: 'Dropbox (toàn bộ)', type: 'folder', episodeId: '0' }).toString()}`; } catch {}
+          }}}
           aria-label="Mở thư mục Dropbox chứa tất cả tập"
           disabled={!dropboxFolderUrl}
           title={dropboxFolderUrl ? 'Mở thư mục Dropbox' : 'Chưa có link Dropbox'}

@@ -301,6 +301,7 @@ const NJWPlayerComponent = ({
   const rafRef = useRef<number | null>(null);
   const suppressClickRef = useRef(false);
   const forcedAutoplayMuteRef = useRef(false);
+  const scheduleControlsAutohideRef = useRef<(() => void) | null>(null);
   const controllerRef = useRef<ReturnType<
     typeof createFullscreenController
   > | null>(null);
@@ -325,7 +326,6 @@ const NJWPlayerComponent = ({
   const [controlsVisible, setControlsVisible] = useState(false);
   // Dedicated visibility for the 3 big center mobile buttons to avoid being stuck
   const [centerControlsVisible, setCenterControlsVisible] = useState(false);
-  const centerControlsTimerRef = useRef<number | null>(null);
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [scrubPct, setScrubPct] = useState<number | null>(null);
   const [isHovering, setIsHovering] = useState(false);
@@ -648,6 +648,10 @@ const NJWPlayerComponent = ({
       p.on("play", () => {
         setIsPlaying(true);
         setIsBuffering(false);
+        // Ensure autohide can kick in after resuming playback on mobile
+        setIsHovering(false);
+        setControlsVisible(true);
+        scheduleControlsAutohideRef.current?.();
         if (isAndroid) {
           const v = containerRef.current?.querySelector(
             "video"
@@ -659,18 +663,33 @@ const NJWPlayerComponent = ({
           }
         }
       });
-      p.on("pause", () => setIsPlaying(false));
+      p.on("pause", () => {
+        setIsPlaying(false);
+        // When paused, we are not buffering for playback
+        setIsBuffering(false);
+      });
       p.on("time", (e: any) => {
         setPosition(e?.position || 0);
         if (typeof e?.duration === "number") setDuration(e.duration);
+        // Any time update implies playback is progressing; clear buffering
+        if (playerInstance.current?.getState?.() === "playing") {
+          setIsBuffering(false);
+        }
       });
       p.on("buffer", (e: any) => {
         setIsBuffering(true);
         if (typeof e?.bufferPercent === "number") {
           const dur = p.getDuration?.() || 0;
           setBuffer((e.bufferPercent / 100) * dur);
+          // If buffer nearly full, avoid keeping spinner forever
+          if (e.bufferPercent >= 95) {
+            setIsBuffering(false);
+          }
         }
       });
+      // Idle/complete/firstFrame should never show buffering spinner
+      p.on("idle", () => setIsBuffering(false));
+      p.on("complete", () => setIsBuffering(false));
       p.on("volume", (e: any) =>
         setVolumeState(
           typeof e?.volume === "number" ? e.volume : CONFIG.DEFAULT_VOLUME
@@ -712,6 +731,7 @@ const NJWPlayerComponent = ({
         setCurrentLevel(typeof cq === "number" ? cq : null);
       });
       p.on("firstFrame", () => {
+        setIsBuffering(false);
         const pos = savedPositionRef.current;
         if (pos > 0.2) {
           try {
@@ -881,6 +901,8 @@ const NJWPlayerComponent = ({
 
       if (shouldHide) {
         setControlsVisible(false);
+        // Keep center controls in sync on touch devices
+        if (isTouch) setCenterControlsVisible(false);
         if (!isTouch) setCursorHidden(true);
         controlsHideTimerRef.current = null;
       } else {
@@ -895,75 +917,40 @@ const NJWPlayerComponent = ({
     isHoveringControlsRef,
   ]);
 
-  // Mobile center controls autohide (separate from bottom bar) to fix cases where they get stuck
-  const scheduleCenterControlsAutohide = useCallback((immediate?: boolean) => {
-    if (!isTouchDeviceRef.current) return; // only for touch
-    if (centerControlsTimerRef.current) {
-      window.clearTimeout(centerControlsTimerRef.current);
-      centerControlsTimerRef.current = null;
-    }
-    const hide = () => {
-      // Only hide if still playing and not recently interacted
-      if (isPlayingRef.current && centerControlsVisibleRef.current) {
-        setCenterControlsVisible(false);
-      }
-      centerControlsTimerRef.current = null;
-    };
-    if (immediate) return hide();
-    centerControlsTimerRef.current = window.setTimeout(hide, CONFIG.CONTROLS_AUTOHIDE_MS_TOUCH);
-  }, [isTouchDeviceRef, isPlayingRef, centerControlsVisibleRef]);
+  // Expose the scheduler to earlier effects via ref to avoid ordering issues
+  useEffect(() => {
+    scheduleControlsAutohideRef.current = scheduleControlsAutohide;
+  }, [scheduleControlsAutohide]);
+
+  // Removed separate center-controls autohide; we synchronize with the main controls timer
 
   // When generic controls visibility changes on touch, sync center controls logic (but keep independent timer)
   useEffect(() => {
     if (!isTouchDevice) return;
-    if (controlsVisible) {
-      // show center only if playing (if paused keep them visible manually)
-      if (isPlaying) setCenterControlsVisible(true);
-      scheduleCenterControlsAutohide();
-    }
-  }, [controlsVisible, isTouchDevice, isPlaying, scheduleCenterControlsAutohide]);
+    // Center controls visibility follows the main control bar
+    setCenterControlsVisible(!!controlsVisible);
+  }, [controlsVisible, isTouchDevice]);
 
   // React to play/pause to show/hide center controls deterministically
-  useEffect(() => {
-    if (!isTouchDevice) return;
-    if (isPlaying) {
-      setCenterControlsVisible(true);
-      scheduleCenterControlsAutohide();
-    } else {
-      // On pause keep them visible for user interaction (do not autohide)
-      setCenterControlsVisible(true);
-      if (centerControlsTimerRef.current) {
-        window.clearTimeout(centerControlsTimerRef.current);
-        centerControlsTimerRef.current = null;
-      }
-    }
-  }, [isPlaying, isTouchDevice, scheduleCenterControlsAutohide]);
+  // Center controls now mirror controlsVisible; no extra play/pause handling needed
 
   // Orientation or fullscreen changes should reshow briefly then hide
   useEffect(() => {
     if (!isTouchDevice) return;
     if (isFullscreen) {
+      // Briefly show controls when entering fullscreen; main timer will hide them
       setCenterControlsVisible(true);
-      scheduleCenterControlsAutohide();
     }
-  }, [isFullscreen, isTouchDevice, scheduleCenterControlsAutohide]);
+  }, [isFullscreen, isTouchDevice]);
 
   // User interactions that should reset timer
   const bumpCenterControls = useCallback(() => {
     if (!isTouchDeviceRef.current) return;
     setCenterControlsVisible(true);
-    scheduleCenterControlsAutohide();
-  }, [scheduleCenterControlsAutohide, isTouchDeviceRef]);
+    // rely on main controls timer
+  }, [isTouchDeviceRef]);
 
-  // Cleanup timer on unmount
-  useEffect(() => {
-    return () => {
-      if (centerControlsTimerRef.current) {
-        window.clearTimeout(centerControlsTimerRef.current);
-        centerControlsTimerRef.current = null;
-      }
-    };
-  }, []);
+  // No separate center-controls timer anymore
 
   useEffect(() => {
     if (controlsVisible) {
@@ -1207,6 +1194,18 @@ const NJWPlayerComponent = ({
             isPlaying ? p.pause?.() : p.play?.(true);
             scheduleControlsAutohide();
           }}
+          onTouchEnd={() => {
+            // End of touch interaction should allow autohide
+            setIsHovering(false);
+          }}
+          onTouchCancel={() => {
+            setIsHovering(false);
+          }}
+          onPointerUp={(e) => {
+            if (e.pointerType === "touch") {
+              setIsHovering(false);
+            }
+          }}
           onContextMenu={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -1314,7 +1313,15 @@ const NJWPlayerComponent = ({
               centerControlsVisible ? "opacity-100" : "opacity-0"
             } pointer-events-none`}
           >
-            <div className="pointer-events-auto flex items-center gap-4 sm:gap-6">
+            <div
+              className="pointer-events-auto flex items-center gap-4 sm:gap-6"
+              onTouchEnd={() => {
+                // Let main timer hide after interactions
+                setIsHovering(false);
+                scheduleControlsAutohide();
+              }}
+              onTouchCancel={() => setIsHovering(false)}
+            >
               <button
                 aria-label={CONFIG.LABELS.BACK_X(CONFIG.SKIP_SECONDS)}
                 className="flex items-center justify-center p-1 rounded-full bg-white/10 transition-colors duration-200 drop-shadow-lg"
@@ -1324,6 +1331,7 @@ const NJWPlayerComponent = ({
                   scheduleControlsAutohide();
                   bumpCenterControls();
                 }}
+                onTouchEnd={() => setIsHovering(false)}
               >
                 <BackwardIcon className="h-7 w-7 text-white" />
               </button>
@@ -1346,6 +1354,7 @@ const NJWPlayerComponent = ({
                   scheduleControlsAutohide();
                   bumpCenterControls();
                 }}
+                onTouchEnd={() => setIsHovering(false)}
               >
                 <div className="transition-opacity duration-300 ease-in-out">
                   {isPlaying ? (
@@ -1364,6 +1373,7 @@ const NJWPlayerComponent = ({
                   scheduleControlsAutohide();
                   bumpCenterControls();
                 }}
+                onTouchEnd={() => setIsHovering(false)}
               >
                 <ForwardIcon className="h-7 w-7 text-white" />
               </button>

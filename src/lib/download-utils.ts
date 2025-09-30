@@ -56,6 +56,21 @@ export function openDropboxLink(url: string, filename?: string, isRaw?: boolean,
   }
 }
 
+export function openDropboxFolder(url: string, label: string = 'Thư mục Dropbox'): void {
+  try {
+    const params = new URLSearchParams({
+      url,
+      filename: label,
+      type: 'folder',
+      episodeId: '0',
+    });
+    window.location.href = `/download-redirect?${params.toString()}`;
+  } catch (error) {
+    console.error('Failed to navigate to folder redirect page:', error);
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+}
+
 export function triggerDownload(url: string, filename?: string): void {
   try {
     const link = document.createElement('a');
