@@ -63,9 +63,9 @@ function ServerSelectorComponent({
     }
 
     const filename = `Tập ${currentEpisode.id}`;
-    
-    // Check if it's a Google Drive link and handle accordingly
-    if (currentEpisode.downloadUrl.includes('drive.google.com')) {
+
+    // Check if it's a Dropbox link and handle accordingly
+    if (currentEpisode.downloadUrl.includes('dropbox.com')) {
       openGoogleDriveLink(currentEpisode.downloadUrl, filename, false, currentEpisode.id);
     } else {
       // For other types of links, try direct download
@@ -85,9 +85,9 @@ function ServerSelectorComponent({
     }
 
     const filename = `Tập ${currentEpisode.id} RAW`;
-    
-    // Check if it's a Google Drive link and handle accordingly
-    if (currentEpisode.rawDownloadUrl.includes('drive.google.com')) {
+
+    // Check if it's a Dropbox link and handle accordingly
+    if (currentEpisode.rawDownloadUrl.includes('dropbox.com')) {
       openGoogleDriveLink(currentEpisode.rawDownloadUrl, filename, true, currentEpisode.id);
     } else {
       // For other types of links, try direct download
