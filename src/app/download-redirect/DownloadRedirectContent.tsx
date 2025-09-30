@@ -13,15 +13,25 @@ export default function DownloadRedirectContent() {
   const [countdown, setCountdown] = useState(5);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [isReturning, setIsReturning] = useState(false);
+  const REDIRECT_DELAY_MS = 1200; // show redirecting state for ~1.2s
 
   const url = searchParams.get('url');
   const filename = searchParams.get('filename') || 'Tập';
   const type = searchParams.get('type') || 'download'; 
   const episodeId = parseInt(searchParams.get('episodeId') || '0');
   
-  const isH265 = type === 'folder' ? false : isH265Episode(episodeId);
+  const isH265 = (type === 'raw' || type === 'folder') ? false : isH265Episode(episodeId);
 
-  // Avoid noisy console logs in production
+  const providerName = useMemo(() => {
+    if (!url) return 'trang tải xuống';
+    const u = url.toLowerCase();
+    if (u.includes('drive.google')) return 'Google Drive';
+    if (u.includes('dropbox.com')) return 'Dropbox';
+    if (u.includes('mega.nz')) return 'MEGA';
+    if (u.includes('mediafire.com')) return 'MediaFire';
+    return 'trang tải xuống';
+  }, [url]);
+
 
   const redirectToUrl = (targetUrl: string) => {
     setIsRedirecting(true);
@@ -30,8 +40,6 @@ export default function DownloadRedirectContent() {
         // Mark that we already redirected for this URL in this session
         const key = `redirected:${targetUrl}`;
         sessionStorage.setItem(key, '1');
-        // Ensure back navigation returns to index instead of this redirect page
-        try { window.history.replaceState(null, '', '/'); } catch {}
       }
     } catch {}
     window.location.href = targetUrl;
@@ -55,7 +63,9 @@ export default function DownloadRedirectContent() {
       setCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          setTimeout(() => redirectToUrl(url), 500);
+          // First show redirecting state for a brief moment, then navigate
+          setIsRedirecting(true);
+          setTimeout(() => redirectToUrl(url), REDIRECT_DELAY_MS);
           return 0;
         }
         return prev - 1;
@@ -67,13 +77,8 @@ export default function DownloadRedirectContent() {
 
   const handleManualRedirect = () => {
     if (url) {
-      try {
-        // Make sure when user presses Back from the external site, they land on index
-        if (typeof window !== 'undefined') {
-          window.history.replaceState(null, '', '/');
-        }
-      } catch {}
-      redirectToUrl(url);
+      setIsRedirecting(true);
+      setTimeout(() => redirectToUrl(url), REDIRECT_DELAY_MS);
     }
   };
 
@@ -189,7 +194,7 @@ export default function DownloadRedirectContent() {
             <div className="text-center space-y-4">
               <div className="flex items-center justify-center gap-2 text-lg font-semibold text-green-600 dark:text-green-400">
                 <ExternalLink className="w-5 h-5 animate-pulse" />
-                <span>Đang chuyển hướng đến Dropbox...</span>
+                <span>Đang chuyển hướng đến {providerName}...</span>
               </div>
               <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                 <div className="h-full bg-gradient-to-r from-green-500 to-emerald-500 animate-pulse" style={{ width: '100%' }} />

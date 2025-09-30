@@ -19,6 +19,7 @@ import {
   getProgress, 
   setProgress,
   clearProgress,
+  setLastEpisode,
   type EpisodeProgress,
 } from '@/lib/resume-storage';
 
@@ -76,6 +77,7 @@ export function useVideoResume({
   const lastSavedTime = useRef<number>(0);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isFeatureActive = isFeatureEnabled('RESUME_FEATURE_ENABLED');
+  const lastEpisodeMarkedRef = useRef<boolean>(false);
   
   const DEBOUNCE_MS = getResumeConfig('PROGRESS_SAVE_DEBOUNCE_MS');
   const MIN_THRESHOLD = getResumeConfig('MIN_RESUME_THRESHOLD');
@@ -90,12 +92,13 @@ export function useVideoResume({
     setShouldShowDialog(false);
     setHasCheckedResume(false);
     lastSavedTime.current = 0;
+    lastEpisodeMarkedRef.current = false;
 
     const progress = getProgress(userId, episodeId);
     setSavedProgress(progress);
 
     if (process.env.NODE_ENV === 'development') {
-      console.info('[use-video-resume] Episode changed to', episodeId, '- loaded progress:', progress);
+      console.warn('[use-video-resume] Episode changed to', episodeId, '- loaded progress:', progress);
     }
   }, [episodeId, userId, isFeatureActive]);
 
@@ -106,7 +109,7 @@ export function useVideoResume({
     const { time, declined } = savedProgress;
 
     if (process.env.NODE_ENV === 'development') {
-      console.info('[use-video-resume] Checking resume eligibility:', {
+      console.warn('[use-video-resume] Checking resume eligibility:', {
         time,
         declined,
         MIN_THRESHOLD,
@@ -117,7 +120,7 @@ export function useVideoResume({
     // Don't show if below threshold
     if (time < MIN_THRESHOLD) {
       if (process.env.NODE_ENV === 'development') {
-        console.info('[use-video-resume] Below threshold, no dialog');
+        console.warn('[use-video-resume] Below threshold, no dialog');
       }
       setHasCheckedResume(true);
       return;
@@ -126,7 +129,7 @@ export function useVideoResume({
     // Don't show if near completion
     if (duration && time >= duration * MAX_PERCENTAGE) {
       if (process.env.NODE_ENV === 'development') {
-        console.info('[use-video-resume] Near completion, no dialog');
+        console.warn('[use-video-resume] Near completion, no dialog');
       }
       setHasCheckedResume(true);
       return;
@@ -135,7 +138,7 @@ export function useVideoResume({
     // Don't show if user previously declined
     if (declined) {
       if (process.env.NODE_ENV === 'development') {
-        console.info('[use-video-resume] Previously declined, no dialog');
+        console.warn('[use-video-resume] Previously declined, no dialog');
       }
       setHasCheckedResume(true);
       return;
@@ -143,7 +146,7 @@ export function useVideoResume({
 
     // Show dialog
     if (process.env.NODE_ENV === 'development') {
-      console.info('[use-video-resume] Showing resume dialog');
+      console.warn('[use-video-resume] Showing resume dialog');
     }
     setShouldShowDialog(true);
     setHasCheckedResume(true);
@@ -173,7 +176,7 @@ export function useVideoResume({
       lastSavedTime.current = time;
 
       if (process.env.NODE_ENV === 'development') {
-        console.info('[use-video-resume] Saved progress', { episodeId: currentEpisodeId, time });
+        console.warn('[use-video-resume] Saved progress', { episodeId: currentEpisodeId, time });
       }
     }, DEBOUNCE_MS);
   }, [userId, isFeatureActive, DEBOUNCE_MS]);
@@ -189,9 +192,20 @@ export function useVideoResume({
       return;
     }
 
+    // Mark this episode as the last watched (only once per episode)
+    if (!lastEpisodeMarkedRef.current) {
+      try {
+        setLastEpisode(userId, episodeId, episodeId);
+        lastEpisodeMarkedRef.current = true;
+      } catch {}
+    }
+
+    // Always track the latest seen time so flush() can persist it immediately
+    lastSavedTime.current = currentTime;
+
     // Pass current episodeId to ensure correct episode is updated
     saveProgressDebounced(currentTime, episodeId);
-  }, [isFeatureActive, duration, MAX_PERCENTAGE, saveProgressDebounced, episodeId]);
+  }, [isFeatureActive, duration, MAX_PERCENTAGE, saveProgressDebounced, episodeId, userId]);
 
   /**
    * Flush progress immediately (call on pause/visibility change)
@@ -213,7 +227,7 @@ export function useVideoResume({
       });
 
       if (process.env.NODE_ENV === 'development') {
-        console.info('[use-video-resume] Flushed progress', { episodeId, time: lastSavedTime.current });
+        console.warn('[use-video-resume] Flushed progress', { episodeId, time: lastSavedTime.current });
       }
     }
   }, [userId, episodeId, isFeatureActive]);
@@ -231,7 +245,7 @@ export function useVideoResume({
     setShouldShowDialog(false);
     
     if (process.env.NODE_ENV === 'development') {
-      console.info('[use-video-resume] Marked as declined', { episodeId });
+      console.warn('[use-video-resume] Marked as declined', { episodeId });
     }
   }, [userId, episodeId, savedProgress, isFeatureActive]);
 
@@ -257,11 +271,24 @@ export function useVideoResume({
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
+      // Flush the most recent progress on unmount (e.g., when switching episodes)
+      try {
+        if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current);
+          saveTimeoutRef.current = null;
+        }
+        if (isFeatureActive && lastSavedTime.current > 0) {
+          setProgress(userId, episodeId, {
+            time: lastSavedTime.current,
+            declined: false,
+          });
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('[use-video-resume] Unmount flush', { episodeId, time: lastSavedTime.current });
+          }
+        }
+      } catch {}
     };
-  }, []);
+  }, [isFeatureActive, userId, episodeId]);
 
   // Flush on visibility change
   useEffect(() => {

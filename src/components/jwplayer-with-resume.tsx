@@ -133,6 +133,10 @@ export function JWPlayerWithResume({
     seekTo(savedProgress.time);
     setHasAppliedResume(true);
     resumeAppliedRef.current = true;
+    try {
+      const p = playerInstanceRef.current;
+      p?.play?.(true);
+    } catch {}
     
     if (process.env.NODE_ENV === 'development') {
   console.warn('[jwplayer-resume] Resumed from', savedProgress.time);
@@ -146,6 +150,10 @@ export function JWPlayerWithResume({
     markDeclined();
     setHasAppliedResume(true);
     resumeAppliedRef.current = true;
+    try {
+      const p = playerInstanceRef.current;
+      p?.play?.(true);
+    } catch {}
     
     if (process.env.NODE_ENV === 'development') {
   console.warn('[jwplayer-resume] User declined resume');
@@ -369,6 +377,17 @@ export function JWPlayerWithResume({
     }
   }, [episodeId]);
 
+  // If a resume prompt should show, ensure playback is paused until user decides
+  useEffect(() => {
+    if (!isResumeEnabled) return;
+    if (isPromptEnabled && shouldShowDialog) {
+      try {
+        const p = playerInstanceRef.current;
+        p?.pause?.();
+      } catch {}
+    }
+  }, [isResumeEnabled, isPromptEnabled, shouldShowDialog]);
+
   return (
     <>
       {/* Visual indicator that resume wrapper is active (dev only) */}
@@ -395,7 +414,7 @@ export function JWPlayerWithResume({
       <NJWPlayerComponent
         videoId={videoId}
         server={server}
-        autoPlay={autoPlay}
+        autoPlay={autoPlay && !(isPromptEnabled && shouldShowDialog)}
         muted={muted}
         controls={controls}
         onLoad={handlePlayerLoad}
