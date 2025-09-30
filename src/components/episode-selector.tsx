@@ -1,12 +1,11 @@
 "use client";
 
-import { memo, useCallback, useMemo, useState, useEffect } from 'react';
+import { memo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { Episode } from '@/data/anime';
 import { cn } from '@/lib/utils';
 import { Tv } from 'lucide-react';
-import { useViewport } from '@/hooks/use-viewport';
 import { withPerformanceOptimization } from '@/lib/higher-order-components';
 import { fp, performanceUtils } from '@/lib/advanced-utils';
 
@@ -23,56 +22,23 @@ function EpisodeSelectorComponent({
   onSelectEpisode,
   className,
 }: EpisodeSelectorProps) {
-const [isHydrated, setIsHydrated] = useState(false);
-  const viewport = useViewport();
+  // CSS-first responsive grid to avoid hydration glitches
+  // Grid: 5 cols on small screens, scales up with breakpoints; keeps classes static across SSR/CSR
+  const gridClass = "grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 2xl:grid-cols-12";
+  // Button sizing via breakpoints to avoid JS-driven layout switches
+  const buttonSizeClass = "w-full h-10 md:h-12 text-xs md:text-sm";
 
-  useEffect(() => {
-    setIsHydrated(true);
-  }, []);
-
-const gridConfig = useMemo(() => {
-    if (!isHydrated) {
-      return {
-        columns: 6,
-        className: "grid-cols-6 md:grid-cols-8",
-        buttonSize: "h-12 w-full text-sm",
-      };
-    }
-    const { width, isMobile, isTablet } = viewport;
-    
-    if (isMobile) {
-      return {
-        columns: width < 400 ? 4 : 5,
-        className: "grid-cols-4 sm:grid-cols-5",
-        buttonSize: "h-10 w-full text-xs",
-      };
-    } else if (isTablet) {
-      return {
-        columns: 8,
-        className: "grid-cols-6 md:grid-cols-8",
-        buttonSize: "h-12 w-full text-sm",
-      };
-    } else {
-      return {
-        columns: width > 1600 ? 15 : width > 1200 ? 12 : 10,
-        className: "grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 2xl:grid-cols-15",
-        buttonSize: "h-12 w-full text-sm",
-      };
-    }
-  }, [viewport, isHydrated]);
-
-const handleEpisodeSelect = useCallback(
-    fp.compose(
-      fp.debounce,
-      (episode: Episode) => {
-        const measure = performanceUtils.measure((ep: Episode) => {
-          onSelectEpisode(ep);
-        }, 'Episode Selection');
-        measure(episode);
-      }
-    ),
-    [onSelectEpisode]
-  );
+  const handleEpisodeSelect = useCallback((episode: Episode) => {
+    const run = () => {
+      const measure = performanceUtils.measure((ep: Episode) => {
+        onSelectEpisode(ep);
+      }, 'Episode Selection');
+      measure(episode);
+    };
+    // basic micro-debounce to avoid double clicks
+    const t = setTimeout(run, 0);
+    return () => clearTimeout(t);
+  }, [onSelectEpisode]);
 
   // Memoized episode button renderer
   const renderEpisodeButton = useCallback((episode: Episode) => {
@@ -83,7 +49,7 @@ const handleEpisodeSelect = useCallback(
         key={episode.id}
         variant={isActive ? 'default' : 'outline'}
         className={cn(
-          gridConfig.buttonSize,
+          buttonSizeClass,
           "font-medium relative overflow-hidden",
           "transform transition-all duration-200",
           "hover:scale-105 active:scale-95",
@@ -107,7 +73,7 @@ const handleEpisodeSelect = useCallback(
     );
   }, [
     currentEpisode.id,
-    gridConfig.buttonSize,
+    buttonSizeClass,
     className,
     handleEpisodeSelect,
   ]);
@@ -125,7 +91,7 @@ const handleEpisodeSelect = useCallback(
         {/* Episode grid */}
         <div className={cn(
           "grid gap-2",
-          gridConfig.className
+          gridClass
         )}>
           {episodes.map(renderEpisodeButton)}
         </div>
