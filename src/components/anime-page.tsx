@@ -14,7 +14,7 @@ import { CommentSection } from './comment-section';
 import { NotificationHeader } from './notification-header';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Heart, Info, Loader2 } from 'lucide-react';
-import { clearEpisodePosition, triggerDownload, openGoogleDriveLink } from '@/lib/download-utils';
+import { clearEpisodePosition, triggerDownload, openDropboxLink } from '@/lib/download-utils';
 import { useScrollNavigation } from '@/hooks/use-scroll-navigation';
 import { useViewport } from '@/hooks/use-viewport';
 import { useAnimeState } from '@/hooks/use-anime-state';
@@ -72,7 +72,7 @@ const { state, actions, computed } = useAnimeState(animeData);
 
   const handleMobileDownload = useCallback((url: string, filename: string) => {
     if (url.includes('dropbox.com')) {
-      openGoogleDriveLink(url, filename, false, currentEpisode.id);
+      openDropboxLink(url, filename, false, currentEpisode.id);
     } else {
       triggerDownload(url, filename);
     }
@@ -80,7 +80,7 @@ const { state, actions, computed } = useAnimeState(animeData);
 
   const handleMobileRawDownload = useCallback((url: string, filename: string) => {
     if (url.includes('dropbox.com')) {
-      openGoogleDriveLink(url, filename, true, currentEpisode.id);
+      openDropboxLink(url, filename, true, currentEpisode.id);
     } else {
       triggerDownload(url, filename);
     }

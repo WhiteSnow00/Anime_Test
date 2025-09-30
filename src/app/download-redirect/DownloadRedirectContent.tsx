@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Download, Clock, Video, AlertTriangle, ExternalLink } from 'lucide-react';
@@ -12,6 +12,7 @@ export default function DownloadRedirectContent() {
   const router = useRouter();
   const [countdown, setCountdown] = useState(5);
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [isReturning, setIsReturning] = useState(false);
 
   const url = searchParams.get('url');
   const filename = searchParams.get('filename') || 'Tập';
@@ -20,24 +21,35 @@ export default function DownloadRedirectContent() {
   
   const isH265 = isH265Episode(episodeId);
 
-  console.log('DownloadRedirect Debug:', {
-    episodeId,
-    episodeIdRaw: searchParams.get('episodeId'),
-    type,
-    isH265,
-    shouldShowWarning: isH265Episode(episodeId) && type !== 'raw'
-  });
+  // Avoid noisy console logs in production
 
   const redirectToUrl = (targetUrl: string) => {
     setIsRedirecting(true);
+    try {
+      if (typeof window !== 'undefined' && targetUrl) {
+        // Mark that we already redirected for this URL in this session
+        const key = `redirected:${targetUrl}`;
+        sessionStorage.setItem(key, '1');
+        // Ensure back navigation returns to index instead of this redirect page
+        try { window.history.replaceState(null, '', '/'); } catch {}
+      }
+    } catch {}
     window.location.href = targetUrl;
   };
 
   useEffect(() => {
-    if (!url) {
-      router.push('/');
-      return;
-    }
+    // Detect browser back/forward navigation and skip auto-redirect when returning
+    try {
+      const nav = (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined);
+      const isBackForward = nav?.type === 'back_forward';
+      const key = url ? `redirected:${url}` : '';
+      const seenThisUrl = key ? sessionStorage.getItem(key) === '1' : false;
+      if (isBackForward && seenThisUrl) {
+        setIsReturning(true);
+      }
+    } catch {}
+
+    if (!url || isReturning) return;
 
     const timer = setInterval(() => {
       setCountdown((prev) => {
@@ -51,10 +63,16 @@ export default function DownloadRedirectContent() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [url, router]);
+  }, [url, isReturning]);
 
   const handleManualRedirect = () => {
     if (url) {
+      try {
+        // Make sure when user presses Back from the external site, they land on index
+        if (typeof window !== 'undefined') {
+          window.history.replaceState(null, '', '/');
+        }
+      } catch {}
       redirectToUrl(url);
     }
   };
@@ -112,42 +130,66 @@ export default function DownloadRedirectContent() {
           {/* Countdown */}
           {!isRedirecting ? (
             <div className="text-center space-y-4">
-              <div className="flex items-center justify-center gap-2 text-lg font-semibold text-primary">
-                <Clock className="w-5 h-5 animate-pulse" />
-                <span>Chuyển hướng sau {countdown} giây</span>
-              </div>
-              
-              {/* Loading animation */}
-              <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                <div 
-                  className="h-full bg-gradient-to-r from-pink-500 to-purple-500 transition-all duration-1000 ease-linear"
-                  style={{ width: `${((5 - countdown) / 5) * 100}%` }}
-                />
-              </div>
-
-              {/* Manual buttons */}
-              <div className="flex gap-3 pt-2">
-                <Button
-                  variant="outline"
-                  onClick={handleGoBack}
-                  className="flex-1 vietnamese-text"
-                >
-                  Quay lại
-                </Button>
-                <Button
-                  onClick={handleManualRedirect}
-                  className="flex-1 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 vietnamese-text"
-                >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Tải ngay
-                </Button>
-              </div>
+              {isReturning ? (
+                <>
+                  <div className="flex items-center justify-center gap-2 text-lg font-semibold text-primary">
+                    <ExternalLink className="w-5 h-5" />
+                    <span>Bạn vừa quay lại từ trang tải xuống</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">Nhấn &quot;Tải ngay&quot; để mở lại trang tải.</p>
+                  <div className="flex gap-3 pt-2">
+                    <Button
+                      variant="outline"
+                      onClick={handleGoBack}
+                      className="flex-1 vietnamese-text"
+                    >
+                      Quay lại
+                    </Button>
+                    <Button
+                      onClick={handleManualRedirect}
+                      className="flex-1 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 vietnamese-text"
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Tải ngay
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center justify-center gap-2 text-lg font-semibold text-primary">
+                    <Clock className="w-5 h-5 animate-pulse" />
+                    <span>Chuyển hướng sau {countdown} giây</span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-pink-500 to-purple-500 transition-all duration-1000 ease-linear"
+                      style={{ width: `${((5 - countdown) / 5) * 100}%` }}
+                    />
+                  </div>
+                  <div className="flex gap-3 pt-2">
+                    <Button
+                      variant="outline"
+                      onClick={handleGoBack}
+                      className="flex-1 vietnamese-text"
+                    >
+                      Quay lại
+                    </Button>
+                    <Button
+                      onClick={handleManualRedirect}
+                      className="flex-1 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 vietnamese-text"
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Tải ngay
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
           ) : (
             <div className="text-center space-y-4">
               <div className="flex items-center justify-center gap-2 text-lg font-semibold text-green-600 dark:text-green-400">
                 <ExternalLink className="w-5 h-5 animate-pulse" />
-                <span>Đang chuyển hướng đến Google Drive...</span>
+                <span>Đang chuyển hướng đến Dropbox...</span>
               </div>
               <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                 <div className="h-full bg-gradient-to-r from-green-500 to-emerald-500 animate-pulse" style={{ width: '100%' }} />

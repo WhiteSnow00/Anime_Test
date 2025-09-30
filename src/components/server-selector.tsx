@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Server, Play, Download, AlertCircle, CheckCircle, PackageOpen } from 'lucide-react';
 import { withPerformanceOptimization } from '@/lib/higher-order-components';
-import { triggerDownload, isValidDownloadUrl, openGoogleDriveLink } from '@/lib/download-utils';
+import { triggerDownload, isValidDownloadUrl, openDropboxLink } from '@/lib/download-utils';
 import type { Episode } from '@/data/anime';
 import { getServerStatus, ServerStatus, validateEpisodeServers, getServerReliabilityScore } from '@/lib/video-server-utils';
 
@@ -66,7 +66,7 @@ function ServerSelectorComponent({
 
     // Check if it's a Dropbox link and handle accordingly
     if (currentEpisode.downloadUrl.includes('dropbox.com')) {
-      openGoogleDriveLink(currentEpisode.downloadUrl, filename, false, currentEpisode.id);
+      openDropboxLink(currentEpisode.downloadUrl, filename, false, currentEpisode.id);
     } else {
       // For other types of links, try direct download
       triggerDownload(currentEpisode.downloadUrl, filename);
@@ -88,7 +88,7 @@ function ServerSelectorComponent({
 
     // Check if it's a Dropbox link and handle accordingly
     if (currentEpisode.rawDownloadUrl.includes('dropbox.com')) {
-      openGoogleDriveLink(currentEpisode.rawDownloadUrl, filename, true, currentEpisode.id);
+      openDropboxLink(currentEpisode.rawDownloadUrl, filename, true, currentEpisode.id);
     } else {
       // For other types of links, try direct download
       triggerDownload(currentEpisode.rawDownloadUrl, filename);
@@ -177,7 +177,7 @@ function ServerSelectorComponent({
                 "bg-purple-500 text-white hover:bg-purple-600 border-purple-500",
               )}
               onClick={handleDownload}
-              aria-label="Mở link Google Drive để tải về"
+              aria-label="Mở link Dropbox để tải về"
             >
               <PackageOpen className="w-3 h-3 sm:w-4 sm:h-4" />
               <div className="flex flex-col items-start">

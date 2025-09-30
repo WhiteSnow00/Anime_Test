@@ -35,7 +35,7 @@ export function clearEpisodePosition(): void {
   }
 }
 
-export function openGoogleDriveLink(url: string, filename?: string, isRaw?: boolean, episodeId?: number): void {
+export function openDropboxLink(url: string, filename?: string, isRaw?: boolean, episodeId?: number): void {
   try {
     if (episodeId) {
       saveEpisodePosition(episodeId);
