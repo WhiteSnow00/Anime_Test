@@ -21,12 +21,11 @@ export function TopNav() {
   return (
     <>
       <nav
-        className="hidden md:block md:sticky md:top-0 z-50 w-full bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60"
-        style={{ paddingTop: "env(safe-area-inset-top)" }}
+        className="hidden md:block z-50 w-full bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60"
         aria-label="KanaFansub top navigation"
       >
         <div className="mx-auto w-full max-w-7xl px-3 sm:px-4">
-          <div className="h-12 md:h-14 flex items-center justify-between">
+          <div className="h-12 md:h-14 flex items-center justify-between px-2">
             {/* Brand */}
             <button
               type="button"

@@ -76,7 +76,7 @@ export default function RootLayout({
       <body className="font-body antialiased" suppressHydrationWarning>
         <AuthProvider>
           <TopNav />
-          <div className="pt-0 md:pt-14">{children}</div>
+          <div className="pt-0">{children}</div>
         </AuthProvider>
         <Toaster />
       </body>
