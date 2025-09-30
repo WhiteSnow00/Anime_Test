@@ -53,7 +53,7 @@ export const viewport: Viewport = {
 };
 
 import { AuthProvider } from '@/contexts/auth-context';
-import { AuthHeader } from '@/components/auth-header';
+import TopNav from '@/components/top-nav';
 
 export default function RootLayout({
   children,
@@ -75,8 +75,8 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased" suppressHydrationWarning>
         <AuthProvider>
-          <AuthHeader />
-          {children}
+          <TopNav />
+          <div className="pt-0 md:pt-14">{children}</div>
         </AuthProvider>
         <Toaster />
       </body>

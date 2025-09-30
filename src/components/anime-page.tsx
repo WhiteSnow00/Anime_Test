@@ -17,9 +17,9 @@ import { AnimeInfo } from "./anime-info";
 import { MobileHeader } from "./mobile-header";
 import { MobileBottomNav } from "./mobile-bottom-nav";
 import { CommentSection } from "./comment-section";
-import { NotificationHeader } from "./notification-header";
+// import { NotificationHeader } from "./notification-header";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Heart, Info, Loader2 } from "lucide-react";
+import { Heart, Info, Loader2, Sparkles } from "lucide-react";
 import {
   clearEpisodePosition,
   triggerDownload,
@@ -475,7 +475,10 @@ function AnimePageComponent() {
         className={`w-full max-w-7xl mx-auto ${layoutConfig.spacing} ${layoutConfig.containerClass}`}
         suppressHydrationWarning
       >
-        <NotificationHeader />
+        {/* Site name */}
+        {/* Brand moved to TopNav */}
+
+        {/* <NotificationHeader /> */}
 
         <div ref={refs.videoRef} id="video-section" data-section="video">
           {videoPlayerComponent}
