@@ -136,7 +136,7 @@ export function getLastEpisode(userId: string): LastEpisodeData | null {
     const data = storage.getItem(STORAGE_KEYS.RESUME);
     if (!data) {
       if (process.env.NODE_ENV === 'development') {
-        console.info('[resume-storage] No last episode data found');
+        console.warn('[resume-storage] No last episode data found');
       }
       return null;
     }
@@ -151,7 +151,7 @@ export function getLastEpisode(userId: string): LastEpisodeData | null {
     }
 
     if (process.env.NODE_ENV === 'development') {
-      console.info('[resume-storage] Retrieved last episode:', parsed.lastEpisode);
+      console.warn('[resume-storage] Retrieved last episode:', parsed.lastEpisode);
     }
 
     return parsed.lastEpisode;
@@ -189,7 +189,7 @@ export function setLastEpisode(
     storage.setItem(STORAGE_KEYS.RESUME, JSON.stringify(data));
     
     if (process.env.NODE_ENV === 'development') {
-      console.info('[resume-storage] setLastEpisode', { episodeNumber, episodeId });
+      console.warn('[resume-storage] setLastEpisode', { episodeNumber, episodeId });
     }
   } catch (e) {
     console.error('[resume-storage] setLastEpisode error:', e);
@@ -209,7 +209,7 @@ export function getProgress(userId: string, episodeId: number): EpisodeProgress 
     const data = storage.getItem(key);
     if (!data) {
       if (process.env.NODE_ENV === 'development') {
-        console.info('[resume-storage] No progress data found for user:', userId);
+        console.warn('[resume-storage] No progress data found for user:', userId);
       }
       return null;
     }
@@ -218,7 +218,7 @@ export function getProgress(userId: string, episodeId: number): EpisodeProgress 
     const progress = progressMap[episodeId] || null;
 
     if (process.env.NODE_ENV === 'development') {
-      console.info('[resume-storage] Retrieved progress for episode', episodeId, ':', progress);
+      console.warn('[resume-storage] Retrieved progress for episode', episodeId, ':', progress);
     }
 
     return progress;
@@ -264,7 +264,7 @@ export function setProgress(
     storage.setItem(key, JSON.stringify(progressMap));
     
     if (process.env.NODE_ENV === 'development') {
-      console.info('[resume-storage] setProgress', { episodeId, progress });
+      console.warn('[resume-storage] setProgress', { episodeId, progress });
     }
   } catch (e) {
     console.error('[resume-storage] setProgress error:', e);
@@ -336,8 +336,8 @@ export function cleanupOldProgress(userId: string): void {
     }
 
     if (cleaned) {
-      storage.setItem(key, JSON.stringify(progressMap));
-      console.info('[resume-storage] Cleaned up old progress data');
+  storage.setItem(key, JSON.stringify(progressMap));
+  console.warn('[resume-storage] Cleaned up old progress data');
     }
   } catch (e) {
     console.error('[resume-storage] cleanupOldProgress error:', e);
@@ -351,5 +351,36 @@ export function cleanupOldProgress(userId: string): void {
  */
 export function isStorageAvailable(): boolean {
   return !storage.isUsingFallback();
+}
+
+/**
+ * Get the most recently updated episode from the user's progress map
+ * Useful fallback when lastEpisode is missing but per-episode progress exists
+ */
+export function getLatestProgressEpisode(userId: string): { episodeId: number; progress: EpisodeProgress } | null {
+  try {
+    const key = `${STORAGE_KEYS.PROGRESS_PREFIX}:${userId}`;
+    const data = storage.getItem(key);
+    if (!data) return null;
+    const progressMap: ProgressMap = JSON.parse(data);
+    let latest: { episodeId: number; progress: EpisodeProgress } | null = null;
+    for (const [epIdStr, prog] of Object.entries(progressMap)) {
+      if (!prog?.updatedAt) continue;
+      const epId = Number(epIdStr);
+      if (!latest) {
+        latest = { episodeId: epId, progress: prog };
+      } else {
+        const prev = new Date(latest.progress.updatedAt).getTime();
+        const cur = new Date(prog.updatedAt).getTime();
+        if (cur > prev) {
+          latest = { episodeId: epId, progress: prog };
+        }
+      }
+    }
+    return latest;
+  } catch (e) {
+    console.error('[resume-storage] getLatestProgressEpisode error:', e);
+    return null;
+  }
 }
 
