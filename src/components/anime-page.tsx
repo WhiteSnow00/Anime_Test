@@ -52,6 +52,28 @@ function AnimePageComponent() {
     return () => clearTimeout(timeoutId);
   }, []);
 
+  // On browser refresh (F5), always scroll to top (mobile + desktop)
+  useEffect(() => {
+    if (!isHydrated) return;
+    try {
+      const navEntries = (performance?.getEntriesByType?.('navigation') || []) as any[];
+      const isReload = navEntries.length > 0
+        ? navEntries[0]?.type === 'reload'
+        : // legacy
+          // @ts-ignore
+          ((performance as any).navigation && (performance as any).navigation.type === 1);
+
+      if (isReload) {
+        // Use a microtask to ensure layout is ready before scrolling
+        setTimeout(() => {
+          try {
+            window.scrollTo({ top: 0, behavior: 'auto' });
+          } catch {}
+        }, 0);
+      }
+    } catch {}
+  }, [isHydrated]);
+
   // Initialize with HLS as preferred server (especially for mobile)
   const getDefaultServer = (): ServerType => {
     const firstEpisode = animeData.episodes[0];
