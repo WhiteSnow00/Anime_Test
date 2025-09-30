@@ -109,7 +109,7 @@ export function ResumeDialog({
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent 
-        className="sm:max-w-[425px] gap-6"
+        className="w-[88vw] max-w-[360px] sm:max-w-[425px] gap-6 p-5 sm:p-6 rounded-xl max-h-[85vh] overflow-y-auto"
         aria-describedby="resume-dialog-description"
       >
         <DialogHeader>
@@ -130,7 +130,7 @@ export function ResumeDialog({
           <Button
             variant="outline"
             onClick={handleStartOver}
-            className="w-full sm:w-auto order-2 sm:order-1"
+            className="w-full sm:w-auto order-2 sm:order-1 h-12"
             aria-label="Xem tập từ đầu"
           >
             <RotateCcw className="mr-2 h-4 w-4" />
@@ -138,7 +138,7 @@ export function ResumeDialog({
           </Button>
           <Button
             onClick={handleContinue}
-            className="w-full sm:w-auto order-1 sm:order-2"
+            className="w-full sm:w-auto order-1 sm:order-2 h-12"
             autoFocus
             aria-label={`Tiếp tục từ ${formatTime(savedTime)}`}
           >

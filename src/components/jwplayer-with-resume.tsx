@@ -391,25 +391,6 @@ export function JWPlayerWithResume({
   return (
     <>
       {/* Visual indicator that resume wrapper is active (dev only) */}
-      {process.env.NODE_ENV === 'development' && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '10px',
-            right: '10px',
-            background: 'rgba(34, 197, 94, 0.9)',
-            color: 'white',
-            padding: '4px 8px',
-            borderRadius: '4px',
-            fontSize: '12px',
-            fontWeight: 'bold',
-            zIndex: 9999,
-            pointerEvents: 'none',
-          }}
-        >
-          RESUME ACTIVE (Ep {episodeId})
-        </div>
-      )}
 
       <NJWPlayerComponent
         videoId={videoId}
