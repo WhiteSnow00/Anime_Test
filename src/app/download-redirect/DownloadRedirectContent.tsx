@@ -19,7 +19,7 @@ export default function DownloadRedirectContent() {
   const type = searchParams.get('type') || 'download'; 
   const episodeId = parseInt(searchParams.get('episodeId') || '0');
   
-  const isH265 = (type === 'folder' || type === "raw") ? false : isH265Episode(episodeId);
+  const isH265 = type === "raw" ? false : isH265Episode(episodeId);
 
   const redirectToUrl = (targetUrl: string) => {
     setIsRedirecting(true);
