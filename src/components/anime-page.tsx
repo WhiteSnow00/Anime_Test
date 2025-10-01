@@ -480,7 +480,12 @@ function AnimePageComponent() {
 
         {/* <NotificationHeader /> */}
 
-        <div ref={refs.videoRef} id="video-section" data-section="video">
+        <div
+          ref={refs.videoRef}
+          id="video-section"
+          data-section="video"
+          className={layoutConfig.showMobileHeader ? "mt-3" : undefined}
+        >
           {videoPlayerComponent}
         </div>
 
@@ -541,6 +546,11 @@ function AnimePageComponent() {
         canGoBack={computed.canGoPrevious}
         canGoNext={computed.canGoNext}
       />
+
+      {/* Debug panel for development */}
+      {process.env.NODE_ENV === "development" && isHydrated && (
+        <ResumeDebugPanel currentEpisodeId={currentEpisode?.id} />
+      )}
     </div>
   );
 }

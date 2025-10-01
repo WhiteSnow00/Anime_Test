@@ -54,6 +54,7 @@ export const viewport: Viewport = {
 
 import { AuthProvider } from '@/contexts/auth-context';
 import TopNav from '@/components/top-nav';
+import BackToTop from '@/components/back-to-top';
 
 export default function RootLayout({
   children,
@@ -77,6 +78,7 @@ export default function RootLayout({
         <AuthProvider>
           <TopNav />
           <div className="pt-0">{children}</div>
+          <BackToTop />
         </AuthProvider>
         <Toaster />
       </body>

@@ -1,4 +1,4 @@
-/**
+  /**
  * Feature Flags Configuration
  * 
  * Centralized feature flag management for gradual rollout and A/B testing.
@@ -61,7 +61,7 @@ export const RESUME_CONFIG = {
    * Debounce interval (ms) for saving playback progress
    * Prevents excessive localStorage writes during playback
    */
-  PROGRESS_SAVE_DEBOUNCE_MS: 3000,
+  PROGRESS_SAVE_DEBOUNCE_MS: 3000,  
 
   /**
    * Time tolerance (seconds) for "declined" prompt suppression

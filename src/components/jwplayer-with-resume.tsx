@@ -14,7 +14,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { useVideoResume } from '@/hooks/use-video-resume';
 import { ResumeDialog } from './resume-dialog';
-import { isFeatureEnabled } from '@/lib/feature-flags';
+import { isFeatureEnabled, getResumeConfig } from '@/lib/feature-flags';
 // Import the actual JWPlayer component used in the project
 import NJWPlayerComponent from './new-jwplayer';
 
@@ -66,6 +66,7 @@ export function JWPlayerWithResume({
 
   const isResumeEnabled = isFeatureEnabled('RESUME_FEATURE_ENABLED');
   const isPromptEnabled = isFeatureEnabled('RESUME_PROMPT_ENABLED');
+  const minThreshold = getResumeConfig('MIN_RESUME_THRESHOLD');
 
   console.warn('🎬 JWPlayerWithResume FLAGS', { isResumeEnabled, isPromptEnabled });
 
@@ -322,7 +323,7 @@ export function JWPlayerWithResume({
     // On refresh: continue automatically only if no prompt is expected
     if (
       isPageReloadRef.current &&
-      savedProgress.time > 0 &&
+      savedProgress.time >= minThreshold &&
       !savedProgress.declined &&
       !(isPromptEnabled && shouldShowDialog)
     ) {
@@ -340,8 +341,8 @@ export function JWPlayerWithResume({
     // If dialog should show (non-reload), don't auto-seek
     if (shouldShowDialog) return;
 
-    // Auto-seek on refresh if progress exists
-    if (savedProgress.time > 0 && !savedProgress.declined) {
+    // Auto-seek if progress exists and above threshold
+    if (savedProgress.time >= minThreshold && !savedProgress.declined) {
       // Wait a bit for player to be fully ready
       const timer = setTimeout(() => {
         seekTo(savedProgress.time);
@@ -363,6 +364,7 @@ export function JWPlayerWithResume({
     shouldShowDialog,
     isPromptEnabled,
     seekTo,
+    minThreshold,
   ]);
 
   // Reset resume state on episode change

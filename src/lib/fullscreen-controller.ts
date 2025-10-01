@@ -11,6 +11,7 @@ interface FSContext {
 const isIOS = typeof navigator !== "undefined" &&
   (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
    (navigator.userAgent.includes("Mac") && "ontouchend" in document));
+const isAndroid = typeof navigator !== "undefined" && /android/i.test(navigator.userAgent);
 
 const supportsDOMFS = (el: any) => !!el?.requestFullscreen && typeof document !== "undefined";
 const isDOMInFS = () => !!document.fullscreenElement;
@@ -82,9 +83,27 @@ export function createFullscreenController(ctx: FSContext) {
   const strat = pickStrategy(ctx);
 
   const enter = async (): Promise<FSResult> => {
-
-    await attempt(() => (window as any).screen?.orientation?.lock?.("landscape"));
+    // Enter fullscreen first – Android requires fullscreen before orientation.lock
     const res = await attempt(() => strat.enter(ctx), ctx.onExit) ?? "failed";
+    // After entering, try to lock orientation on Android (non-iOS). Best-effort only.
+    if (res === "entered" && !isIOS) {
+      const tryLock = async () => {
+        const ori = (window as any).screen?.orientation;
+        if (!ori?.lock) return;
+        // Try common landscape variants
+        await attempt(() => ori.lock("landscape" as any));
+        if ((typeof ori.type === "string" && !ori.type.startsWith("landscape"))) {
+          await attempt(() => ori.lock("landscape-primary" as any));
+        }
+        if ((typeof ori.type === "string" && !ori.type.startsWith("landscape"))) {
+          await attempt(() => ori.lock("landscape-secondary" as any));
+        }
+      };
+      // Immediate attempt
+      await tryLock();
+      // And a short delayed retry in case fullscreen settles a tick later
+      setTimeout(() => { tryLock(); }, 50);
+    }
     return res;
   };
 

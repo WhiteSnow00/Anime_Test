@@ -349,6 +349,8 @@ const NJWPlayerComponent = ({
   const isTouchDeviceRef = useSyncedRef(isTouchDevice);
   const centerControlsVisibleRef = useSyncedRef(centerControlsVisible);
   const isPlayingRef = useSyncedRef(isPlaying);
+  // Mobile idle tracking: last time the user touched or interacted with the player
+  const lastInteractionRef = useRef<number>(Date.now());
 
   const jwReady = useJWScript(onError);
   useEffect(() => {
@@ -518,20 +520,37 @@ const NJWPlayerComponent = ({
     }
 
     try {
+      // Prewarm HLS manifest on Android to speed up first segment fetch
+      if (isAndroid && fileUrl) {
+        try { fetch(fileUrl, { method: "HEAD", cache: "no-cache" }); } catch {}
+      }
+
       const sources = [{ file: fileUrl, type: CONFIG.HLS_TYPE, default: true }];
       playerInstance.current = w.jwplayer(playerRef.current).setup({
         width: "100%",
         height: "100%",
         primary: CONFIG.PLAYER_PRIMARY,
         controls: false,
-        autostart: isIOS ? !!autoPlay : autoPlay,
-        mute: isIOS ? true : !!muted,
+        // On mobile, start muted to satisfy autoplay policy and reduce stalls
+        autostart: (isIOS || isAndroid) ? !!autoPlay : autoPlay,
+        mute: (isIOS || isAndroid) ? true : !!muted,
         key: CONFIG.JW_PLAYER_KEY,
         hlsjsdefault: !isIOS,
         hlsjsconfig: {
           xhrSetup: (xhr: XMLHttpRequest) => {
             xhr.withCredentials = false;
           },
+          // Faster startup and fewer stalls on mobile
+          startLevel: 0, // begin with the lowest level to start playback quickly
+          capLevelToPlayerSize: true,
+          maxBufferLength: 10,
+          backBufferLength: 30,
+          lowLatencyMode: false,
+          // Conservative retries to fail fast and let our app handle fallback
+          fragLoadingMaxRetry: 2,
+          fragLoadingRetryDelay: 1000,
+          manifestLoadingMaxRetry: 2,
+          manifestLoadingRetryDelay: 1000,
         },
         safarihlsjs: false,
         enableNativeHls: isIOS,
@@ -551,6 +570,7 @@ const NJWPlayerComponent = ({
         setIsReady(true);
         setIsMuted(!!p.getMute?.());
         if (isAndroid) {
+          // Keep volume state high but autoplay muted; user can unmute with one tap
           p.setVolume?.(100);
         } else {
           const vol = p.getVolume?.();
@@ -574,7 +594,7 @@ const NJWPlayerComponent = ({
             if (wasPlayingRef.current) p.play?.(true);
           } catch {}
         } else if (autoPlay) {
-          if (isIOS) {
+          if (isIOS || isAndroid) {
             try {
               p.setMute?.(true);
               p.play?.(true);
@@ -960,6 +980,75 @@ const NJWPlayerComponent = ({
       controlsHideTimerRef.current = null;
     }
   }, [controlsVisible, scheduleControlsAutohide]);
+
+  // Fallback autohide on mobile/fullscreen to ensure UI disappears after play
+  useEffect(() => {
+    if (!isTouchDevice) return;
+    if (!controlsVisible) return;
+    if (!isPlaying) return;
+
+    const delay = isFullscreen ? 1500 : CONFIG.CONTROLS_AUTOHIDE_MS_TOUCH;
+    const id = window.setTimeout(() => {
+      // Only hide if user isn't interacting and still playing
+      if (
+        isPlayingRef.current &&
+        !isScrubbingRef.current &&
+        !isHoveringRef.current &&
+        !isHoveringControlsRef.current
+      ) {
+        setControlsVisible(false);
+        setCenterControlsVisible(false);
+        if (!isTouchDeviceRef.current) setCursorHidden(true);
+      }
+    }, delay);
+    return () => window.clearTimeout(id);
+  }, [isTouchDevice, isFullscreen, controlsVisible, isPlaying, isPlayingRef, isScrubbingRef, isHoveringRef, isHoveringControlsRef, isTouchDeviceRef]);
+
+  // Mobile-only idle-based hard autohide: if no touch/pointer activity for a while, hide everything
+  useEffect(() => {
+    if (!isTouchDevice) return;
+    const root = containerRef.current;
+    if (!root) return;
+
+    const mark = () => {
+      lastInteractionRef.current = Date.now();
+      // Show on interaction and let the normal timer handle further hiding
+      setControlsVisible(true);
+      setCenterControlsVisible(true);
+      scheduleControlsAutohideRef.current?.();
+    };
+
+    const opts: AddEventListenerOptions = { passive: true };
+    root.addEventListener("pointerdown", mark, opts);
+    root.addEventListener("pointerup", mark, opts);
+    root.addEventListener("touchstart", mark, opts);
+    root.addEventListener("touchend", mark, opts);
+
+    const intervalId = window.setInterval(() => {
+      if (!isPlayingRef.current) return;
+      const idle = Date.now() - lastInteractionRef.current;
+      const threshold = isFullscreenRef.current ? 1500 : CONFIG.CONTROLS_AUTOHIDE_MS_TOUCH;
+      if (idle >= threshold && !isScrubbingRef.current) {
+        setIsHovering(false);
+        setIsHoveringControls(false);
+        setControlsVisible(false);
+        setCenterControlsVisible(false);
+        if (controlsHideTimerRef.current) {
+          window.clearTimeout(controlsHideTimerRef.current);
+          controlsHideTimerRef.current = null;
+        }
+      }
+    }, 250);
+
+    return () => {
+      root.removeEventListener("pointerdown", mark as any, opts as any);
+      root.removeEventListener("pointerup", mark as any, opts as any);
+      root.removeEventListener("touchstart", mark as any, opts as any);
+      root.removeEventListener("touchend", mark as any, opts as any);
+      window.clearInterval(intervalId);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTouchDevice]);
 
   // global fullscreen listeners (DOM FS API)
   useEffect(() => {
