@@ -532,8 +532,9 @@ const NJWPlayerComponent = ({
         primary: CONFIG.PLAYER_PRIMARY,
         controls: false,
         // On mobile, start muted to satisfy autoplay policy and reduce stalls
-        autostart: (isIOS || isAndroid) ? !!autoPlay : autoPlay,
-        mute: (isIOS || isAndroid) ? true : !!muted,
+  autostart: (isIOS || isAndroid) ? !!autoPlay : autoPlay,
+  // Do NOT force mute on mobile; respect the passed-in prop
+  mute: !!muted,
         key: CONFIG.JW_PLAYER_KEY,
         hlsjsdefault: !isIOS,
         hlsjsconfig: {
@@ -595,11 +596,16 @@ const NJWPlayerComponent = ({
           } catch {}
         } else if (autoPlay) {
           if (isIOS || isAndroid) {
+            // Attempt autoplay without forcing mute; if policy blocks, user will tap to play
             try {
-              p.setMute?.(true);
               p.play?.(true);
-              forcedAutoplayMuteRef.current = true;
             } catch {}
+            setTimeout(() => {
+              try {
+                const st = p.getState?.();
+                if (!["playing", "buffering"].includes(st)) p.play?.(true);
+              } catch {}
+            }, CONFIG.AUTOPLAY_RETRY_DELAY_MS);
           } else {
             try {
               p.setMute?.(!!muted === false ? false : !!muted);
