@@ -547,10 +547,6 @@ function AnimePageComponent() {
         canGoNext={computed.canGoNext}
       />
 
-      {/* Debug panel for development */}
-      {process.env.NODE_ENV === "development" && isHydrated && (
-        <ResumeDebugPanel currentEpisodeId={currentEpisode?.id} />
-      )}
     </div>
   );
 }
