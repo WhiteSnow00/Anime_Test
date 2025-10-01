@@ -56,13 +56,16 @@ export function openDropboxLink(url: string, filename?: string, isRaw?: boolean,
   }
 }
 
-export function openDropboxFolder(url: string, label: string = 'Thư mục Dropbox'): void {
+export function openDropboxFolder(url: string, label: string = 'Thư mục Dropbox', episodeId?: number): void {
   try {
+    if (episodeId) {
+      saveEpisodePosition(episodeId);
+    }
     const params = new URLSearchParams({
       url,
       filename: label,
       type: 'folder',
-      episodeId: '0',
+      episodeId: episodeId?.toString() || '0',
     });
     window.location.href = `/download-redirect?${params.toString()}`;
   } catch (error) {

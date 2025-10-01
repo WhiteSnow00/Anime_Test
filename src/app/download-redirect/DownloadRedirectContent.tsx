@@ -13,25 +13,13 @@ export default function DownloadRedirectContent() {
   const [countdown, setCountdown] = useState(5);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [isReturning, setIsReturning] = useState(false);
-  const REDIRECT_DELAY_MS = 1200; // show redirecting state for ~1.2s
 
   const url = searchParams.get('url');
   const filename = searchParams.get('filename') || 'Tập';
   const type = searchParams.get('type') || 'download'; 
   const episodeId = parseInt(searchParams.get('episodeId') || '0');
   
-  const isH265 = (type === 'raw' || type === 'folder') ? false : isH265Episode(episodeId);
-
-  const providerName = useMemo(() => {
-    if (!url) return 'trang tải xuống';
-    const u = url.toLowerCase();
-    if (u.includes('drive.google')) return 'Google Drive';
-    if (u.includes('dropbox.com')) return 'Dropbox';
-    if (u.includes('mega.nz')) return 'MEGA';
-    if (u.includes('mediafire.com')) return 'MediaFire';
-    return 'trang tải xuống';
-  }, [url]);
-
+  const isH265 = (type === 'folder' || type === "raw") ? false : isH265Episode(episodeId);
 
   const redirectToUrl = (targetUrl: string) => {
     setIsRedirecting(true);
@@ -46,16 +34,42 @@ export default function DownloadRedirectContent() {
   };
 
   useEffect(() => {
-    // Detect browser back/forward navigation and skip auto-redirect when returning
+    // Detect browser back/forward navigation and immediately send user to index to avoid blank screens (iOS bfcache quirks)
+    let shouldReturnToHome = false;
+    let seenThisUrl = false;
     try {
       const nav = (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined);
       const isBackForward = nav?.type === 'back_forward';
       const key = url ? `redirected:${url}` : '';
-      const seenThisUrl = key ? sessionStorage.getItem(key) === '1' : false;
+      seenThisUrl = key ? sessionStorage.getItem(key) === '1' : false;
       if (isBackForward && seenThisUrl) {
-        setIsReturning(true);
+        shouldReturnToHome = true;
       }
     } catch {}
+
+    // Fallback for Safari bfcache: when coming back and page is restored from cache, force navigation to /
+    const onPageShow = (e: PageTransitionEvent) => {
+      try {
+        if ((e as any).persisted && seenThisUrl) {
+          setIsReturning(true);
+          window.location.replace('/');
+        }
+      } catch {}
+    };
+    try { window.addEventListener('pageshow', onPageShow as any); } catch {}
+
+    if (shouldReturnToHome) {
+      setIsReturning(true);
+      // Use full document navigation to avoid client-state glitches
+      try { 
+        window.location.replace('/');
+        // Fallback: if navigation didn't happen promptly (iOS quirk), try a hard href
+        setTimeout(() => {
+          try { if (document.visibilityState === 'visible') { window.location.href = '/'; } } catch {}
+        }, 400);
+      } catch { /* noop */ }
+      return () => { try { window.removeEventListener('pageshow', onPageShow as any); } catch {} };
+    }
 
     if (!url || isReturning) return;
 
@@ -63,22 +77,22 @@ export default function DownloadRedirectContent() {
       setCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          // First show redirecting state for a brief moment, then navigate
-          setIsRedirecting(true);
-          setTimeout(() => redirectToUrl(url), REDIRECT_DELAY_MS);
+          setTimeout(() => redirectToUrl(url), 500);
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
 
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      try { window.removeEventListener('pageshow', onPageShow as any); } catch {}
+    };
   }, [url, isReturning]);
 
   const handleManualRedirect = () => {
     if (url) {
-      setIsRedirecting(true);
-      setTimeout(() => redirectToUrl(url), REDIRECT_DELAY_MS);
+      redirectToUrl(url);
     }
   };
 
@@ -138,26 +152,13 @@ export default function DownloadRedirectContent() {
               {isReturning ? (
                 <>
                   <div className="flex items-center justify-center gap-2 text-lg font-semibold text-primary">
-                    <ExternalLink className="w-5 h-5" />
-                    <span>Bạn vừa quay lại từ trang tải xuống</span>
+                    <ExternalLink className="w-5 h-5 animate-pulse" />
+                    <span>Đang đưa bạn về trang chủ...</span>
                   </div>
-                  <p className="text-sm text-muted-foreground">Nhấn &quot;Tải ngay&quot; để mở lại trang tải.</p>
-                  <div className="flex gap-3 pt-2">
-                    <Button
-                      variant="outline"
-                      onClick={handleGoBack}
-                      className="flex-1 vietnamese-text"
-                    >
-                      Quay lại
-                    </Button>
-                    <Button
-                      onClick={handleManualRedirect}
-                      className="flex-1 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 vietnamese-text"
-                    >
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Tải ngay
-                    </Button>
+                  <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-pink-500 to-purple-500 animate-pulse" style={{ width: '100%' }} />
                   </div>
+                  <p className="text-sm text-muted-foreground">Vui lòng chờ trong giây lát</p>
                 </>
               ) : (
                 <>
@@ -194,7 +195,7 @@ export default function DownloadRedirectContent() {
             <div className="text-center space-y-4">
               <div className="flex items-center justify-center gap-2 text-lg font-semibold text-green-600 dark:text-green-400">
                 <ExternalLink className="w-5 h-5 animate-pulse" />
-                <span>Đang chuyển hướng đến {providerName}...</span>
+                <span>Đang chuyển hướng đến Dropbox...</span>
               </div>
               <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                 <div className="h-full bg-gradient-to-r from-green-500 to-emerald-500 animate-pulse" style={{ width: '100%' }} />

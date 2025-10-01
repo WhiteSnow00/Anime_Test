@@ -220,7 +220,7 @@ function ServerSelectorComponent({
               "px-3 py-2 sm:px-4 sm:py-2",
               "bg-blue-600 text-white hover:bg-blue-700 border-blue-600"
             )}
-            onClick={() => { if (dropboxFolderUrl) openDropboxFolder(dropboxFolderUrl, 'Dropbox (toàn bộ)'); }}
+            onClick={() => { if (dropboxFolderUrl) openDropboxFolder(dropboxFolderUrl, 'Dropbox (toàn bộ)', currentEpisode?.id); }}
             aria-label="Mở thư mục Dropbox chứa tất cả tập"
             disabled={!dropboxFolderUrl}
             title={dropboxFolderUrl ? 'Mở thư mục Dropbox' : 'Chưa có link Dropbox'}

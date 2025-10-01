@@ -36,6 +36,8 @@ import {
 import { FloatingSupportWidget } from "./floating-support-widget";
 import { useAuth } from "@/contexts/auth-context";
 import { ResumeDebugPanel } from "./resume-debug-panel";
+import TopNav from "./top-nav";
+import BackToTop from "./back-to-top";
 
 function AnimePageComponent() {
   console.log("🎭 ANIME-PAGE COMPONENT RENDERING");
@@ -56,18 +58,21 @@ function AnimePageComponent() {
   useEffect(() => {
     if (!isHydrated) return;
     try {
-      const navEntries = (performance?.getEntriesByType?.('navigation') || []) as any[];
-      const isReload = navEntries.length > 0
-        ? navEntries[0]?.type === 'reload'
-        : // legacy
-          // @ts-ignore
-          ((performance as any).navigation && (performance as any).navigation.type === 1);
+      const navEntries = (performance?.getEntriesByType?.("navigation") ||
+        []) as any[];
+      const isReload =
+        navEntries.length > 0
+          ? navEntries[0]?.type === "reload"
+          : // legacy
+            // @ts-ignore
+            (performance as any).navigation &&
+            (performance as any).navigation.type === 1;
 
       if (isReload) {
         // Use a microtask to ensure layout is ready before scrolling
         setTimeout(() => {
           try {
-            window.scrollTo({ top: 0, behavior: 'auto' });
+            window.scrollTo({ top: 0, behavior: "auto" });
           } catch {}
         }, 0);
       }
@@ -465,6 +470,7 @@ function AnimePageComponent() {
 
   return (
     <div className="min-h-screen bg-background" suppressHydrationWarning>
+      <TopNav />
       <FloatingSupportWidget />
 
       {layoutConfig.showMobileHeader && (
@@ -547,6 +553,7 @@ function AnimePageComponent() {
         canGoNext={computed.canGoNext}
       />
 
+      <BackToTop />
     </div>
   );
 }

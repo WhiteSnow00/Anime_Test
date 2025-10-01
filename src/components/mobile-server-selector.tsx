@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Play, AlertCircle, Download, CloudDownload, PackageOpen } from 'lucide-react';
+import { openDropboxFolder } from '@/lib/download-utils';
 import { cn } from '@/lib/utils';
 import type { SimpleMobileServerType } from './simple-mobile-player';
 import type { Episode } from '@/data/anime';
@@ -160,9 +161,7 @@ export function MobileServerSelector({
         <Button
           variant="outline"
           className="w-full mt-2 mb-3 flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700 border-blue-600"
-          onClick={() => { if (dropboxFolderUrl) {
-            try { window.location.href = `/download-redirect?${new URLSearchParams({ url: dropboxFolderUrl, filename: 'Dropbox (toàn bộ)', type: 'folder', episodeId: '0' }).toString()}`; } catch {}
-          }}}
+          onClick={() => { if (dropboxFolderUrl) { openDropboxFolder(dropboxFolderUrl, 'Dropbox (toàn bộ)', currentEpisode?.id); }}}
           aria-label="Mở thư mục Dropbox chứa tất cả tập"
           disabled={!dropboxFolderUrl}
           title={dropboxFolderUrl ? 'Mở thư mục Dropbox' : 'Chưa có link Dropbox'}
