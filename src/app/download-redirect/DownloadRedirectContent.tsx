@@ -19,7 +19,8 @@ export default function DownloadRedirectContent() {
   const type = searchParams.get('type') || 'download'; 
   const episodeId = parseInt(searchParams.get('episodeId') || '0');
   
-  const isH265 = (type === 'folder' || type === "raw") ? false : isH265Episode(episodeId);
+  const isH265 = (type === "raw" || type === "folder") ? false : isH265Episode(episodeId);
+  const isFolder = type === 'folder';
 
   const redirectToUrl = (targetUrl: string) => {
     setIsRedirecting(true);
@@ -140,6 +141,27 @@ export default function DownloadRedirectContent() {
                   <div className="flex items-center gap-2 text-xs text-yellow-600 dark:text-yellow-400">
                     <Video className="w-4 h-4" />
                     <span>Video được mã hóa H.265 để tối ưu dung lượng</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isFolder && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+                <div className="space-y-2">
+                  <h3 className="font-medium text-yellow-800 dark:text-yellow-200 vietnamese-text">
+                    Lưu ý khi mở liên kết
+                  </h3>
+                  <p className="text-sm text-yellow-700 dark:text-yellow-300 leading-relaxed vietnamese-text">
+                    Nếu liên kết mở bị lỗi hoặc trắng trang, hãy thử mở bằng <span className="font-semibold">trình duyệt khác</span>
+                    (Chrome / Safari / Firefox) hoặc dán trực tiếp URL vào thanh địa chỉ. Bạn cũng nên đảm bảo đã đăng nhập Dropbox và tắt chặn nội dung nếu có.
+                  </p>
+                  <div className="flex items-center gap-2 text-xs text-yellow-600 dark:text-yellow-400">
+                    <ExternalLink className="w-4 h-4" />
+                    <span>Nếu vẫn không được, thử mở bằng trình duyệt mặc định của thiết bị.</span>
                   </div>
                 </div>
               </div>
