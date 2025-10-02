@@ -16,15 +16,12 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { isH265Episode } from "@/data/anime";
-import { set } from "mongoose";
 
 export default function DownloadRedirectContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [countdown, setCountdown] = useState(5);
   const [isRedirecting, setIsRedirecting] = useState(false);
-  const [isReturning, setIsReturning] = useState(false);
-  const [hideUI, setHideUI] = useState(false);
 
   const url = searchParams.get("url");
   const filename = searchParams.get("filename") || "Tập";
@@ -62,7 +59,7 @@ export default function DownloadRedirectContent() {
 
   // Pre-redirect as early as possible (before paint) to avoid showing any UI when returning
   useEffect(() => {
-    if (!url || isReturning) return;
+    if (!url) return;
     const timer = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
@@ -76,7 +73,7 @@ export default function DownloadRedirectContent() {
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [url, isReturning]);
+  }, [url]);
 
   useEffect(() => {
     const onPageShow = (e: PageTransitionEvent) => {
@@ -102,11 +99,6 @@ export default function DownloadRedirectContent() {
   };
 
   if (!url) {
-    return null;
-  }
-
-  if (hideUI) {
-    // Prevent any flash while we are navigating away to index
     return null;
   }
 
