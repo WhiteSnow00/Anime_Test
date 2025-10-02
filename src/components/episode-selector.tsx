@@ -29,15 +29,11 @@ function EpisodeSelectorComponent({
   const buttonSizeClass = "w-full h-10 md:h-12 text-xs md:text-sm";
 
   const handleEpisodeSelect = useCallback((episode: Episode) => {
-    const run = () => {
-      const measure = performanceUtils.measure((ep: Episode) => {
-        onSelectEpisode(ep);
-      }, 'Episode Selection');
-      measure(episode);
-    };
-    // basic micro-debounce to avoid double clicks
-    const t = setTimeout(run, 0);
-    return () => clearTimeout(t);
+    // Call synchronously to avoid race conditions between rapid clicks causing wrong active state
+    const measure = performanceUtils.measure((ep: Episode) => {
+      onSelectEpisode(ep);
+    }, 'Episode Selection');
+    measure(episode);
   }, [onSelectEpisode]);
 
   // Memoized episode button renderer
@@ -60,7 +56,7 @@ function EpisodeSelectorComponent({
             : "hover:bg-muted",
           className
         )}
-        onClick={() => handleEpisodeSelect(episode)}
+        onClick={() => { if (!isActive) handleEpisodeSelect(episode); }}
         aria-label={`Select episode ${episode.id}`}
       >
         <span className="font-semibold">{episode.id}</span>
