@@ -429,7 +429,17 @@ export function CommentItem({
                             "border-red-500/50 text-red-700 dark:text-red-300 bg-red-50/70 dark:bg-red-950/30"
                         )}
                       >
-                        {comment.userRole && <>Thành Viên</>}
+                          {comment.userRole === 'administrator' ? (
+                              <>
+                                  <Snowflake className="h-3 w-3 mr-1" />
+                                  Quản Trị Viên
+                              </>
+                          ) : (
+                              <>
+                                  <Turtle className="h-3 w-3 mr-1" />
+                                  Thành Viên
+                              </>
+                          )}
                       </Badge>
                     )}
                   </div>
@@ -992,7 +1002,17 @@ function ReplyItem({
                       "border-red-400/60 text-red-600 dark:text-red-300 bg-red-50/60 dark:bg-red-950/25"
                   )}
                 >
-                  {reply.userId && <>Thành Viên</>}
+                    {reply.userRole === 'administrator' ? (
+                        <>
+                            <Snowflake className="h-3 w-3 mr-1" />
+                            Quản Trị Viên
+                        </>
+                    ) : (
+                        <>
+                            <Turtle className="h-3 w-3 mr-1" />
+                            Thành Viên
+                        </>
+                    )}
                 </Badge>
               )}
               <span className="text-[11px] sm:text-[12px] text-muted-foreground">
