@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { isH265Episode } from "@/data/anime";
 import { set } from "mongoose";
+import { clearEpisodePosition } from "@/lib/download-utils";
 
 export default function DownloadRedirectContent() {
   const searchParams = useSearchParams();
@@ -85,7 +86,10 @@ export default function DownloadRedirectContent() {
     if (url) startRedirect(url);
   };
 
-  const handleGoBack = () => router.back();
+  const handleGoBack = () => {
+    clearEpisodePosition();
+    router.back();
+  }
 
   if (!url) return null;
 
