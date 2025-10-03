@@ -22,23 +22,18 @@ function EpisodeSelectorComponent({
   onSelectEpisode,
   className,
 }: EpisodeSelectorProps) {
-  // CSS-first responsive grid to avoid hydration glitches
-  // Grid: 5 cols on small screens, scales up with breakpoints; keeps classes static across SSR/CSR
   const gridClass = "grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 2xl:grid-cols-12";
-  // Button sizing via breakpoints to avoid JS-driven layout switches
   const buttonSizeClass = "w-full h-10 md:h-12 text-xs md:text-sm";
 
   const handleEpisodeSelect = useCallback((episode: Episode) => {
-    // Call synchronously to avoid race conditions between rapid clicks causing wrong active state
     const measure = performanceUtils.measure((ep: Episode) => {
       onSelectEpisode(ep);
     }, 'Episode Selection');
     measure(episode);
   }, [onSelectEpisode]);
 
-  // Memoized episode button renderer
   const renderEpisodeButton = useCallback((episode: Episode) => {
-    const isActive = currentEpisode.id === episode.id;
+    const isActive = Number(currentEpisode.id) === Number(episode.id);
     
     return (
       <Button
