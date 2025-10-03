@@ -47,7 +47,7 @@ function EpisodeSelectorComponent({
           "touch-manipulation",
           "focus:ring-2 focus:ring-primary focus:ring-offset-2",
           isActive 
-            ? "bg-primary text-primary-foreground shadow-md scale-105 z-10" 
+            ? "bg-primary text-primary-foreground shadow-md scale-105 z-10 ring-2 ring-primary ring-offset-2" 
             : "hover:bg-muted",
           className
         )}
@@ -91,5 +91,16 @@ function EpisodeSelectorComponent({
   );
 }
 
+function areEqual(prev: EpisodeSelectorProps, next: EpisodeSelectorProps) {
+  const prevSelected = String(prev.currentEpisode?.id ?? "");
+  const nextSelected = String(next.currentEpisode?.id ?? "");
+  const sameSelected = prevSelected === nextSelected;
+
+  const sameEpisodesRef = prev.episodes === next.episodes; // if you recreate arrays, consider shallow compare by ids
+  const sameClass = prev.className === next.className;
+
+  return sameSelected && sameEpisodesRef && sameClass;
+}
+
 // Apply performance optimizations
-export const EpisodeSelector = withPerformanceOptimization(memo(EpisodeSelectorComponent));
+export const EpisodeSelector = withPerformanceOptimization(memo(EpisodeSelectorComponent, areEqual));
