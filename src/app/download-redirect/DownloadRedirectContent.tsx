@@ -1,11 +1,7 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
-import {
-  useEffect,
-  useState,
-  useCallback,
-} from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,10 +12,12 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { isH265Episode } from "@/data/anime";
+import { set } from "mongoose";
 
 export default function DownloadRedirectContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+
   const [countdown, setCountdown] = useState(5);
   const [isRedirecting, setIsRedirecting] = useState(false);
 
@@ -32,75 +30,64 @@ export default function DownloadRedirectContent() {
     type === "raw" || type === "folder" ? false : isH265Episode(episodeId);
   const isFolder = type === "folder";
 
-  const redirectToUrl = (targetUrl: string) => {
+  const isBackForwardRef = useRef(false);
+
+  const startRedirect = (targetUrl: string) => {
+    if (!targetUrl || isRedirecting) return;
     setIsRedirecting(true);
-    setCountdown(0);
     setTimeout(() => {
-      try {
-        if (typeof window !== "undefined" && targetUrl) {
-          try {
-            sessionStorage.setItem(
-              `redirected:${targetUrl}`,
-              JSON.stringify({ v: 1, at: Date.now() })
-            );
-          } catch {}
-
-          try {
-            window.history.replaceState(null, "", "/");
-          } catch {}
-
-          window.location.href = targetUrl;
-          return;
-        }
-      } catch {}
-      window.location.href = targetUrl;
+      window.location.replace(targetUrl);
     }, 1000);
   };
 
-  // Pre-redirect as early as possible (before paint) to avoid showing any UI when returning
   useEffect(() => {
-    if (!url) return;
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          // show green for 1s, then go
-          setIsRedirecting(true);
-          setTimeout(() => redirectToUrl(url), 1000);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [url]);
+    try {
+      const nav = performance.getEntriesByType("navigation")[0] as
+        | PerformanceNavigationTiming
+        | undefined;
+      if (nav?.type === "back_forward") {
+        isBackForwardRef.current = true;
+        window.location.replace("/");
+        return;
+      }
+    } catch {}
 
-  useEffect(() => {
     const onPageShow = (e: PageTransitionEvent) => {
       if ((e as any).persisted) {
+        isBackForwardRef.current = true;
         try {
           window.location.replace("/");
         } catch {}
       }
     };
-
     window.addEventListener("pageshow", onPageShow as any);
     return () => window.removeEventListener("pageshow", onPageShow as any);
   }, []);
 
+  useEffect(() => {
+    if (!url || isBackForwardRef.current || isRedirecting) return;
+
+    const t = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(t);
+          startRedirect(url); // green 1s, then navigate
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(t);
+  }, [url, isRedirecting]);
+
   const handleManualRedirect = () => {
-    if (url) {
-      redirectToUrl(url);
-    }
+    if (url) startRedirect(url);
   };
 
-  const handleGoBack = () => {
-    router.back();
-  };
+  const handleGoBack = () => router.back();
 
-  if (!url) {
-    return null;
-  }
+  if (!url) return null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-pink-50 dark:from-pink-950/20 dark:via-purple-950/20 dark:to-pink-950/20 flex items-center justify-center p-4">
@@ -109,7 +96,6 @@ export default function DownloadRedirectContent() {
 
       <Card className="w-full max-w-md mx-auto shadow-xl border-pink-200/50 dark:border-pink-800/50 backdrop-blur-sm relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-pink-400 via-purple-400 to-pink-400" />
-
         <CardContent className="p-6 space-y-6">
           <div className="text-center space-y-2">
             <div className="w-16 h-16 mx-auto bg-gradient-to-r from-pink-100 to-purple-100 dark:from-pink-900/50 dark:to-purple-900/50 rounded-full flex items-center justify-center shadow-md">
@@ -121,7 +107,7 @@ export default function DownloadRedirectContent() {
             <p className="text-sm text-muted-foreground">
               {type === "raw"
                 ? "Phim RAW (Không phụ đề)"
-                : type === "folder"
+                : isFolder
                 ? "Thư mục Dropbox"
                 : "Phim có phụ đề"}
               : {filename}
@@ -137,14 +123,13 @@ export default function DownloadRedirectContent() {
                     Lưu ý về định dạng video
                   </h3>
                   <p className="text-sm text-yellow-700 dark:text-yellow-300 leading-relaxed vietnamese-text">
-                    Nếu bạn không thể xem video, hãy thử tải các phần mềm phát
-                    video bên ngoài ví dụ như{" "}
-                    <span className="font-semibold">VLC</span> (Có sẵn trên
-                    iOS/Android/Windows/MacOS) hoặc các phần mềm tương tự.
+                    Nếu bạn không thể xem video, hãy thử{" "}
+                    <span className="font-semibold">VLC</span>{" "}
+                    (iOS/Android/Windows/MacOS) hoặc app tương tự.
                   </p>
                   <div className="flex items-center gap-2 text-xs text-yellow-600 dark:text-yellow-400">
                     <Video className="w-4 h-4" />
-                    <span>Video được mã hóa H.265 để tối ưu dung lượng</span>
+                    <span>Video mã hóa H.265 để tối ưu dung lượng</span>
                   </div>
                 </div>
               </div>
@@ -160,17 +145,13 @@ export default function DownloadRedirectContent() {
                     Lưu ý khi mở liên kết
                   </h3>
                   <p className="text-sm text-yellow-700 dark:text-yellow-300 leading-relaxed vietnamese-text">
-                    Nếu liên kết mở bị lỗi hoặc trắng trang, hãy thử mở bằng{" "}
-                    <span className="font-semibold">trình duyệt khác</span>
-                    (Chrome / Safari / Firefox) hoặc dán trực tiếp URL vào thanh
-                    địa chỉ. Bạn cũng nên đảm bảo đã đăng nhập Dropbox và tắt
-                    chặn nội dung nếu có.
+                    Nếu mở lỗi/trắng trang, thử trình duyệt khác hoặc dán URL
+                    trực tiếp; đảm bảo đã đăng nhập Dropbox.
                   </p>
                   <div className="flex items-center gap-2 text-xs text-yellow-600 dark:text-yellow-400">
                     <ExternalLink className="w-4 h-4" />
                     <span>
-                      Nếu vẫn không được, thử mở bằng trình duyệt mặc định của
-                      thiết bị.
+                      Nếu vẫn lỗi, thử trình duyệt mặc định của thiết bị.
                     </span>
                   </div>
                 </div>
@@ -178,37 +159,34 @@ export default function DownloadRedirectContent() {
             </div>
           )}
 
-          {/* Countdown */}
           {!isRedirecting ? (
             <div className="text-center space-y-4">
-              <>
-                <div className="flex items-center justify-center gap-2 text-lg font-semibold text-primary">
-                  <Clock className="w-5 h-5 animate-pulse" />
-                  <span>Chuyển hướng sau {countdown} giây</span>
-                </div>
-                <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-pink-500 to-purple-500 transition-all duration-1000 ease-linear"
-                    style={{ width: `${((5 - countdown) / 5) * 100}%` }}
-                  />
-                </div>
-                <div className="flex gap-3 pt-2">
-                  <Button
-                    variant="outline"
-                    onClick={handleGoBack}
-                    className="flex-1 vietnamese-text"
-                  >
-                    Quay lại
-                  </Button>
-                  <Button
-                    onClick={handleManualRedirect}
-                    className="flex-1 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 vietnamese-text"
-                  >
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    Tải ngay
-                  </Button>
-                </div>
-              </>
+              <div className="flex items-center justify-center gap-2 text-lg font-semibold text-primary">
+                <Clock className="w-5 h-5 animate-pulse" />
+                <span>Chuyển hướng sau {countdown} giây</span>
+              </div>
+              <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-pink-500 to-purple-500 transition-all duration-1000 ease-linear"
+                  style={{ width: `${((5 - countdown) / 5) * 100}%` }}
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={handleGoBack}
+                  className="flex-1 vietnamese-text"
+                >
+                  Quay lại
+                </Button>
+                <Button
+                  onClick={handleManualRedirect}
+                  className="flex-1 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 vietnamese-text"
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Tải ngay
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="text-center space-y-4">
@@ -218,7 +196,7 @@ export default function DownloadRedirectContent() {
               </div>
               <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-green-500 to-emerald-500 animate-pulse"
+                  className="h-full bg-gradient-to-r from-green-500 to-emerald-500 transition-all duration-1000 ease-linear"
                   style={{ width: "100%" }}
                 />
               </div>
