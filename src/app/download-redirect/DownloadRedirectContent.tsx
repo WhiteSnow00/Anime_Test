@@ -87,7 +87,6 @@ export default function DownloadRedirectContent() {
   };
 
   const handleGoBack = () => {
-    clearEpisodePosition();
     router.back();
   }
 

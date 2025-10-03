@@ -440,7 +440,12 @@ export function useAnimeState(initialAnime?: Anime, user?: { id: string } | null
           const episodeExists = state.anime.episodes.find(ep => ep.id === episodeId);
           if (episodeExists) {
             dispatch({ type: 'SET_EPISODE', payload: episodeExists });
+            // Immediately clear marker after successful restore to prevent sticky override
+            try { localStorage.removeItem('last-episode-download'); } catch {}
             return;
+          } else {
+            // Clean up stale/invalid marker
+            try { localStorage.removeItem('last-episode-download'); } catch {}
           }
         }
 

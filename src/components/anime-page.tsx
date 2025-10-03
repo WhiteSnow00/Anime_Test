@@ -35,7 +35,6 @@ import {
 } from "@/lib/higher-order-components";
 import { FloatingSupportWidget } from "./floating-support-widget";
 import { useAuth } from "@/contexts/auth-context";
-import { ResumeDebugPanel } from "./resume-debug-panel";
 import TopNav from "./top-nav";
 import BackToTop from "./back-to-top";
 
