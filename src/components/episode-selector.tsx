@@ -91,16 +91,16 @@ function EpisodeSelectorComponent({
   );
 }
 
-function areEqual(prev: EpisodeSelectorProps, next: EpisodeSelectorProps) {
-  const prevSelected = String(prev.currentEpisode?.id ?? "");
-  const nextSelected = String(next.currentEpisode?.id ?? "");
-  const sameSelected = prevSelected === nextSelected;
+// function areEqual(prev: EpisodeSelectorProps, next: EpisodeSelectorProps) {
+//   const prevSelected = String(prev.currentEpisode?.id ?? "");
+//   const nextSelected = String(next.currentEpisode?.id ?? "");
+//   const sameSelected = prevSelected === nextSelected;
 
-  const sameEpisodesRef = prev.episodes === next.episodes; // if you recreate arrays, consider shallow compare by ids
-  const sameClass = prev.className === next.className;
+//   const sameEpisodesRef = prev.episodes === next.episodes; // if you recreate arrays, consider shallow compare by ids
+//   const sameClass = prev.className === next.className;
 
-  return sameSelected && sameEpisodesRef && sameClass;
-}
+//   return sameSelected && sameEpisodesRef && sameClass;
+// }
 
 // Apply performance optimizations
-export const EpisodeSelector = withPerformanceOptimization(memo(EpisodeSelectorComponent, areEqual));
+export const EpisodeSelector = EpisodeSelectorComponent;
