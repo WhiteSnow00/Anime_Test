@@ -46,7 +46,7 @@ export const animeData: Anime = {
   summary:
     "Tsugumi Rintaro, một nam sinh to lớn, trầm tính và có hơi “hung dữ” do vẻ ngoài của mình. Cậu tới từ trường cấp 3 Chidori, ngôi trường nam sinh cấp thấp hội tụ đủ những thành phần “bất hảo”. Bên cạnh trường của cậu là trường nữ sinh Kikyo, một trường cấp 3 vô cùng danh giá. Cậu thường xuyên bắt gặp Waguri Kaoruko, một khách hàng tại cửa hàng bánh nhà mình. Rintaro cảm thấy thoải mái khi dành thời gian bên Kaoruko. Tuy nhiên, học sinh của trường Kikyo lại cực kỳ căm ghét trường Chidori khiến mối quan hệ giữa cả hai trở nên khó xử. Đây là câu chuyện về 2 con người ở rất gần nhưng lại rất xa.",
   genres: ['Slice of Life', 'Romance', 'Drama', 'School Life'],
-  status: 'Đang Tiến Hành',
+  status: 'Đã Hoàn Thành',
   episodeCount: 13,
   releaseYear: 2025,
   studio: 'CloverWorks',
@@ -197,6 +197,18 @@ export const animeData: Anime = {
           },
           downloadUrl: 'https://www.dropbox.com/scl/fi/0u2i809eva2z59y1gbvok/Kanasub-KaoruHana-12-S01e12-Webrip-1080P-H265-E-Ac-3.mp4?rlkey=jmdzva4pe3y0fsp5c8kn2pfe0&st=ah4nnxwx&dl=0',
           rawDownloadUrl: 'https://www.dropbox.com/scl/fi/i7g17ntz95w46odxt6pyo/Kaoru-Hana-wa-Rin-to-Saku-Raw-T-p-12.mkv?rlkey=kejwydghdjnh1756j1var0jwe&st=a6kuyog7&dl=0'
+      },
+	  {
+          id: 13,
+          title: 'Episode 13',
+          videoId: '13',
+          servers: {
+              hls: 'Tập13.m3u8',
+              helvid: '',
+              hydax: 'sAjv5tezT'
+          },
+          downloadUrl: 'https://www.dropbox.com/scl/fi/te5s4myypx4f77geq5l8a/Kanasub-KaoruHana-13-S01e13-Webrip-1080P-H265-E-Ac-3.mp4?rlkey=lfliziveqntrel7sjufa3gw8z&st=5tm0oeln&dl=0',
+          rawDownloadUrl: 'https://www.dropbox.com/scl/fi/y6w577h6pkx0l98nul95u/Kaoru-Hana-wa-Rin-to-Saku-Raw-T-p-13.mkv?rlkey=rkqkj805d78znbihdvg7nk010&st=6s2mn1cn&dl=0'
       },
   ],
 };
