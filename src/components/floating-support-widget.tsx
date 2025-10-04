@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
+import Image from 'next/image';
 import { Star, Gift, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -13,44 +14,12 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
   const [isHovered, setIsHovered] = useState(false);
   const [scrollTop, setScrollTop] = useState(0);
   const [isClient, setIsClient] = useState(false);
-  const [qrImageSrc, setQrImageSrc] = useState('https://stash.del4yowo.id.vn/qr.png');
   const [imageError, setImageError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadTimeout, setLoadTimeout] = useState<NodeJS.Timeout | null>(null);
+  const QR_SRC = '/images/qr.png'; 
 
   useEffect(() => {
     setIsClient(true);
-    
-    const initializeQRImage = async () => {
-      const primaryAvailable = await testImageAvailability('https://stash.del4yowo.id.vn/qr.png', 3000);
-      
-      if (!primaryAvailable) {
-        console.log('Primary QR image not available, using fallback immediately');
-        setImageError(true);
-        setQrImageSrc('https://i.ibb.co/v4MMFJcN/qr.png');
-      }
-      setIsLoading(false);
-    };
-
-    initializeQRImage();
-    
-    const preloadImage = () => {
-      const primaryLink = document.createElement('link');
-      primaryLink.rel = 'preload';
-      primaryLink.as = 'image';
-      primaryLink.href = 'https://stash.del4yowo.id.vn/qr.png';
-      primaryLink.crossOrigin = 'anonymous';
-      document.head.appendChild(primaryLink);
-
-      const fallbackLink = document.createElement('link');
-      fallbackLink.rel = 'preload';
-      fallbackLink.as = 'image';
-      fallbackLink.href = 'https://i.ibb.co/v4MMFJcN/qr.png';
-      fallbackLink.crossOrigin = 'anonymous';
-      document.head.appendChild(fallbackLink);
-    };
-    
-    const preloadTimeout = setTimeout(preloadImage, 100);
     
     let timeoutId: NodeJS.Timeout;
     
@@ -66,14 +35,10 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
     setScrollTop(initialScrollTop);
     
     window.addEventListener('scroll', handleScroll, { passive: true });
-    
+
     return () => {
       window.removeEventListener('scroll', handleScroll);
       clearTimeout(timeoutId);
-      clearTimeout(preloadTimeout);
-      if (loadTimeout) {
-        clearTimeout(loadTimeout);
-      }
     };
   }, []);
 
@@ -89,56 +54,16 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
 
   const handleImageError = useCallback(() => {
     if (!imageError) {
-      console.log('Primary QR image failed, switching to fallback');
+      console.warn('QR image failed to load from local path');
       setImageError(true);
-      setQrImageSrc('https://i.ibb.co/v4MMFJcN/qr.png');
-      setIsLoading(false);
-      if (loadTimeout) {
-        clearTimeout(loadTimeout);
-        setLoadTimeout(null);
-      }
-    }
-  }, [imageError, loadTimeout]);
-
-  const handleImageLoad = useCallback(() => {
-    setIsLoading(false);
-    if (loadTimeout) {
-      clearTimeout(loadTimeout);
-      setLoadTimeout(null);
-    }
-  }, [loadTimeout]);
-
-  const switchToFallback = useCallback(() => {
-    if (!imageError) {
-      console.log('Primary QR image timeout or connectivity issue, switching to fallback');
-      setImageError(true);
-      setQrImageSrc('https://i.ibb.co/v4MMFJcN/qr.png');
       setIsLoading(false);
     }
   }, [imageError]);
 
-  const testImageAvailability = useCallback((url: string, timeout: number = 5000): Promise<boolean> => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      const timeoutId = setTimeout(() => {
-        img.onload = null;
-        img.onerror = null;
-        resolve(false);
-      }, timeout);
-
-      img.onload = () => {
-        clearTimeout(timeoutId);
-        resolve(true);
-      };
-      
-      img.onerror = () => {
-        clearTimeout(timeoutId);
-        resolve(false);
-      };
-
-      img.src = url;
-    });
+  const handleImageLoad = useCallback(() => {
+    setIsLoading(false);
   }, []);
+  // Removed remote fallback/test logic; we always use local public image
 
   if (!isClient) {
     return null;
@@ -241,8 +166,8 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500"></div>
                 </div>
               )}
-              <img
-                src={qrImageSrc}
+              <Image
+                src={QR_SRC}
                 alt="QR Code ủng hộ nhóm dịch"
                 width={200}
                 height={200}
@@ -260,10 +185,8 @@ export function FloatingSupportWidget({ className }: FloatingSupportWidgetProps)
                 onContextMenu={(e) => e.preventDefault()}
                 onDragStart={(e) => e.preventDefault()}
                 onError={handleImageError}
-                onLoad={handleImageLoad}
-                loading="eager"
-                fetchPriority="high"
-                decoding="sync"
+                onLoadingComplete={handleImageLoad}
+                priority
               />
             </div>
           </div>
