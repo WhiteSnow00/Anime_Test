@@ -165,9 +165,31 @@ async function initializeDatabase() {
         console.log(`  ✓ Collection exists: ${name}`);
       }
 
-      // Ensure indexes are created
+      // Ensure indexes are created - handle conflicts by dropping and recreating
       console.log(`  🔍 Creating indexes for: ${name}`);
-      await model.createIndexes();
+      try {
+        await model.createIndexes();
+      } catch (error: any) {
+        // If index conflict (code 86), drop existing indexes and retry
+        if (error.code === 86 || error.codeName === 'IndexKeySpecsConflict') {
+          console.log(`  ⚠️  Index conflict detected, dropping and recreating indexes...`);
+          
+          try {
+            // Drop all indexes except _id
+            await db!.collection(name).dropIndexes();
+            console.log(`  🗑️  Dropped existing indexes`);
+            
+            // Retry creating indexes
+            await model.createIndexes();
+            console.log(`  ✅ Indexes recreated successfully`);
+          } catch (retryError) {
+            console.error(`  ❌ Failed to recreate indexes:`, retryError);
+            throw retryError;
+          }
+        } else {
+          throw error;
+        }
+      }
     }
 
     console.log('\n✅ All collections and indexes created successfully\n');

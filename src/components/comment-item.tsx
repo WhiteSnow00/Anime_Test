@@ -282,9 +282,16 @@ export function CommentItem({
 
   const handleTouchStart = useCallback(
     (e: React.TouchEvent | React.MouseEvent) => {
-      if (!isLoggedIn || !user || window.innerWidth > 768) return;
-      if (!(comment.userId === user.id || comment.userName === user.username))
-        return;
+      if (window.innerWidth > 768) return;
+      // Logged-in: can only delete own comments WITH userId
+      if (isLoggedIn && user) {
+        if (!comment.userId || !(comment.userId === user.id || comment.userName === user.username))
+          return;
+      }
+      // Guest (not logged in): can only delete guest comments WITHOUT userId
+      else {
+        if (comment.userId) return; // Has userId = can't delete as guest
+      }
       const target = e.target as HTMLElement;
       const replyElement = target.closest("[data-reply-container]");
       if (replyElement) {
@@ -464,10 +471,13 @@ export function CommentItem({
               </div>
 
               {/* Options Menu - Desktop only, hidden on mobile (use long-press instead) */}
-              {isLoggedIn &&
+              {/* Logged-in: show delete only for own comments with userId. Guest: show delete only for guest comments (no userId) */}
+              {((isLoggedIn &&
                 user &&
+                comment.userId &&
                 (comment.userId === user.id ||
-                  comment.userName === user.username) && (
+                  comment.userName === user.username)) ||
+                (!isLoggedIn && !comment.userId)) && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
@@ -508,10 +518,12 @@ export function CommentItem({
             />
 
             {/* Mobile Long-press Hint - Only show for comment owners on mobile */}
-            {isLoggedIn &&
+            {((isLoggedIn &&
               user &&
+              comment.userId &&
               (comment.userId === user.id ||
-                comment.userName === user.username) && (
+                comment.userName === user.username)) ||
+              (!isLoggedIn && !comment.userId)) && (
                 <div className="text-xs text-muted-foreground mb-2 lg:hidden flex items-center gap-1">
                   <span className="w-1 h-1 bg-muted-foreground rounded-full animate-pulse" />
                   Nhấn giữ để xóa bình luận
@@ -873,9 +885,16 @@ function ReplyItem({
 
   const handleTouchStart = useCallback(
     (e: React.TouchEvent | React.MouseEvent) => {
-      if (!isLoggedIn || !user || window.innerWidth > 768) return;
-      if (!(reply.userId === user.id || reply.userName === user.username))
-        return;
+      if (window.innerWidth > 768) return;
+      // Logged-in: can only delete own replies WITH userId
+      if (isLoggedIn && user) {
+        if (!reply.userId || !(reply.userId === user.id || reply.userName === user.username))
+          return;
+      }
+      // Guest (not logged in): can only delete guest replies WITHOUT userId
+      else {
+        if (reply.userId) return; // Has userId = can't delete as guest
+      }
       e.stopPropagation();
       setIsLongPressing(true);
       longPressTimerRef.current = setTimeout(() => {
@@ -1021,10 +1040,13 @@ function ReplyItem({
             </div>
 
             {/* Options Menu for Reply - Desktop only, hidden on mobile (use long-press instead) */}
-            {isLoggedIn &&
+            {/* Logged-in: show delete only for own replies with userId. Guest: show delete only for guest replies (no userId) */}
+            {((isLoggedIn &&
               user &&
+              reply.userId &&
               (reply.userId === user.id ||
-                reply.userName === user.username) && (
+                reply.userName === user.username)) ||
+              (!isLoggedIn && !reply.userId)) && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -1068,9 +1090,11 @@ function ReplyItem({
           </div>
 
           {/* Mobile Long-press Hint for Replies - Only show for reply owners on mobile */}
-          {isLoggedIn &&
+          {((isLoggedIn &&
             user &&
-            (reply.userId === user.id || reply.userName === user.username) && (
+            reply.userId &&
+            (reply.userId === user.id || reply.userName === user.username)) ||
+            (!isLoggedIn && !reply.userId)) && (
               <div className="text-[10px] text-muted-foreground mb-1 lg:hidden flex items-center gap-1">
                 <span className="w-0.5 h-0.5 bg-muted-foreground rounded-full animate-pulse" />
                 Nhấn giữ để xóa

@@ -24,29 +24,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Get auth token from cookies
-    const cookieStore = await cookies();
-    const token = cookieStore.get('auth-token')?.value;
-    
-    if (!token) {
-      return NextResponse.json({
-        success: false,
-        message: 'Bạn cần đăng nhập để xóa bình luận'
-      }, { status: 401 });
-    }
-
-    let user;
-    try {
-      const decoded = verifyToken(token);
-      user = decoded;
-    } catch (error) {
-      return NextResponse.json({
-        success: false,
-        message: 'Token không hợp lệ'
-      }, { status: 401 });
-    }
-
-    // Get the comment/reply to check ownership
+    // Get the comment/reply to check ownership first
     const comment = await MongoDBExtendedService.getCommentById(commentId);
     
     if (!comment) {
@@ -56,25 +34,68 @@ export async function POST(request: NextRequest) {
       }, { status: 404 });
     }
 
-    // Check if user is the owner
-    // Compare userId strings (both should be converted to strings for safety)
-    const userIdMatch = comment.userId && user.userId && 
-                       comment.userId.toString() === user.userId.toString();
+    // Get auth token from cookies
+    const cookieStore = await cookies();
+    const token = cookieStore.get('auth-token')?.value;
     
-    // Compare usernames as fallback (case-insensitive)
-    const usernameMatch = comment.userName && user.username && 
-                         comment.userName.trim().toLowerCase() === user.username.trim().toLowerCase();
-    
-    const isOwner = userIdMatch || usernameMatch;
+    let user = null;
+    let isOwner = false;
+
+    // Try to authenticate with token (for logged-in users)
+    if (token) {
+      try {
+        const decoded = verifyToken(token);
+        user = decoded;
+
+        // Logged-in users can ONLY delete their own comments (with userId)
+        if (comment.userId) {
+          // Compare userId strings (both should be converted to strings for safety)
+          const userIdMatch = user.userId && 
+                             comment.userId.toString() === user.userId.toString();
+          
+          // Compare usernames as fallback (case-insensitive)
+          const usernameMatch = user.username && comment.userName &&
+                               comment.userName.trim().toLowerCase() === user.username.trim().toLowerCase();
+          
+          isOwner = userIdMatch || usernameMatch;
+        }
+        // If comment has no userId (guest comment), logged-in user CANNOT delete it
+        else {
+          isOwner = false;
+        }
+      } catch (error) {
+        // Invalid token, treat as guest
+        user = null;
+      }
+    }
+
+    // If not logged in, check IP-based ownership for guest comments ONLY
+    if (!user && !comment.userId) {
+      // This is a guest comment and user is not logged in, check IP match
+      const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+                       request.headers.get('x-real-ip') ||
+                       'unknown';
+      
+      const ipMatch = comment.ipAddress && clientIp && 
+                     comment.ipAddress === clientIp;
+      
+      isOwner = ipMatch;
+
+      console.log('Guest comment IP ownership check:', {
+        commentIp: comment.ipAddress,
+        clientIp: clientIp,
+        ipMatch
+      });
+    }
 
     console.log('Delete ownership check:', {
       commentUserId: comment.userId,
-      tokenUserId: user.userId,
+      tokenUserId: user?.userId,
       commentUserName: comment.userName,
-      tokenUsername: user.username,
-      userIdMatch,
-      usernameMatch,
-      isOwner
+      tokenUsername: user?.username,
+      isOwner,
+      isGuestComment: !comment.userId,
+      isLoggedIn: !!user
     });
 
     if (!isOwner) {
