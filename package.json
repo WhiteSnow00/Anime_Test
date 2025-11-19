@@ -17,7 +17,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "setup-db": "node scripts/setup-database.js",
-    "vercel-setup": "node scripts/vercel-setup.js"
+    "vercel-setup": "node scripts/vercel-setup.js",
+    "db:init": "tsx scripts/init-db.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.3",
