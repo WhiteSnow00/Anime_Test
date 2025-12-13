@@ -58,7 +58,7 @@ export const animeData: Anime = {
       title: 'Episode 1',
       videoId: '01',
       servers: {
-        hls: 'https://play.ninoyo.com/file/ayaya-kana/kaoru-hana-ayaya-kana-1/kaoru-hana-ayaya-kana-1.m3u8',
+        hls: 'https://play.ayaya-kana.id.vn/file/ayaya-kana/kaoru-hana-ayaya-kana-1/kaoru-hana-ayaya-kana-1.m3u8',
         helvid: '8c8edb8924a8',
         hydax: 'AkqMUVl6B'
       },
@@ -70,7 +70,7 @@ export const animeData: Anime = {
       title: 'Episode 2',
       videoId: '02',
       servers: {
-        hls: 'https://play.ninoyo.com/file/ayaya-kana/kaoru-hana-ayaya-kana-2/kaoru-hana-ayaya-kana-2.m3u8',
+        hls: 'https://play.ayaya-kana.id.vn/file/ayaya-kana/kaoru-hana-ayaya-kana-2/kaoru-hana-ayaya-kana-2.m3u8',
         helvid: 'f2daff898ca2',
         hydax: '7iGNIKWEk'
       },
@@ -82,7 +82,7 @@ export const animeData: Anime = {
       title: 'Episode 3',
       videoId: '03',
       servers: {
-        hls: 'https://play.ninoyo.com/file/ayaya-kana/kaoru-hana-ayaya-kana-3/kaoru-hana-ayaya-kana-3.m3u8',
+        hls: 'https://play.ayaya-kana.id.vn/file/ayaya-kana/kaoru-hana-ayaya-kana-3/kaoru-hana-ayaya-kana-3.m3u8',
         helvid: '50909806cf25',
         hydax: 'dibBTjuqH'
       },
@@ -94,7 +94,7 @@ export const animeData: Anime = {
       title: 'Episode 4',
       videoId: '04',
       servers: {
-        hls: 'https://play.ninoyo.com/file/ayaya-kana/kaoru-hana-ayaya-kana-4/kaoru-hana-ayaya-kana-4.m3u8',
+        hls: 'https://play.ayaya-kana.id.vn/file/ayaya-kana/kaoru-hana-ayaya-kana-4/kaoru-hana-ayaya-kana-4.m3u8',
         helvid: '28b0a006506a',
         hydax: 'p_BMmjguS'
       },
@@ -106,7 +106,7 @@ export const animeData: Anime = {
       title: 'Episode 5',
       videoId: '05',
       servers: {
-        hls: 'https://play.ninoyo.com/file/ayaya-kana/kaoru-hana-ayaya-kana-5/kaoru-hana-ayaya-kana-5.m3u8',
+        hls: 'https://play.ayaya-kana.id.vn/file/ayaya-kana/kaoru-hana-ayaya-kana-5/kaoru-hana-ayaya-kana-5.m3u8',
         helvid: '136aa79ac114',
         hydax: 'cN3EniKSx'
       },
@@ -118,7 +118,7 @@ export const animeData: Anime = {
       title: 'Episode 6',
       videoId: '06',
       servers: {
-        hls: 'https://play.ninoyo.com/file/ayaya-kana/kaoru-hana-ayaya-kana-6/kaoru-hana-ayaya-kana-6.m3u8',
+        hls: 'https://play.ayaya-kana.id.vn/file/ayaya-kana/kaoru-hana-ayaya-kana-6/kaoru-hana-ayaya-kana-6.m3u8',
         helvid: 'ae8e488008c8',
         hydax: 'GDFMakAV5'
       },
@@ -130,7 +130,7 @@ export const animeData: Anime = {
       title: 'Episode 7',
       videoId: '07',
       servers: {
-        hls: 'https://play.ninoyo.com/file/ayaya-kana/kaoru-hana-ayaya-kana-7/kaoru-hana-ayaya-kana-7.m3u8',
+        hls: 'https://play.ayaya-kana.id.vn/file/ayaya-kana/kaoru-hana-ayaya-kana-7/kaoru-hana-ayaya-kana-7.m3u8',
         helvid: '3d35b127f164',
         hydax: '-dOrUWexxF'
       },
@@ -142,7 +142,7 @@ export const animeData: Anime = {
       title: 'Episode 8',
       videoId: '08',
       servers: {
-        hls: 'https://play.ninoyo.com/file/ayaya-kana/kaoru-hana-ayaya-kana-8/kaoru-hana-ayaya-kana-8.m3u8',
+        hls: 'https://play.ayaya-kana.id.vn/file/ayaya-kana/kaoru-hana-ayaya-kana-8/kaoru-hana-ayaya-kana-8.m3u8',
         helvid: 'b7bf8f6a1904',
         hydax: '5JzCVvQaO'
       },
@@ -154,7 +154,7 @@ export const animeData: Anime = {
       title: 'Episode 9',
       videoId: '09',
       servers: {
-        hls: 'https://play.ninoyo.com/file/ayaya-kana/kaoru-hana-ayaya-kana-9/kaoru-hana-ayaya-kana-9.m3u8',
+        hls: 'https://play.ayaya-kana.id.vn/file/ayaya-kana/kaoru-hana-ayaya-kana-9/kaoru-hana-ayaya-kana-9.m3u8',
         helvid: 'ce53e6d3d73d',
         hydax: 'YGIB7e96h'
       },
@@ -166,7 +166,7 @@ export const animeData: Anime = {
       title: 'Episode 10',
       videoId: '10',
       servers: {
-        hls: 'https://play.ninoyo.com/file/ayaya-kana/kaoru-hana-ayaya-kana-10/kaoru-hana-ayaya-kana-10.m3u8',
+        hls: 'https://play.ayaya-kana.id.vn/file/ayaya-kana/kaoru-hana-ayaya-kana-10/kaoru-hana-ayaya-kana-10.m3u8',
         helvid: 'cc9f4c5d0931',
         hydax: 'INm7KujW9'
       },
@@ -178,7 +178,7 @@ export const animeData: Anime = {
       title: 'Episode 11',
       videoId: '11',
       servers: {
-        hls: 'https://play.ninoyo.com/file/ayaya-kana/kaoru-hana-ayaya-kana-11/kaoru-hana-ayaya-kana-11.m3u8',
+        hls: 'https://play.ayaya-kana.id.vn/file/ayaya-kana/kaoru-hana-ayaya-kana-11/kaoru-hana-ayaya-kana-11.m3u8',
         helvid: 'bb2fee1d6943',
         hydax: '8m8i7ojXo'
       },
@@ -190,7 +190,7 @@ export const animeData: Anime = {
       title: 'Episode 12',
       videoId: '12',
       servers: {
-        hls: 'https://play.ninoyo.com/file/ayaya-kana/kaoru-hana-ayaya-kana-12/kaoru-hana-ayaya-kana-12.m3u8',
+        hls: 'https://play.ayaya-kana.id.vn/file/ayaya-kana/kaoru-hana-ayaya-kana-12/kaoru-hana-ayaya-kana-12.m3u8',
         helvid: '74304b540215',
         hydax: 'kF3bfa3Td'
       },
@@ -202,7 +202,7 @@ export const animeData: Anime = {
       title: 'Episode 13',
       videoId: '13',
       servers: {
-        hls: 'https://play.ninoyo.com/file/ayaya-kana/kaoru-hana-ayaya-kana-13/kaoru-hana-ayaya-kana-13.m3u8',
+        hls: 'https://play.ayaya-kana.id.vn/file/ayaya-kana/kaoru-hana-ayaya-kana-13/kaoru-hana-ayaya-kana-13.m3u8',
         helvid: '',
         hydax: 'sAjv5tezT'
       },
