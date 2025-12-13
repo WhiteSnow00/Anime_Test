@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Security check for allowed domains
-    if (!file.includes('backblazeb2.com') && !file.includes('tiktokcdn.com')) {
+    if (!file.includes('backblazeb2.com') && !file.includes('tiktokcdn.com') && !file.includes('play.ninoyo.com')) {
       return NextResponse.json(
         { error: 'Invalid remote domain' },
         { status: 403 }

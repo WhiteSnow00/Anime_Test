@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    if (!url.includes('tiktokcdn.com') && !url.includes('backblazeb2.com')) {
+    if (!url.includes('tiktokcdn.com') && !url.includes('backblazeb2.com') && !url.includes('play.ninoyo.com')) {
       return NextResponse.json(
         { error: 'Invalid URL domain' },
         { status: 403 }

@@ -281,6 +281,11 @@ const NJWPlayerComponent = ({
   const isHls = server === "hls";
   const fileUrl = useMemo(() => {
     if (!isHls) return "";
+
+    if (videoId.startsWith('http://') || videoId.startsWith('https://')) {
+      return videoId;
+    }
+
     const rel = `/api/hls?file=${encodeURIComponent(videoId)}`;
     if (typeof window !== "undefined")
       return new URL(rel, window.location.origin).toString();
