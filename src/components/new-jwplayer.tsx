@@ -125,7 +125,7 @@ function detectPipSupport(p: any, video: HTMLVideoElement | null): boolean {
   if (typeof p?.isPipSupported === "function") {
     try {
       if (p.isPipSupported() === true) return true;
-    } catch {}
+    } catch { }
   }
   // Standard
   const supportsStandard =
@@ -137,7 +137,7 @@ function detectPipSupport(p: any, video: HTMLVideoElement | null): boolean {
   const supportsWebkit =
     typeof (video as any).webkitSupportsPresentationMode === "function" &&
     (video as any).webkitSupportsPresentationMode("picture-in-picture") ===
-      true;
+    true;
   return !!(supportsStandard || supportsWebkit);
 }
 
@@ -160,7 +160,7 @@ function protectVideoElement(video: HTMLVideoElement, isAndroid: boolean) {
       ],
     });
     consoleProtection.detectConsoleAccess();
-  } catch {}
+  } catch { }
   const applyProtection = () => {
     const originalGetAttribute = video.getAttribute;
     video.getAttribute = function (this: HTMLVideoElement, name: string) {
@@ -361,12 +361,12 @@ const NJWPlayerComponent = ({
   useEffect(() => {
     setIsTouchDevice(
       typeof window !== "undefined" &&
-        ("ontouchstart" in window || navigator.maxTouchPoints > 0)
+      ("ontouchstart" in window || navigator.maxTouchPoints > 0)
     );
     try {
       const ok =
         typeof CSS !== "undefined" &&
-        typeof (CSS as any).supports === "function"
+          typeof (CSS as any).supports === "function"
           ? CSS.supports("aspect-ratio: 16/9")
           : false;
       setSupportsAspectRatio(!!ok);
@@ -473,7 +473,7 @@ const NJWPlayerComponent = ({
     const apply = (v: HTMLVideoElement) => {
       try {
         v.crossOrigin = "anonymous";
-      } catch {}
+      } catch { }
       v.setAttribute("playsinline", "");
       v.setAttribute("webkit-playsinline", "");
     };
@@ -516,13 +516,13 @@ const NJWPlayerComponent = ({
           p.getState?.()
         );
         p.remove?.();
-      } catch {}
+      } catch { }
     }
 
     try {
       // Prewarm HLS manifest on Android to speed up first segment fetch
       if (isAndroid && fileUrl) {
-        try { fetch(fileUrl, { method: "HEAD", cache: "no-cache" }); } catch {}
+        try { fetch(fileUrl, { method: "HEAD", cache: "no-cache" }); } catch { }
       }
 
       const sources = [{ file: fileUrl, type: CONFIG.HLS_TYPE, default: true }];
@@ -532,9 +532,9 @@ const NJWPlayerComponent = ({
         primary: CONFIG.PLAYER_PRIMARY,
         controls: false,
         // On mobile, start muted to satisfy autoplay policy and reduce stalls
-  autostart: (isIOS || isAndroid) ? !!autoPlay : autoPlay,
-  // Do NOT force mute on mobile; respect the passed-in prop
-  mute: !!muted,
+        autostart: (isIOS || isAndroid) ? !!autoPlay : autoPlay,
+        // Do NOT force mute on mobile; respect the passed-in prop
+        mute: !!muted,
         key: CONFIG.JW_PLAYER_KEY,
         hlsjsdefault: !isIOS,
         hlsjsconfig: {
@@ -593,30 +593,30 @@ const NJWPlayerComponent = ({
           try {
             p.seek?.(savedPositionRef.current);
             if (wasPlayingRef.current) p.play?.(true);
-          } catch {}
+          } catch { }
         } else if (autoPlay) {
           if (isIOS || isAndroid) {
             // Attempt autoplay without forcing mute; if policy blocks, user will tap to play
             try {
               p.play?.(true);
-            } catch {}
+            } catch { }
             setTimeout(() => {
               try {
                 const st = p.getState?.();
                 if (!["playing", "buffering"].includes(st)) p.play?.(true);
-              } catch {}
+              } catch { }
             }, CONFIG.AUTOPLAY_RETRY_DELAY_MS);
           } else {
             try {
               p.setMute?.(!!muted === false ? false : !!muted);
               forcedAutoplayMuteRef.current = !muted;
               p.play?.(true);
-            } catch {}
+            } catch { }
             setTimeout(() => {
               try {
                 const st = p.getState?.();
                 if (!["playing", "buffering"].includes(st)) p.play?.(true);
-              } catch {}
+              } catch { }
             }, CONFIG.AUTOPLAY_RETRY_DELAY_MS);
           }
         }
@@ -762,7 +762,7 @@ const NJWPlayerComponent = ({
         if (pos > 0.2) {
           try {
             p.seek(pos);
-          } catch {}
+          } catch { }
         }
         if (wasPlayingRef.current) p.play?.(true);
         savedPositionRef.current = 0;
@@ -788,7 +788,7 @@ const NJWPlayerComponent = ({
       onError?.(e?.message || CONFIG.ERRORS.INIT);
     }
 
-    return () => {};
+    return () => { };
   }, [
     isHls,
     fileUrl,
@@ -825,7 +825,7 @@ const NJWPlayerComponent = ({
     () => () => {
       try {
         playerInstance.current?.remove?.();
-      } catch {}
+      } catch { }
       if (controlsHideTimerRef.current) {
         window.clearTimeout(controlsHideTimerRef.current);
         controlsHideTimerRef.current = null;
@@ -849,7 +849,7 @@ const NJWPlayerComponent = ({
     try {
       p.setMute?.(!!muted);
       if (autoPlay && p.getState?.() !== "playing") p.play?.(true);
-    } catch {}
+    } catch { }
   }, [autoPlay, muted]);
 
   // keyboard shortcuts
@@ -873,7 +873,7 @@ const NJWPlayerComponent = ({
         if (forcedAutoplayMuteRef.current && !muted) {
           try {
             p.setMute?.(false);
-          } catch {}
+          } catch { }
           forcedAutoplayMuteRef.current = false;
         }
       };
@@ -1070,7 +1070,7 @@ const NJWPlayerComponent = ({
 
         try {
           playerInstance.current?.setFullscreen?.(false);
-        } catch {}
+        } catch { }
       }
     };
     document.addEventListener("fullscreenchange", onFsChange);
@@ -1203,8 +1203,8 @@ const NJWPlayerComponent = ({
           isIOS
             ? "relative w-full aspect-video bg-black [transform:translateZ(0)]"
             : isFullscreen
-            ? "fixed left-0 top-0 w-[100vw] h-[100vh] bg-black z-50 box-border flex items-center justify-center"
-            : "relative w-full aspect-video bg-black [transform:translateZ(0)]"
+              ? "fixed left-0 top-0 w-[100vw] h-[100vh] bg-black z-50 box-border flex items-center justify-center"
+              : "relative w-full aspect-video bg-black [transform:translateZ(0)]"
         }
         tabIndex={0}
         onMouseEnter={() => {
@@ -1252,9 +1252,8 @@ const NJWPlayerComponent = ({
         {/* Interaction overlay */}
         <div
           ref={overlayRef}
-          className={`absolute inset-0 z-10 ${
-            !isTouchDevice && cursorHidden ? "cursor-none" : "cursor-pointer"
-          }`}
+          className={`absolute inset-0 z-10 ${!isTouchDevice && cursorHidden ? "cursor-none" : "cursor-pointer"
+            }`}
           style={{
             WebkitTapHighlightColor: "transparent",
             touchAction: "manipulation",
@@ -1283,7 +1282,7 @@ const NJWPlayerComponent = ({
             if (forcedAutoplayMuteRef.current && !muted) {
               try {
                 p.setMute?.(false);
-              } catch {}
+              } catch { }
               forcedAutoplayMuteRef.current = false;
             }
             isPlaying ? p.pause?.() : p.play?.(true);
@@ -1404,9 +1403,8 @@ const NJWPlayerComponent = ({
         {/* Mobile centered controls */}
         {isTouchDevice && (
           <div
-            className={`absolute inset-0 z-30 flex items-center justify-center transition-opacity duration-200 ${
-              centerControlsVisible ? "opacity-100" : "opacity-0"
-            } pointer-events-none`}
+            className={`absolute inset-0 z-30 flex items-center justify-center transition-opacity duration-200 ${centerControlsVisible ? "opacity-100" : "opacity-0"
+              } pointer-events-none`}
           >
             <div
               className="pointer-events-auto flex items-center gap-4 sm:gap-6"
@@ -1442,7 +1440,7 @@ const NJWPlayerComponent = ({
                   if (forcedAutoplayMuteRef.current && !muted) {
                     try {
                       p.setMute?.(false);
-                    } catch {}
+                    } catch { }
                     forcedAutoplayMuteRef.current = false;
                   }
                   isPlaying ? p.pause?.() : p.play?.(true);
@@ -1478,13 +1476,11 @@ const NJWPlayerComponent = ({
 
         {/* Bottom control bar */}
         <div
-          className={`${
-            isIOS ? "absolute" : isFullscreen ? "fixed" : "absolute"
-          } inset-x-0 bottom-0 z-20 flex flex-col gap-2 text-white transition-opacity duration-300 ${
-            controlsVisible
+          className={`${isIOS ? "absolute" : isFullscreen ? "fixed" : "absolute"
+            } inset-x-0 bottom-0 z-20 flex flex-col gap-2 text-white transition-opacity duration-300 ${controlsVisible
               ? "opacity-100 pointer-events-auto"
               : "opacity-0 pointer-events-none"
-          } bg-gradient-to-t from-black/40 to-transparent px-3 pb-[calc(0.2rem+env(safe-area-inset-bottom))]`}
+            } bg-gradient-to-t from-black/40 to-transparent px-3 pb-[calc(0.2rem+env(safe-area-inset-bottom))]`}
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           onMouseEnter={() => setIsHoveringControls(true)}
@@ -1502,9 +1498,8 @@ const NJWPlayerComponent = ({
         >
           {/* progress bar */}
           <div
-            className={`relative cursor-pointer group ${
-              controlsVisible ? "" : "pointer-events-none"
-            }`}
+            className={`relative cursor-pointer group ${controlsVisible ? "" : "pointer-events-none"
+              }`}
             ref={progressBarRef}
             style={{ height: isTouchDevice ? 10 : 5 }}
             onMouseMove={(e) => {
@@ -1621,9 +1616,8 @@ const NJWPlayerComponent = ({
             />
             {hoverTime && (
               <div
-                className={`absolute -top-8 -translate-x-1/2 bg-gray-900/90 text-white text-xs font-medium rounded-lg px-3 py-1.5 shadow-lg pointer-events-none ${
-                  hoverTime ? "opacity-100 scale-100" : "opacity-0 scale-95"
-                } transition-all duration-100 ease-in-out`}
+                className={`absolute -top-8 -translate-x-1/2 bg-gray-900/90 text-white text-xs font-medium rounded-lg px-3 py-1.5 shadow-lg pointer-events-none ${hoverTime ? "opacity-100 scale-100" : "opacity-0 scale-95"
+                  } transition-all duration-100 ease-in-out`}
                 style={{ left: hoverTime?.x }}
               >
                 {formatTime(hoverTime.t)}
@@ -1633,9 +1627,8 @@ const NJWPlayerComponent = ({
 
           {/* bottom row */}
           <div
-            className={`flex items-center justify-between gap-2 md:gap-4 ${
-              isIOS && "pb-4"
-            }`}
+            className={`flex items-center justify-between gap-2 md:gap-4 ${isIOS && "pb-4"
+              }`}
           >
             <div className="flex items-center gap-1 md:gap-3">
               {!isTouchDevice && (
