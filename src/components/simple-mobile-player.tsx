@@ -52,6 +52,11 @@ export function SimpleMobilePlayer({
         hlsFile = episodeData?.servers.hls || videoId;
       }
 
+      if (hlsFile.startsWith('/')) {
+        console.log(`HLS mobile player URL (local): ${hlsFile}`);
+        return hlsFile;
+      }
+
       // Support remote URLs directly without proxy
       if (hlsFile.startsWith('http://') || hlsFile.startsWith('https://')) {
         console.log(`HLS mobile player URL (remote): ${hlsFile}`);

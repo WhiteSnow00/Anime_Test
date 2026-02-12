@@ -282,6 +282,10 @@ const NJWPlayerComponent = ({
   const fileUrl = useMemo(() => {
     if (!isHls) return "";
 
+    if (videoId.startsWith('/')) {
+      return videoId;
+    }
+
     if (videoId.startsWith('http://') || videoId.startsWith('https://')) {
       return videoId;
     }
