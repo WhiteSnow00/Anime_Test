@@ -38,7 +38,7 @@ import { useAuth } from "@/contexts/auth-context";
 import TopNav from "./top-nav";
 import BackToTop from "./back-to-top";
 
-function AnimePageComponent({ animeData = defaultAnimeData }: { animeData?: Anime }) {
+function AnimePageComponent({ animeData = defaultAnimeData, animeSlug }: { animeData?: Anime; animeSlug?: string }) {
   console.log("🎭 ANIME-PAGE COMPONENT RENDERING");
 
   const { user } = useAuth();
@@ -81,6 +81,7 @@ function AnimePageComponent({ animeData = defaultAnimeData }: { animeData?: Anim
   // Initialize with HLS as preferred server (especially for mobile)
   const getDefaultServer = (): ServerType => {
     const firstEpisode = animeData.episodes[0];
+    if (!firstEpisode) return "hls";
     // Always prioritize HLS first as it's the best for mobile and general use
     if (firstEpisode.servers.hls) {
       console.log("🎭 DEFAULT SERVER: HLS (has HLS data)");
@@ -205,26 +206,14 @@ function AnimePageComponent({ animeData = defaultAnimeData }: { animeData?: Anim
   });
 
   useEffect(() => {
-    if (!viewport?.isActualMobile) {
-      // For desktop, set default server based on availability
-      const firstEpisode = animeData.episodes[0];
-      if (firstEpisode.servers.hls) {
-        setCurrentServer("hls");
-      } else if (firstEpisode.servers.helvid) {
-        setCurrentServer("helvid");
-      } else if (firstEpisode.servers.hydax) {
-        setCurrentServer("hydax");
-      }
-    } else {
-      // For actual mobile devices, prefer HLS as the primary server
-      const firstEpisode = animeData.episodes[0];
-      if (firstEpisode.servers.hls) {
-        setCurrentServer("hls");
-      } else if (firstEpisode.servers.helvid) {
-        setCurrentServer("helvid");
-      } else if (firstEpisode.servers.hydax) {
-        setCurrentServer("hydax");
-      }
+    const firstEpisode = animeData.episodes[0];
+    if (!firstEpisode) return;
+    if (firstEpisode.servers.hls) {
+      setCurrentServer("hls");
+    } else if (firstEpisode.servers.helvid) {
+      setCurrentServer("helvid");
+    } else if (firstEpisode.servers.hydax) {
+      setCurrentServer("hydax");
     }
   }, [viewport?.isActualMobile]);
 
@@ -530,7 +519,11 @@ function AnimePageComponent({ animeData = defaultAnimeData }: { animeData?: Anim
           data-section="comment"
           className="mt-6 comment-section-mobile"
         >
-          <CommentSection currentEpisodeId={currentEpisode.id} />
+          <CommentSection
+            currentEpisodeId={currentEpisode.id}
+            animeSlug={animeSlug}
+            animeTitle={animeData.title}
+          />
         </div>
       </div>
 
