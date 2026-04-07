@@ -69,6 +69,7 @@ if (isServer) {
     userAgent: { type: String },
     ipAddress: { type: String, maxlength: 45 },
     episodeViewing: { type: Number },
+    animeSlug: { type: String, maxlength: 50 },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false }
   }, {
     collection: 'comments'

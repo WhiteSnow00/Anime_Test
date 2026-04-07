@@ -1,13 +1,14 @@
 export interface Comment {
-  _id?: string; 
+  _id?: string;
   userName: string;
-  displayName?: string; 
+  displayName?: string;
   content: string;
   timestamp: Date;
   isApproved: boolean;
   userAgent?: string;
   ipAddress?: string;
-  episodeViewing?: number; 
+  episodeViewing?: number;
+  animeSlug?: string;
   userId?: string;
   userRole?: 'user' | 'administrator';
 }
@@ -15,7 +16,8 @@ export interface Comment {
 export interface CommentFormData {
   userName: string;
   content: string;
-  episodeViewing?: number; 
+  episodeViewing?: number;
+  animeSlug?: string;
 }
 
 export interface CommentStats {

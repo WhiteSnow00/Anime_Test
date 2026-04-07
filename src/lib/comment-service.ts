@@ -4,9 +4,11 @@ import { Comment, CommentFormData } from '@/types/comment';
 
 export class CommentService {
   // Get all approved comments from API
-  static async getComments(): Promise<Comment[]> {
+  static async getComments(animeSlug?: string): Promise<Comment[]> {
     try {
-      const response = await fetch('/api/comments?limit=10000', {
+      const params = new URLSearchParams({ limit: '10000' });
+      if (animeSlug) params.set('animeSlug', animeSlug);
+      const response = await fetch(`/api/comments?${params}`, {
         method: 'GET',
         cache: 'no-store'
       });
@@ -39,7 +41,8 @@ export class CommentService {
         body: JSON.stringify({
           userName: formData.userName.trim(),
           content: this.processEmojis(formData.content.trim()),
-          episodeViewing: formData.episodeViewing
+          episodeViewing: formData.episodeViewing,
+          animeSlug: formData.animeSlug
         })
       });
 

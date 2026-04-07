@@ -361,7 +361,8 @@ export class MongoDBExtendedService extends SimpleMongoDBService {
   }
 
   static async getCommentsWithInteractions(
-    episodeId?: number
+    episodeId?: number,
+    animeSlug?: string
   ): Promise<ExtendedComment[]> {
     if (!isServer) {
       return [];
@@ -369,11 +370,15 @@ export class MongoDBExtendedService extends SimpleMongoDBService {
 
     try {
       await this.ensureConnection();
-      
+
+      const matchConditions: any = {};
+      if (episodeId) matchConditions.episodeViewing = episodeId;
+      if (animeSlug) matchConditions.animeSlug = animeSlug;
+
       // Build aggregation pipeline for optimized comment retrieval
       const pipeline: any[] = [
-        // Match comments by episode if specified
-        ...(episodeId ? [{ $match: { episodeViewing: episodeId } }] : []),
+        // Match comments by episode/anime if specified
+        ...(Object.keys(matchConditions).length > 0 ? [{ $match: matchConditions }] : []),
         
         // Sort by timestamp descending
         { $sort: { timestamp: -1 } },
