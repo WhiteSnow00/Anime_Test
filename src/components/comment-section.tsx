@@ -17,11 +17,13 @@ import { CommentItem } from '@/components/comment-item';
 
 interface CommentSectionProps {
   currentEpisodeId?: number;
+  animeSlug?: string;
+  animeTitle?: string;
   className?: string;
 }
 
-export function CommentSection({ currentEpisodeId, className }: CommentSectionProps) {
-  const { comments, setComments, isLoading, isSubmitting, addComment, removeComment, refreshComments } = useComments();
+export function CommentSection({ currentEpisodeId, animeSlug, animeTitle, className }: CommentSectionProps) {
+  const { comments, setComments, isLoading, isSubmitting, addComment, removeComment, refreshComments } = useComments(animeSlug);
   const { isLoggedIn, user } = useAuth();
   const [formData, setFormData] = useState({
     userName: '',
@@ -52,7 +54,8 @@ export function CommentSection({ currentEpisodeId, className }: CommentSectionPr
     const commentData = {
       ...formData,
       userName: isLoggedIn && user ? user.username : formData.userName,
-      episodeViewing: currentEpisodeId
+      episodeViewing: currentEpisodeId,
+      animeSlug
     };
 
     const result = await addComment(commentData);
@@ -112,7 +115,7 @@ export function CommentSection({ currentEpisodeId, className }: CommentSectionPr
         <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
         <div>
           <h3 className="text-base sm:text-lg font-semibold">Bình luận</h3>
-          <p className="text-xs sm:text-sm text-muted-foreground">Hoa Thơm Kiêu Hãnh</p>
+          {animeTitle && <p className="text-xs sm:text-sm text-muted-foreground">{animeTitle}</p>}
         </div>
       </div>
 

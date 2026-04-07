@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { CommentService } from '@/lib/comment-service';
 import { Comment, CommentFormData } from '@/types/comment';
 
-export function useComments() {
+export function useComments(animeSlug?: string) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -12,7 +12,7 @@ export function useComments() {
   const loadComments = async () => {
     setIsLoading(true);
     try {
-      const allComments = await CommentService.getComments();
+      const allComments = await CommentService.getComments(animeSlug);
       setComments(allComments);
     } catch (error) {
       console.error('Error loading comments:', error);
@@ -50,7 +50,7 @@ export function useComments() {
 
   useEffect(() => {
     loadComments();
-  }, []);
+  }, [animeSlug]);
 
   return {
     comments,

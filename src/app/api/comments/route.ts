@@ -194,16 +194,18 @@ export async function GET(request: NextRequest) {
     }
     const { searchParams } = new URL(request.url);
     const episodeId = searchParams.get('episode');
+    const animeSlug = searchParams.get('animeSlug') || undefined;
     const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
     const limit = Math.min(500, Math.max(1, parseInt(searchParams.get('limit') || '50')));
     const sortBy = searchParams.get('sort') || 'newest';
     const filterApproved = searchParams.get('approved') !== 'false';
-    
+
     const token = request.cookies.get('auth-token')?.value;
     const { userId, userRole } = await getUserInfo(token);
-    
+
     const allComments = await MongoDBExtendedService.getCommentsWithInteractions(
-      episodeId ? parseInt(episodeId) : undefined
+      episodeId ? parseInt(episodeId) : undefined,
+      animeSlug
     );
     const baseComments = filterApproved
       ? allComments.filter((c: any) => c.isApproved)
@@ -303,7 +305,7 @@ export async function POST(request: NextRequest) {
     }
     
   const body = await request.json();
-  const { userName: rawUserName, content: rawContent, episodeViewing } = body;
+  const { userName: rawUserName, content: rawContent, episodeViewing, animeSlug } = body;
   let userName = rawUserName;
   let content = rawContent;
     
@@ -339,6 +341,7 @@ export async function POST(request: NextRequest) {
       userAgent: request.headers.get('user-agent') || '',
       ipAddress: clientIp,
       episodeViewing: episodeViewing ? parseInt(episodeViewing) : undefined,
+      animeSlug: animeSlug || undefined,
       userId: userInfo.userId,
       userRole: userInfo.userRole,
       metadata: {
