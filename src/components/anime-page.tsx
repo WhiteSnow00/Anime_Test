@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { animeData, type Episode } from "@/data/anime";
+import { animeData as defaultAnimeData, type Anime, type Episode } from "@/data/anime";
 import { VideoPlayer } from "./video-player";
 import {
   SimpleMobilePlayer,
@@ -38,7 +38,7 @@ import { useAuth } from "@/contexts/auth-context";
 import TopNav from "./top-nav";
 import BackToTop from "./back-to-top";
 
-function AnimePageComponent() {
+function AnimePageComponent({ animeData = defaultAnimeData }: { animeData?: Anime }) {
   console.log("🎭 ANIME-PAGE COMPONENT RENDERING");
 
   const { user } = useAuth();
