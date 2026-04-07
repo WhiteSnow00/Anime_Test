@@ -95,9 +95,42 @@ interface JWPlayerProps {
   controls?: boolean; // kept for parity, UI is custom
   onLoad?: () => void;
   onError?: (error: string) => void;
+  onHudHeightChange?: (height: number) => void;
   className?: string;
   chapters?: number[]; // seconds from start
 }
+
+type DesktopControlKey =
+  | "play"
+  | "backward"
+  | "forward"
+  | "chapter"
+  | "volume"
+  | "time"
+  | "screenshot"
+  | "pip"
+  | "fullscreen";
+
+type DesktopControlCluster = "left" | "right";
+
+type DesktopControlTone = "dark" | "light";
+
+const DESKTOP_CONTROL_CLUSTER_MAP: Record<DesktopControlKey, DesktopControlCluster> = {
+  play: "left",
+  backward: "left",
+  forward: "left",
+  chapter: "left",
+  volume: "left",
+  time: "left",
+  screenshot: "right",
+  pip: "right",
+  fullscreen: "right",
+};
+
+const DEFAULT_DESKTOP_CONTROL_TONES: Record<DesktopControlCluster, DesktopControlTone> = {
+  left: "dark",
+  right: "dark",
+};
 
 /* =====================================================================================
  * UTILS
@@ -273,6 +306,7 @@ const NJWPlayerComponent = ({
   controls = true,
   onLoad,
   onError,
+  onHudHeightChange,
   className = "",
   chapters = [],
 }: JWPlayerProps) => {
@@ -300,6 +334,7 @@ const NJWPlayerComponent = ({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const progressBarRef = useRef<HTMLDivElement | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
+  const bottomHudRef = useRef<HTMLDivElement | null>(null);
   const playerInstance = useRef<any>(null);
   const prevFileUrlRef = useRef<string | null>(null);
   const savedPositionRef = useRef(0);
@@ -350,6 +385,11 @@ const NJWPlayerComponent = ({
   const [supportsAspectRatio, setSupportsAspectRatio] = useState(true);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [showImagePreview, setShowImagePreview] = useState(false);
+  const [showRemainingTime, setShowRemainingTime] = useState(false);
+  const [desktopHudHeight, setDesktopHudHeight] = useState(96);
+  const [desktopControlTones, setDesktopControlTones] = useState<Record<DesktopControlCluster, DesktopControlTone>>(
+    DEFAULT_DESKTOP_CONTROL_TONES
+  );
 
   const isScrubbingRef = useSyncedRef(isScrubbing);
   const isHoveringRef = useSyncedRef(isHovering);
@@ -360,6 +400,19 @@ const NJWPlayerComponent = ({
   const isPlayingRef = useSyncedRef(isPlaying);
   // Mobile idle tracking: last time the user touched or interacted with the player
   const lastInteractionRef = useRef<number>(Date.now());
+  const desktopControlRefs = useRef<Partial<Record<DesktopControlKey, HTMLElement | null>>>({});
+
+  const setDesktopControlRef = useCallback(
+    (key: DesktopControlKey, node: HTMLElement | null) => {
+      if (node) {
+        desktopControlRefs.current[key] = node;
+        return;
+      }
+
+      delete desktopControlRefs.current[key];
+    },
+    []
+  );
 
   const jwReady = useJWScript(onError);
   useEffect(() => {
@@ -383,6 +436,40 @@ const NJWPlayerComponent = ({
       setSupportsAspectRatio(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (isTouchDevice) {
+      setDesktopHudHeight(0);
+      onHudHeightChange?.(0);
+      return;
+    }
+
+    const hudNode = bottomHudRef.current;
+    if (!hudNode) return;
+
+    const updateHudHeight = () => {
+      const nextHeight = Math.ceil(hudNode.getBoundingClientRect().height);
+      if (!Number.isFinite(nextHeight) || nextHeight <= 0) return;
+      setDesktopHudHeight(nextHeight);
+      onHudHeightChange?.(nextHeight);
+    };
+
+    updateHudHeight();
+
+    if (typeof ResizeObserver === "undefined") {
+      const timeoutId = window.setTimeout(updateHudHeight, 100);
+      return () => window.clearTimeout(timeoutId);
+    }
+
+    const observer = new ResizeObserver(() => updateHudHeight());
+    observer.observe(hudNode);
+    window.addEventListener("resize", updateHudHeight);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updateHudHeight);
+    };
+  }, [isTouchDevice, onHudHeightChange]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -829,6 +916,137 @@ const NJWPlayerComponent = ({
     return () => v.removeEventListener("volumechange", onVol);
   }, [isReady]);
 
+  useEffect(() => {
+    if (!isReady || isTouchDevice) return;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = 160;
+    canvas.height = 90;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+
+    if (!context) return;
+
+    const resolveToneFromLuminance = (
+      luminance: number
+    ): DesktopControlTone => (luminance < 148 ? "dark" : "light");
+
+    const sampleLuminanceAtElement = (
+      element: HTMLElement,
+      videoRect: DOMRect
+    ): number | null => {
+      const iconAnchor = element.querySelector("svg") as SVGElement | null;
+      const rect = (iconAnchor?.getBoundingClientRect() ??
+        element.getBoundingClientRect()) as DOMRect;
+
+      if (rect.width < 1 || rect.height < 1 || videoRect.width < 1 || videoRect.height < 1) {
+        return null;
+      }
+
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+
+      if (
+        centerX < videoRect.left ||
+        centerX > videoRect.right ||
+        centerY < videoRect.top ||
+        centerY > videoRect.bottom
+      ) {
+        return null;
+      }
+
+      const relativeX = (centerX - videoRect.left) / videoRect.width;
+      const relativeY = (centerY - videoRect.top) / videoRect.height;
+      const canvasX = Math.round(relativeX * (canvas.width - 1));
+      const canvasY = Math.round(relativeY * (canvas.height - 1));
+      const sampleWidth = Math.max(4, Math.min(canvas.width, Math.round((rect.width / videoRect.width) * canvas.width * 0.35)));
+      const sampleHeight = Math.max(4, Math.min(canvas.height, Math.round((rect.height / videoRect.height) * canvas.height * 0.35)));
+      const startX = Math.max(0, Math.min(canvas.width - sampleWidth, canvasX - Math.floor(sampleWidth / 2)));
+      const startY = Math.max(0, Math.min(canvas.height - sampleHeight, canvasY - Math.floor(sampleHeight / 2)));
+      const { data } = context.getImageData(startX, startY, sampleWidth, sampleHeight);
+
+      let luminanceTotal = 0;
+      let pixelCount = 0;
+
+      for (let index = 0; index < data.length; index += 4) {
+        const alpha = data[index + 3] / 255;
+        if (alpha < 0.2) continue;
+
+        luminanceTotal +=
+          (0.2126 * data[index] +
+            0.7152 * data[index + 1] +
+            0.0722 * data[index + 2]) *
+          alpha;
+        pixelCount += 1;
+      }
+
+      if (pixelCount === 0) return null;
+
+      return luminanceTotal / pixelCount;
+    };
+
+    const sampleControlThemes = () => {
+      const video = containerRef.current?.querySelector(
+        "video"
+      ) as HTMLVideoElement | null;
+
+      if (!video || video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) {
+        return;
+      }
+
+      try {
+        const videoRect = video.getBoundingClientRect();
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        setDesktopControlTones((previous) => {
+          let changed = false;
+          const next = { ...previous };
+          const clusterSamples: Record<DesktopControlCluster, number[]> = {
+            left: [],
+            right: [],
+          };
+
+          (Object.keys(DESKTOP_CONTROL_CLUSTER_MAP) as DesktopControlKey[]).forEach((key) => {
+            const element = desktopControlRefs.current[key];
+            if (!element || !element.isConnected) return;
+
+            const luminance = sampleLuminanceAtElement(element, videoRect);
+            if (luminance == null) return;
+
+            clusterSamples[DESKTOP_CONTROL_CLUSTER_MAP[key]].push(luminance);
+          });
+
+          (Object.keys(clusterSamples) as DesktopControlCluster[]).forEach((cluster) => {
+            const samples = clusterSamples[cluster];
+            if (samples.length === 0) return;
+
+            const averageLuminance =
+              samples.reduce((sum, value) => sum + value, 0) / samples.length;
+            const nextTone = resolveToneFromLuminance(averageLuminance);
+
+            if (next[cluster] !== nextTone) {
+              next[cluster] = nextTone;
+              changed = true;
+            }
+          });
+
+          return changed ? next : previous;
+        });
+      } catch {
+        // Ignore sampling failures (e.g. transient cross-origin/decoder states)
+      }
+    };
+
+    const intervalMs = controlsVisible ? 320 : 720;
+    const initialTimeoutId = window.setTimeout(sampleControlThemes, 120);
+    const intervalId = window.setInterval(sampleControlThemes, intervalMs);
+
+    return () => {
+      window.clearTimeout(initialTimeoutId);
+      window.clearInterval(intervalId);
+    };
+  }, [controlsVisible, isReady, isTouchDevice]);
+
   // teardown
   useEffect(
     () => () => {
@@ -1194,27 +1412,61 @@ const NJWPlayerComponent = ({
   const bufferedPct = duration ? (buffer / duration) * 100 : 0;
   const effectivePlayedPct =
     isScrubbing && scrubPct !== null ? scrubPct : playedPct;
+  const remainingTime = Math.max(0, duration - position);
+  const getDesktopTone = (key: DesktopControlKey): DesktopControlTone =>
+    desktopControlTones[DESKTOP_CONTROL_CLUSTER_MAP[key]] ?? "dark";
+  const getDesktopControlButtonClass = (key: DesktopControlKey) =>
+    getDesktopTone(key) === "dark"
+      ? "rounded-2xl bg-black/78 p-2.5 text-white shadow-[0_12px_28px_rgba(15,23,42,0.52)] transition-all duration-200 hover:bg-black/84 hover:text-white hover:shadow-[0_12px_30px_rgba(236,72,153,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-300/60"
+      : "rounded-2xl bg-white/96 p-2.5 text-black shadow-[0_12px_28px_rgba(15,23,42,0.18)] transition-all duration-200 hover:bg-white hover:text-black hover:shadow-[0_12px_30px_rgba(236,72,153,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-300/50";
+  const getDesktopTooltipClass = (key: DesktopControlKey) =>
+    getDesktopTone(key) === "dark"
+      ? "rounded-xl bg-black/84 px-3 py-1.5 text-xs font-medium text-white shadow-[0_12px_30px_rgba(2,6,23,0.42)] backdrop-blur-xl"
+      : "rounded-xl bg-white/96 px-3 py-1.5 text-xs font-medium text-black shadow-[0_12px_30px_rgba(15,23,42,0.16)] backdrop-blur-xl";
+  const getDesktopVolumeGroupClass = (key: DesktopControlKey) =>
+    getDesktopTone(key) === "dark"
+      ? "group relative flex items-center overflow-hidden rounded-2xl bg-black/76 pr-0 shadow-[0_10px_24px_rgba(15,23,42,0.4)] transition-[padding] duration-300 hover:pr-2"
+      : "group relative flex items-center overflow-hidden rounded-2xl bg-white/96 pr-0 shadow-[0_10px_24px_rgba(15,23,42,0.18)] transition-[padding] duration-300 hover:pr-2";
+  const getDesktopTimePillClass = (key: DesktopControlKey) =>
+    getDesktopTone(key) === "dark"
+      ? "flex select-none items-center gap-2 rounded-2xl bg-black/76 px-3 py-2 text-xs font-medium text-white shadow-[0_10px_24px_rgba(15,23,42,0.4)] transition-all duration-200 hover:bg-black/84 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-300/60 sm:text-sm md:gap-2"
+      : "flex select-none items-center gap-2 rounded-2xl bg-white/96 px-3 py-2 text-xs font-medium text-black shadow-[0_10px_24px_rgba(15,23,42,0.18)] transition-all duration-200 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-300/50 sm:text-sm md:gap-2";
+  const getDesktopMutedTextClass = (key: DesktopControlKey) =>
+    getDesktopTone(key) === "dark" ? "text-white/55" : "text-black/55";
+  const getDesktopSecondaryTextClass = (key: DesktopControlKey) =>
+    getDesktopTone(key) === "dark" ? "text-white/72" : "text-black/72";
+  const getDesktopIconToneClass = (key: DesktopControlKey) =>
+    getDesktopTone(key) === "dark" ? "text-white" : "text-black";
 
   return (
     <div
-      className={`relative rounded-xl overflow-hidden shadow-2xl ${className}`}
+      className={`relative overflow-hidden rounded-[1.35rem] border border-white/10 bg-slate-950 shadow-[0_32px_90px_rgba(2,6,23,0.7)] ${className}`}
     >
       {/* Loading / buffering overlay */}
       {(!isReady || isBuffering) && (
-        <div className="absolute inset-0 z-[999] flex items-center justify-center bg-transparent pointer-events-none">
-          <LoaderPinwheel className="animate-spin h-8 w-8 md:h-16 md:w-16 text-pink-400 drop-shadow-lg" />
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 z-[5] flex items-center justify-center bg-slate-950/34 backdrop-blur-[2px] transition-[bottom] duration-200"
+          style={{ bottom: !isTouchDevice ? `${desktopHudHeight}px` : 0 }}
+        >
+          <div
+            className="relative flex h-16 w-16 items-center justify-center rounded-full border border-white/10 bg-black/40 shadow-[0_18px_50px_rgba(2,6,23,0.55)] md:h-24 md:w-24"
+            style={{ transform: !isTouchDevice ? `translateY(${desktopHudHeight / 2}px)` : undefined }}
+          >
+            <div className="absolute inset-1 rounded-full bg-[radial-gradient(circle,rgba(244,114,182,0.25),transparent_70%)]" />
+            <LoaderPinwheel className="relative h-8 w-8 animate-spin text-pink-300 drop-shadow-[0_0_20px_rgba(244,114,182,0.55)] md:h-12 md:w-12" />
+          </div>
         </div>
       )}
 
-      <div
-        ref={containerRef}
-        className={
-          isIOS
-            ? "relative w-full aspect-video bg-black [transform:translateZ(0)]"
-            : isFullscreen
-              ? "fixed left-0 top-0 w-[100vw] h-[100vh] bg-black z-50 box-border flex items-center justify-center"
-              : "relative w-full aspect-video bg-black [transform:translateZ(0)]"
-        }
+        <div
+          ref={containerRef}
+          className={
+            isIOS
+              ? "relative w-full aspect-video overflow-hidden bg-black [transform:translateZ(0)]"
+              : isFullscreen
+                ? "fixed left-0 top-0 z-50 box-border flex h-[100vh] w-[100vw] items-center justify-center overflow-hidden bg-black"
+                : "relative w-full aspect-video overflow-hidden bg-black [transform:translateZ(0)]"
+          }
         tabIndex={0}
         onMouseEnter={() => {
           setIsHovering(true);
@@ -1244,10 +1496,16 @@ const NJWPlayerComponent = ({
           }
         }}
         onTouchEnd={() => setIsHovering(false)}
-      >
-        {isIOS && !supportsAspectRatio && (
-          <div style={{ paddingTop: "56.25%" }} />
-        )}
+        >
+          {!isFullscreen && !isTouchDevice && (
+            <>
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(244,114,182,0.16),transparent_30%),radial-gradient(circle_at_bottom,rgba(59,130,246,0.12),transparent_28%)]" />
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-white/10 via-white/[0.04] to-transparent" />
+            </>
+          )}
+          {isIOS && !supportsAspectRatio && (
+            <div style={{ paddingTop: "56.25%" }} />
+          )}
         <div
           id="kana-player"
           ref={playerRef}
@@ -1356,18 +1614,22 @@ const NJWPlayerComponent = ({
         {seekOverlay && (
           <>
             {seekOverlay.type === "back" && (
-              <div className="absolute left-0 top-0 bottom-0 z-[999] flex items-center pl-4 md:pl-8 pointer-events-none">
-                <div className="flex items-center gap-2 bg-gray-700/80 backdrop-blur-sm text-white text-base md:text-lg font-semibold rounded-lg px-3 py-2 shadow-xl animate-fade select-none">
-                  <Rewind className="h-6 w-6 md:h-8 md:w-8 text-pink-400 animate-bounce-left" />
+              <div className="absolute left-0 top-0 bottom-0 z-[15] flex items-center pl-4 md:pl-8 pointer-events-none">
+                <div className="animate-fade select-none rounded-2xl border border-white/10 bg-slate-900/78 px-4 py-2.5 text-base font-semibold text-white shadow-[0_18px_40px_rgba(2,6,23,0.52)] backdrop-blur-xl md:text-lg">
+                  <div className="flex items-center gap-2">
+                  <Rewind className="h-6 w-6 animate-bounce-left text-pink-300 md:h-8 md:w-8" />
                   <span>Lùi {seekOverlay.seconds} giây</span>
+                  </div>
                 </div>
               </div>
             )}
             {seekOverlay.type === "forward" && (
-              <div className="absolute right-0 top-0 bottom-0 z-[999] flex items-center justify-end pr-4 md:pr-8 pointer-events-none">
-                <div className="flex items-center gap-2 bg-gray-700/80 backdrop-blur-sm text-white text-base md:text-lg font-semibold rounded-lg px-3 py-2 shadow-xl animate-fade select-none">
+              <div className="absolute right-0 top-0 bottom-0 z-[15] flex items-center justify-end pr-4 md:pr-8 pointer-events-none">
+                <div className="animate-fade select-none rounded-2xl border border-white/10 bg-slate-900/78 px-4 py-2.5 text-base font-semibold text-white shadow-[0_18px_40px_rgba(2,6,23,0.52)] backdrop-blur-xl md:text-lg">
+                  <div className="flex items-center gap-2">
                   <span>Tiến {seekOverlay.seconds} giây</span>
-                  <FastForward className="h-6 w-6 md:h-8 md:w-8 text-pink-400 animate-bounce-right" />
+                  <FastForward className="h-6 w-6 animate-bounce-right text-pink-300 md:h-8 md:w-8" />
+                  </div>
                 </div>
               </div>
             )}
@@ -1377,7 +1639,7 @@ const NJWPlayerComponent = ({
         {/* About popup (desktop) */}
         {!isTouchDevice && showAboutMsg && aboutPos && (
           <div
-            className="absolute z-40 rounded-md bg-gray-900/95 text-white text-xs shadow-xl border border-gray-700/60 px-3 py-2 whitespace-nowrap"
+            className="absolute z-40 whitespace-nowrap rounded-2xl border border-white/10 bg-slate-950/92 px-3.5 py-2.5 text-xs text-white shadow-[0_18px_40px_rgba(2,6,23,0.48)] backdrop-blur-xl"
             style={{
               top: aboutPos.y,
               left: aboutPos.x,
@@ -1485,11 +1747,12 @@ const NJWPlayerComponent = ({
 
         {/* Bottom control bar */}
         <div
+          ref={bottomHudRef}
           className={`${isIOS ? "absolute" : isFullscreen ? "fixed" : "absolute"
-            } inset-x-0 bottom-0 z-20 flex flex-col gap-2 text-white transition-opacity duration-300 ${controlsVisible
+            } inset-x-0 bottom-0 z-30 flex flex-col gap-2.5 text-white transition-opacity duration-300 ${controlsVisible
               ? "opacity-100 pointer-events-auto"
               : "opacity-0 pointer-events-none"
-            } bg-gradient-to-t from-black/40 to-transparent px-3 pb-[calc(0.2rem+env(safe-area-inset-bottom))]`}
+            } bg-gradient-to-t from-slate-950/92 via-slate-950/46 to-transparent px-4 pb-[calc(0.55rem+env(safe-area-inset-bottom))] pt-10`}
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           onMouseEnter={() => setIsHoveringControls(true)}
@@ -1510,7 +1773,7 @@ const NJWPlayerComponent = ({
             className={`relative cursor-pointer group ${controlsVisible ? "" : "pointer-events-none"
               }`}
             ref={progressBarRef}
-            style={{ height: isTouchDevice ? 10 : 5 }}
+            style={{ height: isTouchDevice ? 10 : 8 }}
             onMouseMove={(e) => {
               if (!progressBarRef.current) return;
               const rect = progressBarRef.current.getBoundingClientRect();
@@ -1548,7 +1811,6 @@ const NJWPlayerComponent = ({
             onClick={(e) => {
               const p = playerInstance.current;
               if (!p || !duration || !progressBarRef.current) return;
-              if (p.getState?.() === "buffering") return;
               const rect = progressBarRef.current.getBoundingClientRect();
               const x = Math.max(
                 0,
@@ -1614,18 +1876,27 @@ const NJWPlayerComponent = ({
               setTimeout(() => setHoverTime(null), 1200);
             }}
           >
-            <div className="absolute inset-0 bg-gray-600/30 rounded-full transition-all duration-200 group-hover:scale-y-150 origin-center" />
+            <div className="absolute inset-0 rounded-full border border-white/10 bg-white/10 transition-all duration-200 group-hover:scale-y-125 origin-center" />
             <div
-              className="absolute inset-y-0 left-0 bg-gray-400/40 rounded-full transition-all duration-200"
+              className="absolute inset-y-0 left-0 rounded-full bg-white/18 transition-all duration-200"
               style={{ width: `${Math.min(100, bufferedPct)}%` }}
             />
             <div
-              className="absolute inset-y-0 left-0 bg-gradient-to-r from-red-500 to-pink-500 rounded-full transition-all duration-200 group-hover:scale-y-150 origin-center"
+              className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-fuchsia-400 via-pink-400 to-orange-300 shadow-[0_0_18px_rgba(244,114,182,0.45)] transition-all duration-200 group-hover:scale-y-125 origin-center"
               style={{ width: `${Math.min(100, effectivePlayedPct)}%` }}
             />
+            {!isTouchDevice && (
+              <div
+                className="absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full border border-white/80 bg-white shadow-[0_0_20px_rgba(255,255,255,0.5)] transition-transform duration-150 group-hover:scale-110"
+                style={{ left: `calc(${Math.min(100, effectivePlayedPct)}% - 7px)` }}
+              />
+            )}
             {hoverTime && (
               <div
-                className={`absolute -top-8 -translate-x-1/2 bg-gray-900/90 text-white text-xs font-medium rounded-lg px-3 py-1.5 shadow-lg pointer-events-none ${hoverTime ? "opacity-100 scale-100" : "opacity-0 scale-95"
+                className={`pointer-events-none absolute -top-10 -translate-x-1/2 rounded-xl px-3 py-1.5 text-xs font-medium shadow-[0_12px_30px_rgba(2,6,23,0.28)] ${getDesktopTone("time") === "dark"
+                  ? "bg-slate-950/92 text-white"
+                  : "bg-white/88 text-slate-950"
+                  } ${hoverTime ? "opacity-100 scale-100" : "opacity-0 scale-95"
                   } transition-all duration-100 ease-in-out`}
                 style={{ left: hoverTime?.x }}
               >
@@ -1645,6 +1916,7 @@ const NJWPlayerComponent = ({
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
+                        ref={(node) => setDesktopControlRef("play", node)}
                         aria-label={
                           isPlaying ? CONFIG.LABELS.PAUSE : CONFIG.LABELS.PLAY
                         }
@@ -1653,7 +1925,7 @@ const NJWPlayerComponent = ({
                           if (!p) return;
                           isPlaying ? p.pause?.() : p.play?.(true);
                         }}
-                        className="p-2 rounded-full hover:bg-white/15 transition-colors duration-200"
+                        className={getDesktopControlButtonClass("play")}
                       >
                         {isPlaying ? (
                           <PauseIcon className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7" />
@@ -1663,7 +1935,7 @@ const NJWPlayerComponent = ({
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="top" sideOffset={15}>
-                      <div className="bg-gray-900 text-white text-xs font-medium rounded-lg px-3 py-1.5 shadow-lg">
+                      <div className={getDesktopTooltipClass("play")}>
                         {isPlaying ? CONFIG.LABELS.PAUSE : CONFIG.LABELS.PLAY}
                       </div>
                     </TooltipContent>
@@ -1675,8 +1947,9 @@ const NJWPlayerComponent = ({
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
+                        ref={(node) => setDesktopControlRef("backward", node)}
                         aria-label={CONFIG.LABELS.BACK_X(CONFIG.SKIP_SECONDS)}
-                        className="p-2 rounded-full hover:bg-white/15 transition-colors duration-200"
+                        className={getDesktopControlButtonClass("backward")}
                         onClick={() => {
                           seekBy(-CONFIG.SKIP_SECONDS);
                           scheduleControlsAutohide();
@@ -1686,7 +1959,7 @@ const NJWPlayerComponent = ({
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="top" sideOffset={15}>
-                      <div className="bg-gray-900 text-white text-xs font-medium rounded-lg px-3 py-1.5 shadow-lg">
+                      <div className={getDesktopTooltipClass("backward")}>
                         {CONFIG.TOOLTIPS.BACKWARD}
                       </div>
                     </TooltipContent>
@@ -1698,10 +1971,11 @@ const NJWPlayerComponent = ({
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
+                        ref={(node) => setDesktopControlRef("forward", node)}
                         aria-label={CONFIG.LABELS.FORWARD_X(
                           CONFIG.SKIP_SECONDS
                         )}
-                        className="p-2 rounded-full hover:bg-white/15 transition-colors duration-200"
+                        className={getDesktopControlButtonClass("forward")}
                         onClick={() => {
                           seekBy(CONFIG.SKIP_SECONDS);
                           scheduleControlsAutohide();
@@ -1711,7 +1985,7 @@ const NJWPlayerComponent = ({
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="top" sideOffset={15}>
-                      <div className="bg-gray-900 text-white text-xs font-medium rounded-lg px-3 py-1.5 shadow-lg">
+                      <div className={getDesktopTooltipClass("forward")}>
                         {CONFIG.TOOLTIPS.FORWARD}
                       </div>
                     </TooltipContent>
@@ -1724,6 +1998,7 @@ const NJWPlayerComponent = ({
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
+                        ref={(node) => setDesktopControlRef("chapter", node)}
                         aria-label={CONFIG.LABELS.NEXT_CHAPTER}
                         onClick={() => {
                           const p = playerInstance.current;
@@ -1746,13 +2021,13 @@ const NJWPlayerComponent = ({
                             scheduleControlsAutohide();
                           }
                         }}
-                        className="p-2 rounded-full hover:bg-white/15 transition-colors duration-200"
+                        className={getDesktopControlButtonClass("chapter")}
                       >
                         <Flag className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7" />
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="top" sideOffset={15}>
-                      <div className="bg-gray-900 text-white text-xs font-medium rounded-lg px-3 py-1.5 shadow-lg">
+                      <div className={getDesktopTooltipClass("chapter")}>
                         {CONFIG.TOOLTIPS.NEXT_CHAPTER}
                       </div>
                     </TooltipContent>
@@ -1761,7 +2036,10 @@ const NJWPlayerComponent = ({
               )}
 
               {/* Volume */}
-              <div className="group relative flex items-center">
+              <div
+                ref={(node) => setDesktopControlRef("volume", node)}
+                className={getDesktopVolumeGroupClass("volume")}
+              >
                 <button
                   aria-label={CONFIG.LABELS.MUTE}
                   onClick={() => {
@@ -1770,20 +2048,20 @@ const NJWPlayerComponent = ({
                     p.setMute?.(!isMuted);
                     scheduleControlsAutohide();
                   }}
-                  className="p-2 rounded-full hover:bg-white/15 transition-colors duration-200"
+                  className={getDesktopControlButtonClass("volume")}
                 >
                   {isMuted || volume === 0 ? (
-                    <VolumeOff className="h-5 w-5 sm:h-5 sm:w-5 md:h-6 md:w-6 text-white" />
+                    <VolumeOff className={`h-5 w-5 sm:h-5 sm:w-5 md:h-6 md:w-6 ${getDesktopIconToneClass("volume")}`} />
                   ) : !isMuted && volume > 50 ? (
-                    <Volume2 className="h-5 w-5 sm:h-5 sm:w-5 md:h-6 md:w-6 text-white" />
+                    <Volume2 className={`h-5 w-5 sm:h-5 sm:w-5 md:h-6 md:w-6 ${getDesktopIconToneClass("volume")}`} />
                   ) : (
-                    <Volume1 className="h-5 w-5 sm:h-5 sm:w-5 md:h-6 md:w-6 text-white" />
+                    <Volume1 className={`h-5 w-5 sm:h-5 sm:w-5 md:h-6 md:w-6 ${getDesktopIconToneClass("volume")}`} />
                   )}
                 </button>
                 {!isTouchDevice && (
-                  <div className="pl-2 left-12 w-0 group-hover:w-28 opacity-0 group-hover:opacity-100 transition-all duration-300 items-center hidden sm:flex">
-                    <Slider
-                      className="w-24 md:w-28"
+                    <div className="left-12 hidden w-0 items-center pl-0 opacity-0 transition-all duration-300 group-hover:w-28 group-hover:pl-2 group-hover:opacity-100 sm:flex">
+                      <Slider
+                        className="w-24 md:w-28"
                       max={100}
                       step={1}
                       value={[isMuted ? 0 : volume]}
@@ -1806,11 +2084,18 @@ const NJWPlayerComponent = ({
                 )}
               </div>
 
-              <div className="flex items-center gap-1 md:gap-2 text-xs sm:text-sm font-medium text-white/90 select-none">
-                <span>{formatTime(position)}</span>
-                <span className="text-white/50">/</span>
-                <span className="text-white/70">{formatTime(duration)}</span>
-              </div>
+              <button
+                ref={(node) => setDesktopControlRef("time", node)}
+                type="button"
+                onClick={() => setShowRemainingTime((prev) => !prev)}
+                className={getDesktopTimePillClass("time")}
+                aria-label={showRemainingTime ? "Hiển thị thời gian hiện tại" : "Hiển thị thời gian còn lại"}
+                title={showRemainingTime ? "Bấm để hiện thời gian hiện tại" : "Bấm để hiện thời gian còn lại"}
+              >
+                <span className="tabular-nums">{showRemainingTime ? `-${formatTime(remainingTime)}` : formatTime(position)}</span>
+                <span className={getDesktopMutedTextClass("time")}>/</span>
+                <span className={`tabular-nums ${getDesktopSecondaryTextClass("time")}`}>{formatTime(duration)}</span>
+              </button>
             </div>
 
             <div className="flex items-center gap-1 md:gap-3">
@@ -1819,15 +2104,16 @@ const NJWPlayerComponent = ({
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
+                        ref={(node) => setDesktopControlRef("screenshot", node)}
                         aria-label="Capture video frame"
                         onClick={handleCaptureFrame}
-                        className="p-2 rounded-full hover:bg-white/15 transition-colors duration-200"
+                        className={getDesktopControlButtonClass("screenshot")}
                       >
                         <Camera className="h-5 w-5 pb-1 sm:h-5 sm:w-5 md:h-6 md:w-6" />
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="top" sideOffset={15}>
-                      <div className="bg-gray-900 text-white text-xs font-medium rounded-lg px-3 py-1.5 shadow-lg">
+                      <div className={getDesktopTooltipClass("screenshot")}>
                         {CONFIG.TOOLTIPS.SCREENSHOT}
                       </div>
                     </TooltipContent>
@@ -1840,18 +2126,19 @@ const NJWPlayerComponent = ({
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
+                        ref={(node) => setDesktopControlRef("pip", node)}
                         id="pip-button"
                         aria-label={CONFIG.LABELS.PIP}
                         onClick={() => {
                           pipCtrlRef.current?.toggle();
                         }}
-                        className="p-2 rounded-full hover:bg-white/15 transition-colors duration-200"
+                        className={getDesktopControlButtonClass("pip")}
                       >
                         <PictureInPicture2 className="h-5 w-5 sm:h-5 sm:w-5 md:h-6 md:w-6" />
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="top" sideOffset={15}>
-                      <div className="bg-gray-900 text-white text-xs font-medium rounded-lg px-3 py-1.5 shadow-lg">
+                      <div className={getDesktopTooltipClass("pip")}>
                         {CONFIG.TOOLTIPS.PIP}
                       </div>
                     </TooltipContent>
@@ -1861,9 +2148,10 @@ const NJWPlayerComponent = ({
 
               {/* Fullscreen */}
               <button
+                ref={(node) => setDesktopControlRef("fullscreen", node)}
                 aria-label={CONFIG.LABELS.FULLSCREEN}
                 onClick={() => controllerRef.current?.toggle()}
-                className="p-2 rounded-full hover:bg-white/15 transition-colors duration-200"
+                className={getDesktopControlButtonClass("fullscreen")}
               >
                 <div className="transition-opacity duration-300 ease-in-out">
                   {isIOS ? (

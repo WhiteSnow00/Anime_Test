@@ -28,6 +28,7 @@ interface JWPlayerWithResumeProps {
   controls?: boolean;
   onLoad?: () => void;
   onError?: (error: string) => void;
+  onHudHeightChange?: (height: number) => void;
   className?: string;
   chapters?: number[];
 }
@@ -51,6 +52,7 @@ export function JWPlayerWithResume({
   controls = true,
   onLoad,
   onError,
+  onHudHeightChange,
   className = "",
   chapters = [],
 }: JWPlayerWithResumeProps) {
@@ -402,6 +404,7 @@ export function JWPlayerWithResume({
         controls={controls}
         onLoad={handlePlayerLoad}
         onError={onError}
+        onHudHeightChange={onHudHeightChange}
         className={className}
         chapters={chapters}
       />

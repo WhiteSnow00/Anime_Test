@@ -89,6 +89,7 @@ function VideoPlayerComponent({
   const viewport = useViewport();
   const [isHydrated, setIsHydrated] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [desktopHudHeight, setDesktopHudHeight] = useState(96);
   const [currentServer, setCurrentServer] = useState<ServerType>(server);
   const [triedServers, setTriedServers] = useState<ServerType[]>([]);
   const [retryCount, setRetryCount] = useState(0);
@@ -340,35 +341,42 @@ function VideoPlayerComponent({
     return (
       <div 
         className={cn(
-          "absolute inset-0 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm z-10",
-          isMobileDevice && "backdrop-blur-none bg-background/90"
+          "absolute inset-x-0 top-0 z-[5] flex flex-col items-center justify-center bg-slate-950/74 backdrop-blur-md",
+          isMobileDevice && "bg-background/90 backdrop-blur-none"
         )}
         style={{
+          bottom: !isMobileDevice ? `${desktopHudHeight}px` : 0,
           opacity: overlayProps.opacity,
           transition: overlayProps.transition,
         }}
       >
+        <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-fuchsia-500/10 via-transparent to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
         <div className={cn(
-          "flex flex-col items-center space-y-3",
-          isMobileDevice ? "space-y-2" : "space-y-3"
-        )}>
+          "relative flex flex-col items-center rounded-2xl border border-white/10 bg-black/35 px-6 py-5 shadow-[0_24px_80px_rgba(15,23,42,0.55)] backdrop-blur-xl",
+          isMobileDevice ? "space-y-2 px-4 py-4" : "space-y-3"
+        )}
+        style={{
+          transform: !isMobileDevice ? `translateY(${desktopHudHeight / 2}px)` : undefined,
+        }}>
+          <div className="absolute inset-0 rounded-2xl bg-[radial-gradient(circle_at_top,rgba(244,114,182,0.18),transparent_55%)]" />
           <Loader2 className={cn(
-            "animate-spin text-primary",
+            "relative animate-spin text-pink-300 drop-shadow-[0_0_18px_rgba(244,114,182,0.55)]",
             isMobileDevice ? "h-6 w-6" : "h-8 w-8"
           )} />
           <div className={cn(
-            "text-muted-foreground text-center px-2",
+            "relative px-2 text-center font-medium tracking-[0.02em] text-slate-200/92",
             isMobileDevice ? "text-xs" : "text-sm"
           )}>
             Đang tải {episodeTitle}...
           </div>
           {transitionState.transitionPhase !== 'idle' && (
             <div className={cn(
-              "bg-muted rounded-full overflow-hidden",
+              "relative overflow-hidden rounded-full border border-white/10 bg-white/10",
               isMobileDevice ? "w-16 h-0.5" : "w-24 h-1"
             )}>
               <div 
-                className="h-full bg-primary transition-all duration-300 ease-out"
+                className="h-full bg-gradient-to-r from-fuchsia-400 via-pink-400 to-orange-300 transition-all duration-300 ease-out"
                 style={{ width: `${transitionComputed.transitionProgress}%` }}
               />
             </div>
@@ -380,24 +388,41 @@ function VideoPlayerComponent({
 
   LoadingOverlay.displayName = 'LoadingOverlay';
 
+  const isDesktopPlayer = !viewport.isMobile;
+
   return (
-    <Card className={cn("w-full overflow-hidden shadow-lg rounded-lg transition-all duration-300", className)}>
+    <Card
+      className={cn(
+        "w-full overflow-hidden rounded-[1.4rem] border border-white/10 bg-slate-950/88 shadow-[0_28px_80px_rgba(2,6,23,0.6)] transition-all duration-300",
+        isDesktopPlayer && "ring-1 ring-fuchsia-400/10 before:pointer-events-none before:absolute before:inset-x-10 before:top-0 before:h-28 before:bg-[radial-gradient(circle_at_top,rgba(244,114,182,0.18),transparent_70%)] before:content-['']",
+        className
+      )}
+    >
       <div 
         className={cn(
-          "aspect-video bg-muted relative",
+          "relative aspect-video overflow-hidden bg-slate-950",
+          isDesktopPlayer && "bg-[radial-gradient(circle_at_top,rgba(244,114,182,0.12),transparent_30%),linear-gradient(180deg,rgba(15,23,42,0.22),rgba(2,6,23,0.9))]",
           transitionStyles.getContainerClasses()
         )}
       >
+        {isDesktopPlayer && (
+          <>
+            <div className="pointer-events-none absolute inset-0 border border-white/6" />
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-white/6 via-white/[0.03] to-transparent" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/45 via-black/15 to-transparent" />
+          </>
+        )}
         <LoadingOverlay />
         
         {loadError && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-destructive/10 z-20">
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-md">
+            <div className="rounded-2xl border border-red-400/20 bg-black/35 px-6 py-5 shadow-[0_22px_60px_rgba(0,0,0,0.55)] backdrop-blur-xl">
             <AlertCircle className={cn(
-              "text-destructive mb-2",
+              "mb-2 text-red-300",
               viewport.isMobile ? "h-8 w-8" : "h-12 w-12"
             )} />
             <p className={cn(
-              "text-destructive text-center px-4",
+              "px-4 text-center text-red-100/90",
               viewport.isMobile ? "text-xs" : "text-sm"
             )}>
               {viewport.isMobile ? "Lỗi tải video" : "Failed to load video"}
@@ -408,12 +433,13 @@ function VideoPlayerComponent({
                 transitionActions.resetTransition();
               }}
               className={cn(
-                "mt-2 bg-destructive text-destructive-foreground rounded hover:bg-destructive/90 transition-colors",
+                "mt-3 rounded-xl border border-red-300/15 bg-red-500/85 text-white shadow-lg transition-all hover:bg-red-400",
                 viewport.isMobile ? "px-2 py-1 text-xs" : "px-3 py-1 text-xs"
               )}
             >
               {viewport.isMobile ? "Thử lại" : "Retry"}
             </button>
+            </div>
           </div>
         )}
         
@@ -445,6 +471,7 @@ function VideoPlayerComponent({
                 controls={controls}
                 onLoad={handleIframeLoad}
                 onError={handleIframeError}
+                onHudHeightChange={setDesktopHudHeight}
                 className="w-full h-full"
               />
             ) : (
@@ -457,6 +484,7 @@ function VideoPlayerComponent({
                 controls={controls}
                 onLoad={handleIframeLoad}
                 onError={handleIframeError}
+                onHudHeightChange={setDesktopHudHeight}
                 className="w-full h-full"
               />
             );
