@@ -1,5 +1,5 @@
 import AnimePage from "@/components/anime-page";
-import { animeWhaData } from "@/data/anime-wha";
+import { animeWhaData } from "../../data/anime-wha";
 
 export default function WhaPage() {
   return (
