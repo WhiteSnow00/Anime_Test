@@ -19,7 +19,7 @@ out/
 .env.production.local
 
 # Comment system data (keep private)
-data/
+/data/
 comments.json
 
 # Cache files
