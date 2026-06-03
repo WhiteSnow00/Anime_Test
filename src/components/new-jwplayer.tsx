@@ -89,7 +89,7 @@ const JW_PLAYER_SCRIPT_SRC =
  * ===================================================================================*/
 interface JWPlayerProps {
   videoId: string;
-  server: "hls" | "helvid" | "hydax";
+  server: string;
   autoPlay?: boolean;
   muted?: boolean;
   controls?: boolean; // kept for parity, UI is custom
@@ -920,15 +920,30 @@ const NJWPlayerComponent = ({
     if (!isReady || isTouchDevice) return;
 
     const canvas = document.createElement("canvas");
-    canvas.width = 160;
-    canvas.height = 90;
+    canvas.width = 320;
+    canvas.height = 180;
     const context = canvas.getContext("2d", { willReadFrequently: true });
 
     if (!context) return;
 
-    const resolveToneFromLuminance = (
+    const DARK_TO_LIGHT_THRESHOLD = 165;
+    const LIGHT_TO_DARK_THRESHOLD = 135;
+    const SETTLED_MS = 800;
+
+    const resolveToneWithHysteresis = (
+      currentTone: DesktopControlTone,
       luminance: number
-    ): DesktopControlTone => (luminance < 148 ? "dark" : "light");
+    ): DesktopControlTone => {
+      if (currentTone === "dark" && luminance > DARK_TO_LIGHT_THRESHOLD)
+        return "light";
+      if (currentTone === "light" && luminance < LIGHT_TO_DARK_THRESHOLD)
+        return "dark";
+      return currentTone;
+    };
+
+    // Refs for settled timer (survive across intervals)
+    const pendingToneRef: { current: DesktopControlTone | null } = { current: null };
+    const pendingSinceRef: { current: number } = { current: 0 };
 
     const sampleLuminanceAtElement = (
       element: HTMLElement,
@@ -999,45 +1014,53 @@ const NJWPlayerComponent = ({
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
         setDesktopControlTones((previous) => {
-          let changed = false;
-          const next = { ...previous };
-          const clusterSamples: Record<DesktopControlCluster, number[]> = {
-            left: [],
-            right: [],
-          };
+          const samples: number[] = [];
 
           (Object.keys(DESKTOP_CONTROL_CLUSTER_MAP) as DesktopControlKey[]).forEach((key) => {
             const element = desktopControlRefs.current[key];
             if (!element || !element.isConnected) return;
 
             const luminance = sampleLuminanceAtElement(element, videoRect);
-            if (luminance == null) return;
-
-            clusterSamples[DESKTOP_CONTROL_CLUSTER_MAP[key]].push(luminance);
+            if (luminance != null) samples.push(luminance);
           });
 
-          (Object.keys(clusterSamples) as DesktopControlCluster[]).forEach((cluster) => {
-            const samples = clusterSamples[cluster];
-            if (samples.length === 0) return;
+          if (samples.length === 0) return previous;
 
-            const averageLuminance =
-              samples.reduce((sum, value) => sum + value, 0) / samples.length;
-            const nextTone = resolveToneFromLuminance(averageLuminance);
+          const averageLuminance =
+            samples.reduce((sum, value) => sum + value, 0) / samples.length;
 
-            if (next[cluster] !== nextTone) {
-              next[cluster] = nextTone;
-              changed = true;
-            }
-          });
+          // Use left as the unified current tone (left and right are always kept equal)
+          const currentTone = previous.left;
+          const proposedTone = resolveToneWithHysteresis(currentTone, averageLuminance);
 
-          return changed ? next : previous;
+          if (proposedTone === currentTone) {
+            pendingToneRef.current = null;
+            pendingSinceRef.current = 0;
+            return previous;
+          }
+
+          const now = Date.now();
+          if (pendingToneRef.current !== proposedTone) {
+            pendingToneRef.current = proposedTone;
+            pendingSinceRef.current = now;
+            return previous;
+          }
+
+          if (now - pendingSinceRef.current < SETTLED_MS) {
+            return previous;
+          }
+
+          // Apply unified tone to both clusters
+          pendingToneRef.current = null;
+          pendingSinceRef.current = 0;
+          return { left: proposedTone, right: proposedTone };
         });
       } catch {
         // Ignore sampling failures (e.g. transient cross-origin/decoder states)
       }
     };
 
-    const intervalMs = controlsVisible ? 320 : 720;
+    const intervalMs = controlsVisible ? 1000 : 2000;
     const initialTimeoutId = window.setTimeout(sampleControlThemes, 120);
     const intervalId = window.setInterval(sampleControlThemes, intervalMs);
 
