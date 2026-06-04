@@ -20,7 +20,7 @@ import NJWPlayerComponent from './new-jwplayer';
 
 interface JWPlayerWithResumeProps {
   videoId: string;
-  server: "hls" | "helvid" | "hydax";
+  server: string;
   episodeId: number;
   episodeNumber: number;
   autoPlay?: boolean;

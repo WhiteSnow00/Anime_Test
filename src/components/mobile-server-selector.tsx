@@ -4,14 +4,12 @@ import React, { useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Play, AlertCircle, Download, CloudDownload, PackageOpen } from 'lucide-react';
-import { openDropboxFolder } from '@/lib/download-utils';
+import { Play, AlertCircle, Download, CloudDownload, PackageOpen, HardDrive } from 'lucide-react';
+import { openFolderRedirect, detectDownloadProvider, getDownloadProviderLabel } from '@/lib/download-utils';
 import { cn } from '@/lib/utils';
-import type { SimpleMobileServerType } from './simple-mobile-player';
 import type { Episode } from '@/data/anime';
 
-// Extended type to include HLS for mobile
-export type MobileServerType = SimpleMobileServerType | 'hls';
+export type MobileServerType = string;
 
 interface MobileServerSelectorProps {
   currentServer: MobileServerType;
@@ -20,10 +18,10 @@ interface MobileServerSelectorProps {
   className?: string;
   onDownload: (url: string, filename: string) => void;
   onRawDownload: (url: string, filename: string) => void;
-  dropboxFolderUrl?: string;
+  folderUrl?: string;
 }
 
-const MOBILE_SERVER_CONFIG = {
+const MOBILE_SERVER_CONFIG: Record<string, { name: string; description: string; icon: typeof Play; color: string; priority: number }> = {
   hls: {
     name: 'HLS',
     description: 'Server chính - tốc độ cao',
@@ -45,7 +43,17 @@ const MOBILE_SERVER_CONFIG = {
     color: 'bg-green-500',
     priority: 2,
   },
-} as const;
+};
+
+function getMobileServerConfig(server: string) {
+  return MOBILE_SERVER_CONFIG[server] ?? {
+    name: server.charAt(0).toUpperCase() + server.slice(1),
+    description: 'Server',
+    icon: Play,
+    color: 'bg-orange-500',
+    priority: 99,
+  };
+}
 
 export function MobileServerSelector({
   currentServer,
@@ -54,18 +62,9 @@ export function MobileServerSelector({
   className,
   onDownload,
   onRawDownload,
-  dropboxFolderUrl
+  folderUrl
 }: MobileServerSelectorProps) {
-  const allServers: MobileServerType[] = ['hls', 'helvid', 'hydax'];
-
-  const isServerAvailable = (server: MobileServerType): boolean => {
-    return Boolean(currentEpisode.servers[server as keyof typeof currentEpisode.servers]);
-  };
-
-  // Filter servers to only show available ones
-  const availableServers = allServers.filter(server => 
-    isServerAvailable(server)
-  );
+  const availableServers = Object.keys(currentEpisode.servers || {});
 
   const handleDownload = useCallback(() => {
     if (!currentEpisode?.downloadUrl) return;
@@ -104,10 +103,10 @@ export function MobileServerSelector({
             availableServers.length === 2 ? "grid-cols-2" : "grid-cols-3"
           )}>
             {availableServers.map((server) => {
-              const config = MOBILE_SERVER_CONFIG[server];
+              const config = getMobileServerConfig(server);
               const status = getServerStatus(server);
               const Icon = config.icon;
-              
+
               return (
                 <Button
                   key={server}
@@ -138,36 +137,71 @@ export function MobileServerSelector({
         {currentEpisode?.downloadUrl && (
           <Button
             variant="outline"
-            className="w-full mt-3 flex items-center gap-2 bg-purple-500 text-white hover:bg-purple-600 border-purple-500"
+            className={cn(
+              "w-full mt-3 flex items-center gap-2",
+              detectDownloadProvider(currentEpisode.downloadUrl) === 'googleDrive'
+                ? "bg-green-600 text-white hover:bg-green-700 border-green-600"
+                : detectDownloadProvider(currentEpisode.downloadUrl) === 'dropbox'
+                ? "bg-purple-500 text-white hover:bg-purple-600 border-purple-500"
+                : "bg-blue-500 text-white hover:bg-blue-600 border-blue-500"
+            )}
             onClick={handleDownload}
             aria-label="Tải về anime sub"
           >
-            <PackageOpen className="h-4 w-4" />
-            <span>Tải về (Sub)</span>
+            {detectDownloadProvider(currentEpisode.downloadUrl) === 'googleDrive' ? (
+              <HardDrive className="h-4 w-4" />
+            ) : detectDownloadProvider(currentEpisode.downloadUrl) === 'dropbox' ? (
+              <PackageOpen className="h-4 w-4" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            <span>{getDownloadProviderLabel(detectDownloadProvider(currentEpisode.downloadUrl))} (Sub)</span>
           </Button>
         )}
         {currentEpisode?.rawDownloadUrl && (
           <Button
             variant="outline"
-            className="w-full mt-2 flex items-center gap-2 bg-gray-500 text-white hover:bg-gray-600 border-gray-500"
+            className={cn(
+              "w-full mt-2 flex items-center gap-2",
+              detectDownloadProvider(currentEpisode.rawDownloadUrl) === 'googleDrive'
+                ? "bg-green-600 text-white hover:bg-green-700 border-green-600"
+                : detectDownloadProvider(currentEpisode.rawDownloadUrl) === 'dropbox'
+                ? "bg-gray-500 text-white hover:bg-gray-600 border-gray-500"
+                : "bg-gray-500 text-white hover:bg-gray-600 border-gray-500"
+            )}
             onClick={handleRawDownload}
             aria-label="Tải về anime raw"
           >
-            <Download className="h-4 w-4" />
-            <span>Tải về (RAW)</span>
+            {detectDownloadProvider(currentEpisode.rawDownloadUrl) === 'googleDrive' ? (
+              <HardDrive className="h-4 w-4" />
+            ) : detectDownloadProvider(currentEpisode.rawDownloadUrl) === 'dropbox' ? (
+              <PackageOpen className="h-4 w-4" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            <span>{getDownloadProviderLabel(detectDownloadProvider(currentEpisode.rawDownloadUrl))} (RAW)</span>
           </Button>
         )}
-        {/* Always-visible Dropbox Folder button */}
+        {/* Always-visible Folder button */}
         <Button
           variant="outline"
-          className="w-full mt-2 mb-3 flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700 border-blue-600"
-          onClick={() => { if (dropboxFolderUrl) { openDropboxFolder(dropboxFolderUrl, 'Dropbox (toàn bộ)', currentEpisode?.id); }}}
-          aria-label="Mở thư mục Dropbox chứa tất cả tập"
-          disabled={!dropboxFolderUrl}
-          title={dropboxFolderUrl ? 'Mở thư mục Dropbox' : 'Chưa có link Dropbox'}
+          className={cn(
+            "w-full mt-2 mb-3 flex items-center gap-2",
+            detectDownloadProvider(folderUrl || '') === 'googleDrive'
+              ? "bg-green-600 text-white hover:bg-green-700 border-green-600"
+              : "bg-blue-600 text-white hover:bg-blue-700 border-blue-600"
+          )}
+          onClick={() => { if (folderUrl) { openFolderRedirect(folderUrl, getDownloadProviderLabel(detectDownloadProvider(folderUrl)) + ' (toàn bộ)', currentEpisode?.id); }}}
+          aria-label="Mở thư mục chứa tất cả tập"
+          disabled={!folderUrl}
+          title={folderUrl ? 'Mở thư mục' : 'Chưa có link thư mục'}
         >
-          <PackageOpen className="h-4 w-4" />
-          <span>Tải về (Dropbox - toàn bộ)</span>
+          {detectDownloadProvider(folderUrl || '') === 'googleDrive' ? (
+            <HardDrive className="h-4 w-4" />
+          ) : (
+            <PackageOpen className="h-4 w-4" />
+          )}
+          <span>Tải về ({getDownloadProviderLabel(detectDownloadProvider(folderUrl || ''))} - toàn bộ)</span>
         </Button>
         {/* <div className="mt-3 text-xs text-muted-foreground text-center">
           <p>Chỉ dành cho thiết bị di động. Sử dụng PC để có thêm tùy chọn server.</p>

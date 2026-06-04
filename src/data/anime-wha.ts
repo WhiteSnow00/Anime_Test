@@ -15,7 +15,7 @@ export const animeWhaData: Anime = {
   studio: '',
   rating: 5,
   duration: '24 phút/tập',
-  dropboxFolderUrl: 'https://www.dropbox.com/scl/fo/mqch14xk71dxnxpj0nijf/AL6-YqbZL0ZB0o4a4u4uBWc?rlkey=ztlp3sap4eoskadebjei8lord&e=1&st=rkkektj7&dl=0',
+  folderUrl: 'https://www.dropbox.com/scl/fo/mqch14xk71dxnxpj0nijf/AL6-YqbZL0ZB0o4a4u4uBWc?rlkey=ztlp3sap4eoskadebjei8lord&e=1&st=rkkektj7&dl=0',
   episodes: [
     {
       id: 1,

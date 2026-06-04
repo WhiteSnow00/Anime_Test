@@ -8,18 +8,19 @@ import { withPerformanceOptimization, withErrorBoundary } from '@/lib/higher-ord
 import { performanceUtils } from '@/lib/advanced-utils';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { 
-  recordServerError, 
+import {
+  recordServerError,
   getErrorMessage,
   getNextFallbackServer,
-  createIframeErrorDetector
+  createIframeErrorDetector,
+  generateVideoUrl
 } from '@/lib/video-server-utils';
 import { animeData } from '@/data/anime';
 import NJWPlayerComponent from './new-jwplayer';
 import JWPlayerWithResume from './jwplayer-with-resume';
 import { isFeatureEnabled } from '@/lib/feature-flags';
 
-export type ServerType = 'hls' | 'helvid' | 'hydax';
+export type ServerType = string;
 
 // Helper function to get episode data by various identifiers, including HLS filenames
 const getEpisodeData = (idOrUrl: string) => {
@@ -27,15 +28,14 @@ const getEpisodeData = (idOrUrl: string) => {
   let ep = animeData.episodes.find(ep =>
     ep.videoId === idOrUrl ||
     ep.id.toString().padStart(2, '0') === idOrUrl ||
-    ep.servers.helvid === idOrUrl ||
-    ep.servers.hydax === idOrUrl
+    Object.values(ep.servers).includes(idOrUrl)
   );
   if (ep) return ep;
 
   // HLS filename match (e.g., 'Tập5.m3u8' or path that ends with it)
   if (idOrUrl.includes('.m3u8')) {
     const basename = idOrUrl.split('/').pop() || idOrUrl;
-    ep = animeData.episodes.find(e => e.servers.hls === idOrUrl || e.servers.hls === basename);
+    ep = animeData.episodes.find(e => e.servers['hls'] === idOrUrl || e.servers['hls'] === basename);
     if (ep) return ep;
   }
   return undefined;
@@ -102,13 +102,13 @@ function VideoPlayerComponent({
     }
     
     const episodeData = getEpisodeData(inputVideoId);
-    if (episodeData?.servers.hls) {
-  console.warn(`Found HLS for ${inputVideoId}: ${episodeData.servers.hls}`);
-      return episodeData.servers.hls;
+    if (episodeData?.servers['hls']) {
+  console.warn(`Found HLS for ${inputVideoId}: ${episodeData.servers['hls']}`);
+      return episodeData.servers['hls'];
     }
-    
+
     console.warn(`Could not determine HLS filename for videoId: ${inputVideoId}, defaulting to first episode`);
-    return animeData.episodes[0]?.servers.hls || 'Tập1.m3u8';
+    return animeData.episodes[0]?.servers['hls'] || 'Tập1.m3u8';
   }, []);
 
   const {
@@ -157,10 +157,8 @@ function VideoPlayerComponent({
     const serverId = episodeData?.servers[currentServer];
     
     let videoUrl = '';
-    if (currentServer === 'helvid' && serverId) {
-      videoUrl = `https://helvid.net/play/index/${serverId}`;
-    } else if (currentServer === 'hydax' && serverId) {
-      videoUrl = `https://short.icu/${serverId}`;
+    if (serverId) {
+      videoUrl = generateVideoUrl(currentServer, serverId);
     }
     
   console.warn(`Generated iframe URL for ${currentServer}: ${videoUrl}`);

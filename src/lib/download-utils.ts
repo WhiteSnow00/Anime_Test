@@ -1,5 +1,25 @@
 "use client";
 
+export type DownloadProvider = 'dropbox' | 'googleDrive' | 'direct';
+
+export function detectDownloadProvider(url: string): DownloadProvider {
+  if (!url) return 'direct';
+  if (url.includes('dropbox.com')) return 'dropbox';
+  if (url.includes('drive.google.com') || url.includes('google.com/file/d/')) return 'googleDrive';
+  return 'direct';
+}
+
+export function getDownloadProviderLabel(provider: DownloadProvider): string {
+  switch (provider) {
+    case 'dropbox':
+      return 'Dropbox';
+    case 'googleDrive':
+      return 'Google Drive';
+    default:
+      return 'Tải về';
+  }
+}
+
 export function saveEpisodePosition(episodeId: number): void {
   try {
     if (typeof window !== 'undefined') {
@@ -72,6 +92,10 @@ export function openDropboxFolder(url: string, label: string = 'Thư mục Dropb
     console.error('Failed to navigate to folder redirect page:', error);
     window.open(url, '_blank', 'noopener,noreferrer');
   }
+}
+
+export function openFolderRedirect(url: string, label: string = 'Thư mục', episodeId?: number): void {
+  openDropboxFolder(url, label, episodeId);
 }
 
 export function triggerDownload(url: string, filename?: string): void {

@@ -83,15 +83,15 @@ function AnimePageComponent({ animeData = defaultAnimeData, animeSlug }: { anime
     const firstEpisode = animeData.episodes[0];
     if (!firstEpisode) return "hls";
     // Always prioritize HLS first as it's the best for mobile and general use
-    if (firstEpisode.servers.hls) {
+    if (firstEpisode.servers['hls']) {
       console.log("🎭 DEFAULT SERVER: HLS (has HLS data)");
       return "hls";
     }
-    if (firstEpisode.servers.helvid) {
+    if (firstEpisode.servers['helvid']) {
       console.log("🎭 DEFAULT SERVER: helvid (no HLS data)");
       return "helvid";
     }
-    if (firstEpisode.servers.hydax) {
+    if (firstEpisode.servers['hydax']) {
       console.log("🎭 DEFAULT SERVER: hydax (no HLS/helvid data)");
       return "hydax";
     }
@@ -121,9 +121,9 @@ function AnimePageComponent({ animeData = defaultAnimeData, animeSlug }: { anime
         return currentVideoId;
       }
       // Return first available server video ID
-      if (episode.servers.hls) return episode.servers.hls;
-      if (episode.servers.helvid) return episode.servers.helvid;
-      if (episode.servers.hydax) return episode.servers.hydax;
+      if (episode.servers['hls']) return episode.servers['hls'];
+      if (episode.servers['helvid']) return episode.servers['helvid'];
+      if (episode.servers['hydax']) return episode.servers['hydax'];
       return "";
     },
     [currentServer]
@@ -173,7 +173,7 @@ function AnimePageComponent({ animeData = defaultAnimeData, animeSlug }: { anime
           error.includes("hls") &&
           (error.includes("404") || error.includes("network"))
         ) {
-          const helvidId = currentEpisode.servers.helvid;
+          const helvidId = currentEpisode.servers['helvid'];
           if (helvidId) {
             console.log(
               "HLS server failed with critical error, falling back to Helvid"
@@ -208,11 +208,11 @@ function AnimePageComponent({ animeData = defaultAnimeData, animeSlug }: { anime
   useEffect(() => {
     const firstEpisode = animeData.episodes[0];
     if (!firstEpisode) return;
-    if (firstEpisode.servers.hls) {
+    if (firstEpisode.servers['hls']) {
       setCurrentServer("hls");
-    } else if (firstEpisode.servers.helvid) {
+    } else if (firstEpisode.servers['helvid']) {
       setCurrentServer("helvid");
-    } else if (firstEpisode.servers.hydax) {
+    } else if (firstEpisode.servers['hydax']) {
       setCurrentServer("hydax");
     }
   }, [viewport?.isActualMobile]);
@@ -230,18 +230,18 @@ function AnimePageComponent({ animeData = defaultAnimeData, animeSlug }: { anime
       // Set server based on device type and availability
       if (viewport.isActualMobile) {
         // For actual mobile devices, prefer HLS as the primary server
-        if (episode.servers.hls) {
+        if (episode.servers['hls']) {
           setCurrentServer("hls");
-        } else if (episode.servers.helvid) {
+        } else if (episode.servers['helvid']) {
           setCurrentServer("helvid");
-        } else if (episode.servers.hydax) {
+        } else if (episode.servers['hydax']) {
           setCurrentServer("hydax");
         }
-      } else if (viewport.isDesktop && episode.servers.hls) {
+      } else if (viewport.isDesktop && episode.servers['hls']) {
         setCurrentServer("hls");
-      } else if (episode.servers.helvid) {
+      } else if (episode.servers['helvid']) {
         setCurrentServer("helvid");
-      } else if (episode.servers.hydax) {
+      } else if (episode.servers['hydax']) {
         setCurrentServer("hydax");
       }
 
@@ -430,7 +430,7 @@ function AnimePageComponent({ animeData = defaultAnimeData, animeSlug }: { anime
           currentEpisode={currentEpisode}
           onDownload={handleMobileDownload}
           onRawDownload={handleMobileRawDownload}
-          dropboxFolderUrl={animeData.dropboxFolderUrl}
+          folderUrl={animeData.folderUrl}
         />
       );
     }
@@ -440,7 +440,7 @@ function AnimePageComponent({ animeData = defaultAnimeData, animeSlug }: { anime
         currentServer={currentServer}
         onServerChange={handleServerChange}
         currentEpisode={currentEpisode}
-        dropboxFolderUrl={animeData.dropboxFolderUrl}
+        folderUrl={animeData.folderUrl}
       />
     );
   }, [

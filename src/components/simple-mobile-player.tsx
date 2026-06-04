@@ -6,15 +6,14 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { animeData } from '@/data/anime';
 
-export type SimpleMobileServerType = 'hls' | 'helvid' | 'hydax';
+export type SimpleMobileServerType = string;
 
 // Helper function to get episode data by videoId or episode number
 const getEpisodeData = (videoId: string) => {
   return animeData.episodes.find(ep =>
     ep.videoId === videoId ||
     ep.id.toString().padStart(2, '0') === videoId ||
-    ep.servers.helvid === videoId ||
-    ep.servers.hydax === videoId
+    Object.values(ep.servers).includes(videoId)
   );
 };
 
@@ -49,7 +48,7 @@ export function SimpleMobilePlayer({
       // or get the HLS server data from episode
       let hlsFile = videoId;
       if (!videoId.includes('.m3u8')) {
-        hlsFile = episodeData?.servers.hls || videoId;
+        hlsFile = episodeData?.servers['hls'] || videoId;
       }
 
       if (hlsFile.startsWith('/')) {

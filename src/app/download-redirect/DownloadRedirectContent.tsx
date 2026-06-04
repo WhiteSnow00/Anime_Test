@@ -12,8 +12,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { isH265Episode } from "@/data/anime";
-import { set } from "mongoose";
-import { clearEpisodePosition } from "@/lib/download-utils";
+import { clearEpisodePosition, detectDownloadProvider, getDownloadProviderLabel } from "@/lib/download-utils";
 
 export default function DownloadRedirectContent() {
   const searchParams = useSearchParams();
@@ -30,6 +29,8 @@ export default function DownloadRedirectContent() {
   const isH265 =
     type === "raw" || type === "folder" ? false : isH265Episode(episodeId);
   const isFolder = type === "folder";
+  const provider = detectDownloadProvider(url || "");
+  const providerLabel = getDownloadProviderLabel(provider);
 
   const isBackForwardRef = useRef(false);
 
@@ -111,7 +112,7 @@ export default function DownloadRedirectContent() {
               {type === "raw"
                 ? "Phim RAW (Không phụ đề)"
                 : isFolder
-                ? "Thư mục Dropbox"
+                ? `${providerLabel} (Thư mục)`
                 : "Phim có phụ đề"}
               : {filename}
             </p>
@@ -149,7 +150,7 @@ export default function DownloadRedirectContent() {
                   </h3>
                   <p className="text-sm text-yellow-700 dark:text-yellow-300 leading-relaxed vietnamese-text">
                     Nếu mở lỗi/trắng trang, thử trình duyệt khác hoặc dán URL
-                    trực tiếp; đảm bảo đã đăng nhập Dropbox.
+                    trực tiếp; đảm bảo đã đăng nhập {providerLabel}.
                   </p>
                   <div className="flex items-center gap-2 text-xs text-yellow-600 dark:text-yellow-400">
                     <ExternalLink className="w-4 h-4" />
@@ -195,7 +196,7 @@ export default function DownloadRedirectContent() {
             <div className="text-center space-y-4">
               <div className="flex items-center justify-center gap-2 text-lg font-semibold text-green-600 dark:text-green-400">
                 <ExternalLink className="w-5 h-5 animate-pulse" />
-                <span>Đang chuyển hướng đến Dropbox...</span>
+                <span>Đang chuyển hướng đến {providerLabel}...</span>
               </div>
               <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                 <div

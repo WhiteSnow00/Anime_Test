@@ -1,4 +1,4 @@
-export type ServerType = 'hls' | 'helvid' | 'hydax';
+export type ServerType = string;
 export type ServerStatus = 'online' | 'offline' | 'error' | 'checking';
 
 export interface VideoServerError {
@@ -15,13 +15,13 @@ export interface ServerConfig {
   baseUrl: string;
   timeout: number;
   maxRetries: number;
-  fallbackServers: ServerType[];
+  fallbackServers: string[];
 }
 
-export const SERVER_CONFIGS: Record<ServerType, ServerConfig> = {
+export const SERVER_CONFIGS: Record<string, ServerConfig> = {
   hls: {
     name: 'HLS Stream',
-    priority: 1, // Primary server
+    priority: 1,
     baseUrl: '/api/hls',
     timeout: 10000,
     maxRetries: 3,
@@ -29,19 +29,27 @@ export const SERVER_CONFIGS: Record<ServerType, ServerConfig> = {
   },
   helvid: {
     name: 'Helvid',
-    priority: 2, // Backup server
+    priority: 2,
     baseUrl: 'https://helvid.net/play/index/',
-    timeout: 15000, // Increased timeout for iframe loading
-    maxRetries: 1, // Reduce retries for external servers
+    timeout: 15000,
+    maxRetries: 1,
     fallbackServers: ['hls', 'hydax'],
   },
   hydax: {
     name: 'Hydax',
-    priority: 3, // Last fallback
+    priority: 3,
     baseUrl: 'https://short.icu/',
-    timeout: 15000, // Increased timeout for iframe loading
-    maxRetries: 1, // Reduce retries for external servers
+    timeout: 15000,
+    maxRetries: 1,
     fallbackServers: ['hls', 'helvid'],
+  },
+  hv: {
+    name: 'HV',
+    priority: 4,
+    baseUrl: 'https://video.hian.software/embed/',
+    timeout: 15000,
+    maxRetries: 1,
+    fallbackServers: ['hls', 'helvid', 'hydax'],
   },
 };
 
@@ -50,7 +58,7 @@ const serverErrors = new Map<string, VideoServerError>();
 const serverStatus = new Map<ServerType, ServerStatus>();
 
 export function generateVideoUrl(
-  server: ServerType,
+  server: string,
   videoId: string,
   options?: {
     autoPlay?: boolean;
@@ -60,22 +68,22 @@ export function generateVideoUrl(
   }
 ): string {
   const config = SERVER_CONFIGS[server];
-  
+
+  if (!config) {
+    // Unknown server: assume videoId is already a full URL or path
+    console.log(`Using direct URL for unknown server ${server}: ${videoId}`);
+    return videoId;
+  }
+
   let generatedUrl;
 
   switch (server) {
     case 'hls':
       generatedUrl = `${config.baseUrl}?file=${videoId}`;
       break;
-    case 'helvid':
-      generatedUrl = `${config.baseUrl}${videoId}`;
-      break;
-    case 'hydax':
-      generatedUrl = `${config.baseUrl}${videoId}`;
-      break;
     default:
-      console.error(`Unknown server type: ${server}`);
-      return '';
+      generatedUrl = `${config.baseUrl}${videoId}`;
+      break;
   }
 
   console.log(`Generated video URL for ${server}: ${generatedUrl}`);
@@ -104,11 +112,11 @@ export async function checkVideoUrl(url: string, timeout: number = 5000): Promis
   }
 }
 
-export function getServerStatus(server: ServerType): ServerStatus {
+export function getServerStatus(server: string): ServerStatus {
   return serverStatus.get(server) || 'checking';
 }
 
-export function updateServerStatus(server: ServerType, status: ServerStatus) {
+export function updateServerStatus(server: string, status: ServerStatus) {
   serverStatus.set(server, status);
 }
 
@@ -125,14 +133,14 @@ export function recordServerError(error: VideoServerError) {
   }
 }
 
-export function getServerError(server: ServerType, episodeId: number): VideoServerError | null {
+export function getServerError(server: string, episodeId: number): VideoServerError | null {
   const key = `${server}-${episodeId}`;
   const error = serverErrors.get(key);
-  
+
   if (error && Date.now() - error.timestamp < 300000) { // 5 minutes
     return error;
   }
-  
+
   return null;
 }
 
@@ -146,35 +154,33 @@ export function clearOldErrors() {
 }
 
 export function getNextFallbackServer(
-  currentServer: ServerType,
-  triedServers: ServerType[] = []
-): ServerType | null {
+  currentServer: string,
+  triedServers: string[] = []
+): string | null {
   const config = SERVER_CONFIGS[currentServer];
+  if (!config) return null;
+
   const availableServers = config.fallbackServers.filter(
     (server) => !triedServers.includes(server)
   );
-  
+
   if (availableServers.length === 0) {
     return null;
   }
-  
+
   return availableServers.sort(
-    (a, b) => SERVER_CONFIGS[a].priority - SERVER_CONFIGS[b].priority
+    (a, b) => (SERVER_CONFIGS[a]?.priority ?? 999) - (SERVER_CONFIGS[b]?.priority ?? 999)
   )[0];
 }
 
 export async function findBestServer(
   episode: {
-    servers: {
-      hls?: string;
-      helvid: string;
-      hydax: string;
-    };
+    servers: Record<string, string>;
   },
-  preferredServer?: ServerType
-): Promise<ServerType | null> {
-  const servers: ServerType[] = ['hls', 'helvid', 'hydax'];
-  
+  preferredServer?: string
+): Promise<string | null> {
+  const servers = Object.keys(episode.servers);
+
   if (preferredServer && episode.servers[preferredServer]) {
     const url = generateVideoUrl(preferredServer, episode.servers[preferredServer]!);
     const isWorking = await checkVideoUrl(url, 3000);
@@ -183,18 +189,18 @@ export async function findBestServer(
       return preferredServer;
     }
   }
-  
+
   const sortedServers = servers
-    .filter((s) => s !== preferredServer && episode.servers[s])
-    .sort((a, b) => SERVER_CONFIGS[a].priority - SERVER_CONFIGS[b].priority);
-  
+    .filter((s) => s !== preferredServer)
+    .sort((a, b) => (SERVER_CONFIGS[a]?.priority ?? 999) - (SERVER_CONFIGS[b]?.priority ?? 999));
+
   for (const server of sortedServers) {
     const videoId = episode.servers[server];
     if (!videoId) continue;
-    
+
     const url = generateVideoUrl(server, videoId);
     const isWorking = await checkVideoUrl(url, 3000);
-    
+
     if (isWorking) {
       updateServerStatus(server, 'online');
       return server;
@@ -202,7 +208,7 @@ export async function findBestServer(
       updateServerStatus(server, 'offline');
     }
   }
-  
+
   return null;
 }
 
@@ -239,7 +245,7 @@ export function getErrorMessage(error: VideoServerError, locale: 'vi' | 'en' = '
 
 export function createIframeErrorDetector(
   iframe: HTMLIFrameElement,
-  server: ServerType,
+  server: string,
   videoId: string,
   onError: (error: string) => void
 ): () => void {
@@ -322,38 +328,43 @@ export function createIframeErrorDetector(
 
 export function validateEpisodeServers(episode: {
   id: number;
-  servers: {
-    hls?: string;
-    helvid: string;
-    hydax: string;
-  };
-}): Record<ServerType, boolean> {
-  const validation: Record<ServerType, boolean> = {
-    hls: false,
-    helvid: false,
-    hydax: false,
-  };
-  
-  if (episode.servers.hls && episode.servers.hls.endsWith('.m3u8')) {
-    validation.hls = true;
+  servers: Record<string, string>;
+}): Record<string, boolean> {
+  const validation: Record<string, boolean> = {};
+
+  for (const [server, videoId] of Object.entries(episode.servers)) {
+    if (!videoId) {
+      validation[server] = false;
+      continue;
+    }
+
+    switch (server) {
+      case 'hls':
+        validation[server] = videoId.endsWith('.m3u8');
+        break;
+      case 'helvid':
+        validation[server] = /^[a-f0-9]{12}$/.test(videoId);
+        if (!validation[server]) {
+          console.warn(`Invalid Helvid ID for episode ${episode.id}: ${videoId}`);
+        }
+        break;
+      case 'hydax':
+        validation[server] = /^[a-zA-Z0-9_-]{8,10}$/.test(videoId);
+        if (!validation[server]) {
+          console.warn(`Invalid Hydax ID for episode ${episode.id}: ${videoId}`);
+        }
+        break;
+      default:
+        // Unknown servers: assume valid if non-empty
+        validation[server] = videoId.length > 0;
+        break;
+    }
   }
-  
-  if (episode.servers.helvid && /^[a-f0-9]{12}$/.test(episode.servers.helvid)) {
-    validation.helvid = true;
-  } else {
-    console.warn(`Invalid Helvid ID for episode ${episode.id}: ${episode.servers.helvid}`);
-  }
-  
-  if (episode.servers.hydax && /^[a-zA-Z0-9_-]{8,10}$/.test(episode.servers.hydax)) {
-    validation.hydax = true;
-  } else {
-    console.warn(`Invalid Hydax ID for episode ${episode.id}: ${episode.servers.hydax}`);
-  }
-  
+
   return validation;
 }
 
-export function getServerReliabilityScore(server: ServerType): number {
+export function getServerReliabilityScore(server: string): number {
   const now = Date.now();
   const recentErrors = Array.from(serverErrors.values()).filter(
     (error) => error.server === server && (now - error.timestamp) < 300000 // 5 minutes
@@ -366,24 +377,21 @@ export function getServerReliabilityScore(server: ServerType): number {
 export function getBestAvailableServer(
   episode: {
     id: number;
-    servers: {
-      hls?: string;
-      helvid: string;
-      hydax: string;
-    };
+    servers: Record<string, string>;
   },
-  excludeServers: ServerType[] = []
-): ServerType | null {
-  const availableServers = (['hls', 'helvid', 'hydax'] as ServerType[])
+  excludeServers: string[] = []
+): string | null {
+  const validation = validateEpisodeServers(episode);
+  const availableServers = Object.keys(episode.servers)
     .filter(server => {
-      return !excludeServers.includes(server) && 
-             episode.servers[server] && 
-             validateEpisodeServers(episode)[server];
+      return !excludeServers.includes(server) &&
+             episode.servers[server] &&
+             validation[server];
     })
     .map(server => ({
       server,
       reliability: getServerReliabilityScore(server),
-      priority: SERVER_CONFIGS[server].priority
+      priority: SERVER_CONFIGS[server]?.priority ?? 999
     }))
     .sort((a, b) => {
       if (a.reliability !== b.reliability) {
@@ -391,7 +399,7 @@ export function getBestAvailableServer(
       }
       return a.priority - b.priority;
     });
-  
+
   return availableServers.length > 0 ? availableServers[0].server : null;
 }
 

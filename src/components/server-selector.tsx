@@ -4,13 +4,13 @@ import { memo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { Server, Play, Download, AlertCircle, CheckCircle, PackageOpen } from 'lucide-react';
+import { Server, Play, Download, AlertCircle, CheckCircle, PackageOpen, HardDrive } from 'lucide-react';
 import { withPerformanceOptimization } from '@/lib/higher-order-components';
-import { triggerDownload, isValidDownloadUrl, openDropboxLink, openDropboxFolder } from '@/lib/download-utils';
+import { triggerDownload, isValidDownloadUrl, openDropboxLink, openFolderRedirect, detectDownloadProvider, getDownloadProviderLabel } from '@/lib/download-utils';
 import type { Episode } from '@/data/anime';
 import { getServerStatus, ServerStatus, validateEpisodeServers, getServerReliabilityScore } from '@/lib/video-server-utils';
 
-export type ServerType = 'hls' | 'helvid' | 'hydax';
+export type ServerType = string;
 
 interface ServerSelectorProps {
   currentServer: ServerType;
@@ -18,10 +18,10 @@ interface ServerSelectorProps {
   currentEpisode?: Episode; 
   className?: string;
   serverStatus?: Record<string, ServerStatus>;
-  dropboxFolderUrl?: string;
+  folderUrl?: string;
 }
 
-const serverConfig = {
+const SERVER_CONFIG: Record<string, { name: string; label: string; color: string }> = {
   hls: {
     name: 'HLS Stream',
     label: 'HD Quality',
@@ -37,7 +37,20 @@ const serverConfig = {
     label: 'HD Backup',
     color: 'bg-green-500 hover:bg-green-600',
   },
+  hv: {
+    name: 'Hv',
+    label: 'HD Slow',
+    color: 'bg-green-500 hover:bg-green-600',
+  },
 };
+
+function getServerDisplayConfig(server: string) {
+  return SERVER_CONFIG[server] ?? {
+    name: server.charAt(0).toUpperCase() + server.slice(1),
+    label: 'Server',
+    color: 'bg-orange-500 hover:bg-orange-600',
+  };
+}
 
 function ServerSelectorComponent({ 
   currentServer, 
@@ -45,7 +58,7 @@ function ServerSelectorComponent({
   currentEpisode,
   className,
   serverStatus,
-  dropboxFolderUrl,
+  folderUrl,
 }: ServerSelectorProps) {
   const handleServerSelect = useCallback((server: ServerType) => {
     onServerChange(server);
@@ -63,12 +76,14 @@ function ServerSelectorComponent({
     }
 
     const filename = `Tập ${currentEpisode.id}`;
+    const provider = detectDownloadProvider(currentEpisode.downloadUrl);
 
-    // Check if it's a Dropbox link and handle accordingly
-    if (currentEpisode.downloadUrl.includes('dropbox.com')) {
+    if (provider === 'dropbox') {
       openDropboxLink(currentEpisode.downloadUrl, filename, false, currentEpisode.id);
+    } else if (provider === 'googleDrive') {
+      // Open Google Drive link in new tab
+      window.open(currentEpisode.downloadUrl, '_blank', 'noopener,noreferrer');
     } else {
-      // For other types of links, try direct download
       triggerDownload(currentEpisode.downloadUrl, filename);
     }
   }, [currentEpisode]);
@@ -85,12 +100,13 @@ function ServerSelectorComponent({
     }
 
     const filename = `Tập ${currentEpisode.id} RAW`;
+    const provider = detectDownloadProvider(currentEpisode.rawDownloadUrl);
 
-    // Check if it's a Dropbox link and handle accordingly
-    if (currentEpisode.rawDownloadUrl.includes('dropbox.com')) {
+    if (provider === 'dropbox') {
       openDropboxLink(currentEpisode.rawDownloadUrl, filename, true, currentEpisode.id);
+    } else if (provider === 'googleDrive') {
+      window.open(currentEpisode.rawDownloadUrl, '_blank', 'noopener,noreferrer');
     } else {
-      // For other types of links, try direct download
       triggerDownload(currentEpisode.rawDownloadUrl, filename);
     }
   }, [currentEpisode]);
@@ -107,31 +123,18 @@ function ServerSelectorComponent({
       <CardContent>
         <div className="flex gap-2 sm:gap-3 flex-wrap">
           {/* Server Selection Buttons */}
-          {(Object.keys(serverConfig) as ServerType[]).map((server) => {
-            const config = serverConfig[server];
+          {currentEpisode && Object.keys(currentEpisode.servers).map((server) => {
+            const config = getServerDisplayConfig(server);
             const isActive = currentServer === server;
             const status = serverStatus?.[server] || getServerStatus(server);
-            
+
             // Check server data validation
-            const episodeValidation = currentEpisode ? validateEpisodeServers(currentEpisode) : null;
-            const isValidServer = episodeValidation ? episodeValidation[server] : true;
+            const episodeValidation = validateEpisodeServers(currentEpisode);
+            const isValidServer = episodeValidation[server] ?? true;
             const reliability = getServerReliabilityScore(server);
-            
-            // Hide HLS server if the current episode doesn't have HLS server data
-            if (server === 'hls' && currentEpisode && !currentEpisode.servers.hls) {
-              return null;
-            }
-            
-            // Hide helvid server if the current episode doesn't have helvid server data
-            if (server === 'helvid' && currentEpisode && !currentEpisode.servers.helvid) {
-              return null;
-            }
-            
-            // Hide hydax server if the current episode doesn't have hydax server data
-            if (server === 'hydax' && currentEpisode && !currentEpisode.servers.hydax) {
-              return null;
-            }
-            
+
+            if (!isValidServer) return null;
+
             return (
               <Button
                 key={server}
@@ -140,10 +143,10 @@ function ServerSelectorComponent({
                   "flex items-center gap-2 font-medium transition-all duration-200",
                   "hover:scale-105 active:scale-95 touch-manipulation",
                   "focus:ring-2 focus:ring-primary focus:ring-offset-2",
-                  "text-xs sm:text-sm", 
-                  "px-3 py-2 sm:px-4 sm:py-2", 
-                  isActive 
-                    ? "bg-primary text-primary-foreground shadow-md scale-105" 
+                  "text-xs sm:text-sm",
+                  "px-3 py-2 sm:px-4 sm:py-2",
+                  isActive
+                    ? "bg-primary text-primary-foreground shadow-md scale-105"
                     : "hover:bg-muted",
                 )}
                 onClick={() => handleServerSelect(server)}
@@ -172,17 +175,29 @@ function ServerSelectorComponent({
                 "flex items-center gap-2 font-medium transition-all duration-200",
                 "hover:scale-105 active:scale-95 touch-manipulation",
                 "focus:ring-2 focus:ring-primary focus:ring-offset-2",
-                "text-xs sm:text-sm", 
-                "px-3 py-2 sm:px-4 sm:py-2", 
-                "bg-purple-500 text-white hover:bg-purple-600 border-purple-500",
+                "text-xs sm:text-sm",
+                "px-3 py-2 sm:px-4 sm:py-2",
+                detectDownloadProvider(currentEpisode.downloadUrl) === 'googleDrive'
+                  ? "bg-green-600 text-white hover:bg-green-700 border-green-600"
+                  : detectDownloadProvider(currentEpisode.downloadUrl) === 'dropbox'
+                  ? "bg-purple-500 text-white hover:bg-purple-600 border-purple-500"
+                  : "bg-blue-500 text-white hover:bg-blue-600 border-blue-500",
               )}
               onClick={handleDownload}
-              aria-label="Mở link Dropbox để tải về"
+              aria-label="Tải về anime sub"
             >
-              <PackageOpen className="w-3 h-3 sm:w-4 sm:h-4" />
+              {detectDownloadProvider(currentEpisode.downloadUrl) === 'googleDrive' ? (
+                <HardDrive className="w-3 h-3 sm:w-4 sm:h-4" />
+              ) : detectDownloadProvider(currentEpisode.downloadUrl) === 'dropbox' ? (
+                <PackageOpen className="w-3 h-3 sm:w-4 sm:h-4" />
+              ) : (
+                <Download className="w-3 h-3 sm:w-4 sm:h-4" />
+              )}
               <div className="flex flex-col items-start">
-                <span className="text-xs sm:text-sm font-semibold">Tải về</span>
-                <span className="text-xs opacity-75 hidden sm:block">Dropbox</span>
+                <span className="text-xs sm:text-sm font-semibold">
+                  {getDownloadProviderLabel(detectDownloadProvider(currentEpisode.downloadUrl))}
+                </span>
+                <span className="text-xs opacity-75 hidden sm:block">Sub</span>
               </div>
             </Button>
           )}
@@ -195,21 +210,33 @@ function ServerSelectorComponent({
                 "flex items-center gap-2 font-medium transition-all duration-200",
                 "hover:scale-105 active:scale-95 touch-manipulation",
                 "focus:ring-2 focus:ring-primary focus:ring-offset-2",
-                "text-xs sm:text-sm", 
-                "px-3 py-2 sm:px-4 sm:py-2", 
-                "bg-gray-500 text-white hover:bg-gray-600 border-gray-500",
+                "text-xs sm:text-sm",
+                "px-3 py-2 sm:px-4 sm:py-2",
+                detectDownloadProvider(currentEpisode.rawDownloadUrl) === 'googleDrive'
+                  ? "bg-green-600 text-white hover:bg-green-700 border-green-600"
+                  : detectDownloadProvider(currentEpisode.rawDownloadUrl) === 'dropbox'
+                  ? "bg-gray-500 text-white hover:bg-gray-600 border-gray-500"
+                  : "bg-gray-500 text-white hover:bg-gray-600 border-gray-500",
               )}
               onClick={handleRawDownload}
-              aria-label="Tải phim raw (không phụ đề)"
+              aria-label="Tải về anime raw"
             >
-              <Download className="w-3 h-3 sm:w-4 sm:h-4" />
+              {detectDownloadProvider(currentEpisode.rawDownloadUrl) === 'googleDrive' ? (
+                <HardDrive className="w-3 h-3 sm:w-4 sm:h-4" />
+              ) : detectDownloadProvider(currentEpisode.rawDownloadUrl) === 'dropbox' ? (
+                <PackageOpen className="w-3 h-3 sm:w-4 sm:h-4" />
+              ) : (
+                <Download className="w-3 h-3 sm:w-4 sm:h-4" />
+              )}
               <div className="flex flex-col items-start">
-                <span className="text-xs sm:text-sm font-semibold">RAW</span>
-                <span className="text-xs opacity-75 hidden sm:block">Không Sub</span>
+                <span className="text-xs sm:text-sm font-semibold">
+                  {getDownloadProviderLabel(detectDownloadProvider(currentEpisode.rawDownloadUrl))}
+                </span>
+                <span className="text-xs opacity-75 hidden sm:block">RAW</span>
               </div>
             </Button>
           )}
-          {/* Always-visible Dropbox Folder Button */}
+          {/* Always-visible Folder Button */}
           <Button
             variant="outline"
             className={cn(
@@ -218,17 +245,27 @@ function ServerSelectorComponent({
               "focus:ring-2 focus:ring-primary focus:ring-offset-2",
               "text-xs sm:text-sm",
               "px-3 py-2 sm:px-4 sm:py-2",
-              "bg-blue-600 text-white hover:bg-blue-700 border-blue-600"
+              detectDownloadProvider(folderUrl || '') === 'googleDrive'
+                ? "bg-green-600 text-white hover:bg-green-700 border-green-600"
+                : detectDownloadProvider(folderUrl || '') === 'dropbox'
+                ? "bg-blue-600 text-white hover:bg-blue-700 border-blue-600"
+                : "bg-blue-600 text-white hover:bg-blue-700 border-blue-600"
             )}
-            onClick={() => { if (dropboxFolderUrl) openDropboxFolder(dropboxFolderUrl, 'Dropbox (toàn bộ)', currentEpisode?.id); }}
-            aria-label="Mở thư mục Dropbox chứa tất cả tập"
-            disabled={!dropboxFolderUrl}
-            title={dropboxFolderUrl ? 'Mở thư mục Dropbox' : 'Chưa có link Dropbox'}
+            onClick={() => { if (folderUrl) { openFolderRedirect(folderUrl, getDownloadProviderLabel(detectDownloadProvider(folderUrl)) + ' (toàn bộ)', currentEpisode?.id); }}}
+            aria-label="Mở thư mục chứa tất cả tập"
+            disabled={!folderUrl}
+            title={folderUrl ? 'Mở thư mục' : 'Chưa có link thư mục'}
           >
-            <PackageOpen className="w-3 h-3 sm:w-4 sm:h-4" />
+            {detectDownloadProvider(folderUrl || '') === 'googleDrive' ? (
+              <HardDrive className="w-3 h-3 sm:w-4 sm:h-4" />
+            ) : (
+              <PackageOpen className="w-3 h-3 sm:w-4 sm:h-4" />
+            )}
             <div className="flex flex-col items-start">
               <span className="text-xs sm:text-sm font-semibold">Tải về</span>
-              <span className="text-xs opacity-75 hidden sm:block">Dropbox (toàn bộ)</span>
+              <span className="text-xs opacity-75 hidden sm:block">
+                {getDownloadProviderLabel(detectDownloadProvider(folderUrl || ''))} (toàn bộ)
+              </span>
             </div>
           </Button>
         </div>
