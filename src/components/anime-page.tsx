@@ -301,6 +301,15 @@ function AnimePageComponent({ animeData = defaultAnimeData, animeSlug }: { anime
     scrollActions,
   ]);
 
+  const upcomingEpisode = useMemo(() => {
+    const index = animeData.episodes.findIndex((episode) => episode.id === currentEpisode.id);
+    return index >= 0 ? animeData.episodes[index + 1] : undefined;
+  }, [animeData.episodes, currentEpisode.id]);
+  const nextEpisodeAction = useMemo(() => upcomingEpisode ? {
+    label: `Tập ${upcomingEpisode.id}`,
+    onSelect: () => handleSelectEpisode(upcomingEpisode),
+  } : undefined, [handleSelectEpisode, upcomingEpisode]);
+
   const { episodes, ...animeDetails } = useMemo(() => animeData, []);
 
   const layoutConfig = useMemo(() => {
@@ -355,6 +364,8 @@ function AnimePageComponent({ animeData = defaultAnimeData, animeSlug }: { anime
             videoId={getCurrentVideoId(currentEpisode)}
             server={currentServer}
             episodeTitle={`Tập ${currentEpisode.id}`}
+            episodeId={currentEpisode.id}
+            nextEpisode={nextEpisodeAction}
             autoPlay={true}
             muted={false}
             onError={handleServerError}
@@ -383,6 +394,8 @@ function AnimePageComponent({ animeData = defaultAnimeData, animeSlug }: { anime
         videoId={getCurrentVideoId(currentEpisode)}
         server={currentServer}
         episodeTitle={`Tập ${currentEpisode.id}`}
+        episodeId={currentEpisode.id}
+        nextEpisode={nextEpisodeAction}
         autoPlay={true}
         muted={false}
         onError={handleServerError}
@@ -399,6 +412,8 @@ function AnimePageComponent({ animeData = defaultAnimeData, animeSlug }: { anime
     currentServer,
     currentEpisode,
     handleServerError,
+    getCurrentVideoId,
+    nextEpisodeAction,
   ]);
 
   // Switch to mobile server selector for actual mobile devices

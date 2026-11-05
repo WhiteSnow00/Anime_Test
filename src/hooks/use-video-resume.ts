@@ -32,6 +32,9 @@ interface UseVideoResumeOptions {
   
   /** Video duration in seconds (for completion detection) */
   duration?: number;
+
+  /** Only decide resume eligibility after the media is actually seekable. */
+  mediaReady?: boolean;
   
   /** Callback when resume is triggered */
   onResume?: (time: number) => void;
@@ -67,6 +70,7 @@ export function useVideoResume({
   episodeId,
   user,
   duration,
+  mediaReady = true,
   onResume,
 }: UseVideoResumeOptions): UseVideoResumeReturn {
   const [savedProgress, setSavedProgress] = useState<EpisodeProgress | null>(null);
@@ -104,7 +108,7 @@ export function useVideoResume({
 
   // Check if we should show resume dialog
   useEffect(() => {
-    if (!isFeatureActive || hasCheckedResume || !savedProgress) return;
+    if (!isFeatureActive || !mediaReady || !duration || !Number.isFinite(duration) || hasCheckedResume || !savedProgress) return;
 
     const { time, declined } = savedProgress;
 
@@ -155,6 +159,7 @@ export function useVideoResume({
     hasCheckedResume,
     savedProgress,
     duration,
+    mediaReady,
     MIN_THRESHOLD,
     MAX_PERCENTAGE,
   ]);

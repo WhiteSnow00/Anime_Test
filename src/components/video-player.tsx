@@ -19,6 +19,7 @@ import { animeData } from '@/data/anime';
 import NJWPlayerComponent from './new-jwplayer';
 import JWPlayerWithResume from './jwplayer-with-resume';
 import { isFeatureEnabled } from '@/lib/feature-flags';
+import type { NextEpisodeAction } from '@/lib/player-media';
 
 export type ServerType = string;
 
@@ -71,6 +72,8 @@ interface VideoPlayerProps {
   onLoad?: () => void;
   onError?: (error: string) => void;
   episodeTitle?: string;
+  episodeId?: number;
+  nextEpisode?: NextEpisodeAction;
   className?: string;
 }
 
@@ -83,6 +86,8 @@ function VideoPlayerComponent({
   onLoad,
   onError,
   episodeTitle = 'Episode',
+  episodeId,
+  nextEpisode,
   className 
 }: VideoPlayerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -462,8 +467,9 @@ function VideoPlayerComponent({
                 key={`resume-${currentServer}-${currentVideoId}`}
                 videoId={hlsVideoId}
                 server={currentServer}
-                episodeId={(episodeData?.id ?? Number.parseInt(currentVideoId)) || 0}
-                episodeNumber={(episodeData?.id ?? Number.parseInt(currentVideoId)) || 0}
+                episodeId={episodeId ?? ((episodeData?.id ?? Number.parseInt(currentVideoId)) || 0)}
+                episodeNumber={episodeId ?? ((episodeData?.id ?? Number.parseInt(currentVideoId)) || 0)}
+                nextEpisode={nextEpisode}
                 autoPlay={autoPlay}
                 muted={muted}
                 controls={controls}
@@ -476,6 +482,7 @@ function VideoPlayerComponent({
               <NJWPlayerComponent
                 key={`${currentServer}-${currentVideoId}`}
                 videoId={hlsVideoId}
+                nextEpisode={nextEpisode}
                 server={currentServer}
                 autoPlay={autoPlay}
                 muted={muted}

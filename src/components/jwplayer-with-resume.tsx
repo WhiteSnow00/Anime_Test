@@ -1,22 +1,12 @@
-/**
- * JWPlayer with Resume Functionality
- *
- * Wrapper component that adds resume memory to JWPlayer:
- * - Tracks playback progress with debouncing
- * - Shows "Continue watching?" dialog on episode load
- * - Handles seek to saved position
- * - Manages declined prompt state
- */
-
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { useAuth } from '@/contexts/auth-context';
-import { useVideoResume } from '@/hooks/use-video-resume';
-import { ResumeDialog } from './resume-dialog';
-import { isFeatureEnabled, getResumeConfig } from '@/lib/feature-flags';
-// Import the actual JWPlayer component used in the project
-import NJWPlayerComponent from './new-jwplayer';
+import { useEffect, useRef, useState, useCallback } from "react";
+import { useAuth } from "@/contexts/auth-context";
+import { useVideoResume } from "@/hooks/use-video-resume";
+import { isFeatureEnabled, getResumeConfig } from "@/lib/feature-flags";
+import type { NextEpisodeAction, PlayerMediaHandle } from "@/lib/player-media";
+import { ResumeDialog } from "./resume-dialog";
+import NJWPlayerComponent from "./new-jwplayer";
 
 interface JWPlayerWithResumeProps {
   videoId: string;
@@ -31,18 +21,16 @@ interface JWPlayerWithResumeProps {
   onHudHeightChange?: (height: number) => void;
   className?: string;
   chapters?: number[];
+  nextEpisode?: NextEpisodeAction;
 }
 
-// Global player instance tracker
-let globalPlayerInstance: any = null;
+// Keying the session also resets stale async resume attempts when callers reuse
+// the wrapper for another source/episode instead of remounting it themselves.
+export function JWPlayerWithResume(props: JWPlayerWithResumeProps) {
+  return <ResumeSession key={`${props.server}:${props.videoId}:${props.episodeId}`} {...props} />;
+}
 
-// Module load verification
-console.warn('📦 jwplayer-with-resume.tsx MODULE LOADED');
-
-/**
- * JWPlayer with integrated resume functionality
- */
-export function JWPlayerWithResume({
+function ResumeSession({
   videoId,
   server,
   episodeId,
@@ -55,24 +43,24 @@ export function JWPlayerWithResume({
   onHudHeightChange,
   className = "",
   chapters = [],
+  nextEpisode,
 }: JWPlayerWithResumeProps) {
-  // CRITICAL: Log component render
-  console.warn('🎬 JWPlayerWithResume RENDERED', { episodeId, episodeNumber, videoId });
-
   const { user } = useAuth();
-  const [playerReady, setPlayerReady] = useState(false);
+  const [media, setMedia] = useState<PlayerMediaHandle | null>(null);
   const [duration, setDuration] = useState(0);
   const [hasAppliedResume, setHasAppliedResume] = useState(false);
-  const playerInstanceRef = useRef<any>(null);
-  const resumeAppliedRef = useRef(false);
+  const [resumePending, setResumePending] = useState(false);
+  const [resumeError, setResumeError] = useState<string | null>(null);
+  const mountedRef = useRef(true);
+  const applyingRef = useRef(false);
+  const decisionRef = useRef(false);
+  const autoAttemptedRef = useRef(false);
 
-  const isResumeEnabled = isFeatureEnabled('RESUME_FEATURE_ENABLED');
-  const isPromptEnabled = isFeatureEnabled('RESUME_PROMPT_ENABLED');
-  const minThreshold = getResumeConfig('MIN_RESUME_THRESHOLD');
-
-  console.warn('🎬 JWPlayerWithResume FLAGS', { isResumeEnabled, isPromptEnabled });
-
-  // Resume hook
+  const isResumeEnabled = isFeatureEnabled("RESUME_FEATURE_ENABLED");
+  const isPromptEnabled = isFeatureEnabled("RESUME_PROMPT_ENABLED");
+  const minThreshold = getResumeConfig("MIN_RESUME_THRESHOLD");
+  const maxPercentage = getResumeConfig("MAX_RESUME_PERCENTAGE");
+  const mediaReady = media !== null && duration > 0 && media.canSeek();
   const {
     savedProgress,
     shouldShowDialog,
@@ -81,341 +69,123 @@ export function JWPlayerWithResume({
     markDeclined,
     clearEpisodeProgress,
     isNearCompletion,
-  } = useVideoResume({
-    episodeId,
-    user,
-    duration,
-  });
+  } = useVideoResume({ episodeId, user, duration, mediaReady });
 
-  // Debug logging on mount and state changes
+  const needsDecision = isResumeEnabled && !hasAppliedResume && !!savedProgress &&
+    Number.isFinite(savedProgress.time) && savedProgress.time >= minThreshold &&
+    !savedProgress.declined && (duration === 0 || savedProgress.time < duration * maxPercentage);
+  const dialogOpen = mediaReady && needsDecision && isPromptEnabled && shouldShowDialog;
+  const holdPlayback = needsDecision || resumePending;
+  const holdRef = useRef(holdPlayback);
+  holdRef.current = holdPlayback;
+
   useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('[jwplayer-resume] State update:', {
-        episodeId,
-        episodeNumber,
-        isResumeEnabled,
-        isPromptEnabled,
-        playerReady,
-        savedProgress,
-        shouldShowDialog,
-        hasAppliedResume,
-      });
-    }
-  }, [episodeId, episodeNumber, isResumeEnabled, isPromptEnabled, playerReady, savedProgress, shouldShowDialog, hasAppliedResume]);
-
-  /**
-   * Seek to specific time
-   */
-  const seekTo = useCallback((time: number) => {
-    if (!playerInstanceRef.current) return;
-    
-    try {
-      // JWPlayer API
-      if (typeof playerInstanceRef.current.seek === 'function') {
-        playerInstanceRef.current.seek(time);
-      }
-      // HTML5 video fallback
-      else if (playerInstanceRef.current.currentTime !== undefined) {
-        playerInstanceRef.current.currentTime = time;
-      }
-      
-      if (process.env.NODE_ENV === 'development') {
-  console.warn('[jwplayer-resume] Seeked to', time);
-      }
-    } catch (error) {
-      console.error('[jwplayer-resume] Seek error:', error);
-    }
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
   }, []);
 
-  /**
-   * Handle resume dialog - Continue
-   */
-  const handleContinue = useCallback(() => {
-    if (!savedProgress) return;
-    
-    seekTo(savedProgress.time);
-    setHasAppliedResume(true);
-    resumeAppliedRef.current = true;
-    try {
-      const p = playerInstanceRef.current;
-      p?.play?.(true);
-    } catch {}
-    
-    if (process.env.NODE_ENV === 'development') {
-  console.warn('[jwplayer-resume] Resumed from', savedProgress.time);
-    }
-  }, [savedProgress, seekTo]);
+  const handleMediaReady = useCallback((handle: PlayerMediaHandle) => {
+    if (!handle.canSeek()) return;
+    setDuration(handle.getDuration());
+    setMedia(handle);
+    if (holdRef.current) handle.pause();
+  }, []);
 
-  /**
-   * Handle resume dialog - Start Over
-   */
-  const handleStartOver = useCallback(() => {
+  useEffect(() => {
+    if (!holdPlayback) return;
+    media?.pause();
+  }, [holdPlayback, media]);
+
+  const applyResume = useCallback(async (): Promise<boolean> => {
+    if (applyingRef.current || !media || !savedProgress || !media.canSeek(savedProgress.time)) return false;
+    applyingRef.current = true;
+    setResumePending(true);
+    setResumeError(null);
+    media.pause();
+    const success = await media.seekTo(savedProgress.time);
+    if (!mountedRef.current) return false;
+    applyingRef.current = false;
+    setResumePending(false);
+    if (!success) {
+      setResumeError("Chưa tua được đến vị trí đã lưu. Bạn có thể thử lại.");
+      return false;
+    }
+    decisionRef.current = true;
+    setHasAppliedResume(true);
+    media.play();
+    return true;
+  }, [media, savedProgress]);
+
+  const handleStartOver = useCallback(async () => {
+    if (applyingRef.current) return;
     markDeclined();
+    decisionRef.current = true;
     setHasAppliedResume(true);
-    resumeAppliedRef.current = true;
-    try {
-      const p = playerInstanceRef.current;
-      p?.play?.(true);
-    } catch {}
-    
-    if (process.env.NODE_ENV === 'development') {
-  console.warn('[jwplayer-resume] User declined resume');
-    }
-  }, [markDeclined]);
+    setResumeError(null);
+    if (media && (media.getVideo()?.currentTime ?? 0) > 0.5) await media.seekTo(0);
+    if (mountedRef.current) media?.play();
+  }, [markDeclined, media]);
 
-  /**
-   * Handle player load
-   */
-  const handlePlayerLoad = useCallback(() => {
-    setPlayerReady(true);
-    onLoad?.();
-  }, [onLoad]);
-
-  /**
-   * Expose player instance for time tracking
-   * Uses multiple strategies to capture the JWPlayer instance
-   */
   useEffect(() => {
-    if (!isResumeEnabled || !playerReady) return;
+    if (isPromptEnabled || !needsDecision || !mediaReady || autoAttemptedRef.current) return;
+    autoAttemptedRef.current = true;
+    void applyResume();
+  }, [applyResume, isPromptEnabled, mediaReady, needsDecision]);
 
-    let mounted = true;
-    let retryCount = 0;
-    const maxRetries = 10;
-
-    const checkPlayer = () => {
-      if (!mounted) return;
-
-      const jwplayer = (window as any).jwplayer;
-      if (!jwplayer) {
-        if (retryCount < maxRetries) {
-          retryCount++;
-          setTimeout(checkPlayer, 200);
-        }
-        return;
-      }
-
-      try {
-        // Try multiple methods to get player instance
-        let player = null;
-
-        // Method 1: Get by index
-        try {
-          player = jwplayer(0);
-        } catch (e) {
-          // Method 2: Get by ID (common pattern)
-          try {
-            player = jwplayer('player-container');
-          } catch (e2) {
-            // Method 3: Get first available player
-            const players = document.querySelectorAll('.jwplayer');
-            if (players.length > 0) {
-              const playerId = players[0].id;
-              if (playerId) {
-                player = jwplayer(playerId);
-              }
-            }
-          }
-        }
-
-        if (player && typeof player.on === 'function') {
-          playerInstanceRef.current = player;
-          globalPlayerInstance = player;
-
-          // Listen to time updates
-          player.on('time', (e: any) => {
-            if (!mounted) return;
-
-            const currentTime = e?.position || 0;
-            const dur = e?.duration || 0;
-
-            if (dur > 0 && dur !== duration) {
-              setDuration(dur);
-            }
-
-            // Update progress (debounced)
-            if (currentTime > 0 && !isNearCompletion(currentTime)) {
-              updateProgress(currentTime);
-            }
-          });
-
-          // Flush on pause
-          player.on('pause', () => {
-            if (!mounted) return;
-            flushProgress();
-          });
-
-          // Clear progress on complete (treat as finished)
-          player.on('complete', () => {
-            if (!mounted) return;
-            try {
-              clearEpisodeProgress();
-            } catch (e) {
-              console.warn('[jwplayer-resume] Failed to clear progress on complete:', e);
-            }
-          });
-
-          // Get duration when ready
-          player.on('ready', () => {
-            if (!mounted) return;
-            try {
-              const dur = player.getDuration();
-              if (dur > 0) {
-                setDuration(dur);
-              }
-            } catch (e) {
-              console.warn('[jwplayer-resume] Could not get duration:', e);
-            }
-          });
-
-          if (process.env.NODE_ENV === 'development') {
-            console.warn('[jwplayer-resume] Player instance attached successfully');
-          }
-        } else if (retryCount < maxRetries) {
-          retryCount++;
-          setTimeout(checkPlayer, 200);
-        }
-      } catch (error) {
-        console.error('[jwplayer-resume] Failed to attach player:', error);
-        if (retryCount < maxRetries) {
-          retryCount++;
-          setTimeout(checkPlayer, 200);
-        }
+  // Native listeners bind to this exact video's lifetime. No global player
+  // lookup, late ready listener, or accumulating anonymous JW listeners.
+  const progressCallbacks = useRef({ updateProgress, flushProgress, clearEpisodeProgress, isNearCompletion });
+  progressCallbacks.current = { updateProgress, flushProgress, clearEpisodeProgress, isNearCompletion };
+  useEffect(() => {
+    const video = media?.getVideo();
+    if (!isResumeEnabled || !video) return;
+    const onTime = () => {
+      if (holdRef.current && !decisionRef.current || video.seeking || applyingRef.current) return;
+      setDuration(Number.isFinite(video.duration) ? video.duration : 0);
+      if (video.currentTime > 0 && !progressCallbacks.current.isNearCompletion(video.currentTime)) {
+        progressCallbacks.current.updateProgress(video.currentTime);
       }
     };
-
-    // Start checking after a short delay to ensure player is initialized
-    const initialTimer = setTimeout(checkPlayer, 300);
-
+    const onPause = () => {
+      if (holdRef.current && !decisionRef.current || applyingRef.current) return;
+      progressCallbacks.current.flushProgress();
+    };
+    const onEnded = () => progressCallbacks.current.clearEpisodeProgress();
+    video.addEventListener("timeupdate", onTime);
+    video.addEventListener("pause", onPause);
+    video.addEventListener("ended", onEnded);
     return () => {
-      mounted = false;
-      clearTimeout(initialTimer);
+      video.removeEventListener("timeupdate", onTime);
+      video.removeEventListener("pause", onPause);
+      video.removeEventListener("ended", onEnded);
     };
-  }, [
-    isResumeEnabled,
-    playerReady,
-    updateProgress,
-    flushProgress,
-    isNearCompletion,
-    duration,
-    clearEpisodeProgress,
-  ]);
-
-  // Detect page reloads (for auto-continue behavior on refresh)
-  const isPageReloadRef = useRef(false);
-  useEffect(() => {
-    try {
-      const navEntries = (performance?.getEntriesByType?.('navigation') || []) as any[];
-      if (navEntries.length > 0) {
-        isPageReloadRef.current = navEntries[0]?.type === 'reload';
-      } else {
-        // Legacy fallback
-        // @ts-ignore
-        const nav = (performance as any).navigation;
-        isPageReloadRef.current = nav && nav.type === 1; // 1 = reload
-      }
-    } catch {}
-  }, []);
-
-  // Auto-apply resume if no dialog needed; on page reload do NOT override if prompt should show
-  useEffect(() => {
-    if (!isResumeEnabled) return;
-    if (!playerReady || hasAppliedResume || resumeAppliedRef.current) return;
-    if (!savedProgress) return;
-
-    // On refresh: continue automatically only if no prompt is expected
-    if (
-      isPageReloadRef.current &&
-      savedProgress.time >= minThreshold &&
-      !savedProgress.declined &&
-      !(isPromptEnabled && shouldShowDialog)
-    ) {
-      const timer = setTimeout(() => {
-        seekTo(savedProgress.time);
-        setHasAppliedResume(true);
-        resumeAppliedRef.current = true;
-        if (process.env.NODE_ENV === 'development') {
-          console.warn('[jwplayer-resume] Auto-resumed after page reload to', savedProgress.time);
-        }
-      }, 400);
-      return () => clearTimeout(timer);
-    }
-
-    // If dialog should show (non-reload), don't auto-seek
-    if (shouldShowDialog) return;
-
-    // Auto-seek if progress exists and above threshold
-    if (savedProgress.time >= minThreshold && !savedProgress.declined) {
-      // Wait a bit for player to be fully ready
-      const timer = setTimeout(() => {
-        seekTo(savedProgress.time);
-        setHasAppliedResume(true);
-        resumeAppliedRef.current = true;
-
-        if (process.env.NODE_ENV === 'development') {
-          console.warn('[jwplayer-resume] Auto-seeked to', savedProgress.time);
-        }
-      }, 500);
-
-      return () => clearTimeout(timer);
-    }
-  }, [
-    isResumeEnabled,
-    playerReady,
-    hasAppliedResume,
-    savedProgress,
-    shouldShowDialog,
-    isPromptEnabled,
-    seekTo,
-    minThreshold,
-  ]);
-
-  // Reset resume state on episode change
-  useEffect(() => {
-    setHasAppliedResume(false);
-    resumeAppliedRef.current = false;
-    setPlayerReady(false);
-    setDuration(0);
-
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('[jwplayer-resume] Episode changed to', episodeId, '- resetting state');
-    }
-  }, [episodeId]);
-
-  // If a resume prompt should show, ensure playback is paused until user decides
-  useEffect(() => {
-    if (!isResumeEnabled) return;
-    if (isPromptEnabled && shouldShowDialog) {
-      try {
-        const p = playerInstanceRef.current;
-        p?.pause?.();
-      } catch {}
-    }
-  }, [isResumeEnabled, isPromptEnabled, shouldShowDialog]);
+  }, [isResumeEnabled, media]);
 
   return (
     <>
-      {/* Visual indicator that resume wrapper is active (dev only) */}
-
       <NJWPlayerComponent
         videoId={videoId}
         server={server}
-        autoPlay={autoPlay && !(isPromptEnabled && shouldShowDialog)}
+        autoPlay={autoPlay && !holdPlayback}
         muted={muted}
         controls={controls}
-        onLoad={handlePlayerLoad}
+        onLoad={onLoad}
+        onMediaReady={handleMediaReady}
         onError={onError}
         onHudHeightChange={onHudHeightChange}
         className={className}
         chapters={chapters}
+        nextEpisode={nextEpisode}
       />
-
-      {isResumeEnabled && isPromptEnabled && shouldShowDialog && savedProgress && (
+      {isResumeEnabled && isPromptEnabled && savedProgress && (
         <ResumeDialog
-          open={shouldShowDialog && !hasAppliedResume}
+          open={dialogOpen}
           episodeNumber={episodeNumber}
           savedTime={savedProgress.time}
-          onContinue={handleContinue}
+          onContinue={applyResume}
           onStartOver={handleStartOver}
+          pending={resumePending}
+          error={resumeError}
         />
       )}
     </>
@@ -423,4 +193,3 @@ export function JWPlayerWithResume({
 }
 
 export default JWPlayerWithResume;
-

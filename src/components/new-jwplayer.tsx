@@ -6,31 +6,14 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { Slider } from "@/components/ui/slider";
-import {
-  Volume2,
-  Flag,
-  VolumeOff,
-  Volume1,
-  Maximize2,
-  Minimize2,
-  PictureInPicture2,
-  Camera,
-  LoaderPinwheel,
-  FastForward,
-  Rewind,
-} from "lucide-react";
-import { Tooltip, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
-import { TooltipContent } from "@radix-ui/react-tooltip";
-import {
-  BackwardIcon,
-  ForwardIcon,
-  PauseIcon,
-  PlayIcon,
-} from "./ui/player-icon";
+import { LoaderCircle, SkipForward, X } from "lucide-react";
+import { PlayerControls } from "./player-controls";
+import { SeekFeedback, type SeekFeedbackEvent } from "./seek-feedback";
 import { consoleProtection } from "../lib/console-protection";
 import { createFullscreenController } from "@/lib/fullscreen-controller";
 import { createPipController } from "@/lib/pip-controller";
+import { createSeekController, getSegmentPreviewTime, parseIndependentSegmentStarts } from "@/lib/seek-controller";
+import { createPlayerMediaHandle, shouldShowNextEpisode, type NextEpisodeAction, type PlayerMediaHandle } from "@/lib/player-media";
 
 function useSyncedRef<T>(value: T) {
   const ref = useRef(value);
@@ -52,26 +35,9 @@ const CONFIG = {
   DEFAULT_VOLUME: 80,
   AUTOPLAY_RETRY_DELAY_MS: 250,
   CONTROLS_AUTOHIDE_MS_TOUCH: 2500,
-  CONTROLS_AUTOHIDE_MS_DESKTOP: 1000,
+  CONTROLS_AUTOHIDE_MS_DESKTOP: 2500,
   DOUBLE_TAP_ZONE_RATIO: 0.5,
   SKIP_SECONDS: 10,
-  LABELS: {
-    PLAY: "Play",
-    PAUSE: "Pause",
-    MUTE: "Mute",
-    FULLSCREEN: "Fullscreen",
-    PIP: "Picture-in-Picture",
-    BACK_X: (x: number) => `Back ${x} seconds`,
-    FORWARD_X: (x: number) => `Forward ${x} seconds`,
-    NEXT_CHAPTER: "Next chapter",
-  },
-  TOOLTIPS: {
-    BACKWARD: "Lùi 10 giây",
-    FORWARD: "Tiến 10 giây",
-    NEXT_CHAPTER: "Tới mốc tiếp theo",
-    SCREENSHOT: "Chụp màn hình",
-    PIP: "Chế độ hình trong hình (PiP)",
-  },
   ERRORS: {
     SCRIPT_LOAD: "Failed to load JWPlayer script",
     SETUP: "Player setup error",
@@ -92,45 +58,15 @@ interface JWPlayerProps {
   server: string;
   autoPlay?: boolean;
   muted?: boolean;
-  controls?: boolean; // kept for parity, UI is custom
+  controls?: boolean; // custom controls visibility
   onLoad?: () => void;
   onError?: (error: string) => void;
   onHudHeightChange?: (height: number) => void;
+  onMediaReady?: (media: PlayerMediaHandle) => void;
+  nextEpisode?: NextEpisodeAction;
   className?: string;
   chapters?: number[]; // seconds from start
 }
-
-type DesktopControlKey =
-  | "play"
-  | "backward"
-  | "forward"
-  | "chapter"
-  | "volume"
-  | "time"
-  | "screenshot"
-  | "pip"
-  | "fullscreen";
-
-type DesktopControlCluster = "left" | "right";
-
-type DesktopControlTone = "dark" | "light";
-
-const DESKTOP_CONTROL_CLUSTER_MAP: Record<DesktopControlKey, DesktopControlCluster> = {
-  play: "left",
-  backward: "left",
-  forward: "left",
-  chapter: "left",
-  volume: "left",
-  time: "left",
-  screenshot: "right",
-  pip: "right",
-  fullscreen: "right",
-};
-
-const DEFAULT_DESKTOP_CONTROL_TONES: Record<DesktopControlCluster, DesktopControlTone> = {
-  left: "dark",
-  right: "dark",
-};
 
 /* =====================================================================================
  * UTILS
@@ -141,16 +77,6 @@ const isIOSUA = () =>
   typeof navigator !== "undefined" &&
   (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.userAgent.includes("Mac") && "ontouchend" in document));
-
-function formatTime(seconds: number) {
-  if (!isFinite(seconds) || seconds < 0) seconds = 0;
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  const mm = h > 0 ? String(m).padStart(2, "0") : String(m);
-  const ss = String(s).padStart(2, "0");
-  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
-}
 
 function detectPipSupport(p: any, video: HTMLVideoElement | null): boolean {
   if (!video) return false;
@@ -307,6 +233,8 @@ const NJWPlayerComponent = ({
   onLoad,
   onError,
   onHudHeightChange,
+  onMediaReady,
+  nextEpisode,
   className = "",
   chapters = [],
 }: JWPlayerProps) => {
@@ -330,9 +258,8 @@ const NJWPlayerComponent = ({
     return rel;
   }, [isHls, videoId]);
 
-  const playerRef = useRef<HTMLDivElement | null>(null);
+  const playerHostRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const progressBarRef = useRef<HTMLDivElement | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const bottomHudRef = useRef<HTMLDivElement | null>(null);
   const playerInstance = useRef<any>(null);
@@ -342,7 +269,8 @@ const NJWPlayerComponent = ({
   const controlsHideTimerRef = useRef<number | null>(null);
   const aboutHideTimerRef = useRef<number | null>(null);
   const seekOverlayTimerRef = useRef<number | null>(null);
-  const rafRef = useRef<number | null>(null);
+  const seekFeedbackSequenceRef = useRef(0);
+  const seekFeedbackLastAtRef = useRef(0);
   const suppressClickRef = useRef(false);
   const forcedAutoplayMuteRef = useRef(false);
   const scheduleControlsAutohideRef = useRef<(() => void) | null>(null);
@@ -361,17 +289,11 @@ const NJWPlayerComponent = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [duration, setDuration] = useState(0);
   const [position, setPosition] = useState(0);
+  const [seekTarget, setSeekTarget] = useState<number | null>(null);
+  const [isSeekLoading, setIsSeekLoading] = useState(false);
   const [buffer, setBuffer] = useState(0);
-  const [levels, setLevels] = useState<{ label: string; index: number }[]>([]);
-  const [currentLevel, setCurrentLevel] = useState<number | null>(null);
-  const [hoverTime, setHoverTime] = useState<{ x: number; t: number } | null>(
-    null
-  );
   const [controlsVisible, setControlsVisible] = useState(false);
-  // Dedicated visibility for the 3 big center mobile buttons to avoid being stuck
-  const [centerControlsVisible, setCenterControlsVisible] = useState(false);
   const [isScrubbing, setIsScrubbing] = useState(false);
-  const [scrubPct, setScrubPct] = useState<number | null>(null);
   const [isHovering, setIsHovering] = useState(false);
   const [isHoveringControls, setIsHoveringControls] = useState(false);
   const [cursorHidden, setCursorHidden] = useState(false);
@@ -385,36 +307,202 @@ const NJWPlayerComponent = ({
   const [supportsAspectRatio, setSupportsAspectRatio] = useState(true);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [showImagePreview, setShowImagePreview] = useState(false);
-  const [showRemainingTime, setShowRemainingTime] = useState(false);
-  const [desktopHudHeight, setDesktopHudHeight] = useState(96);
-  const [desktopControlTones, setDesktopControlTones] = useState<Record<DesktopControlCluster, DesktopControlTone>>(
-    DEFAULT_DESKTOP_CONTROL_TONES
-  );
+  const [nextEpisodeDismissed, setNextEpisodeDismissed] = useState(false);
+  const mediaReadyCallbackRef = useSyncedRef(onMediaReady);
 
   const isScrubbingRef = useSyncedRef(isScrubbing);
   const isHoveringRef = useSyncedRef(isHovering);
   const isHoveringControlsRef = useSyncedRef(isHoveringControls);
   const isFullscreenRef = useSyncedRef(isFullscreen);
   const isTouchDeviceRef = useSyncedRef(isTouchDevice);
-  const centerControlsVisibleRef = useSyncedRef(centerControlsVisible);
   const isPlayingRef = useSyncedRef(isPlaying);
+  const durationRef = useSyncedRef(duration);
+  const seekControllerRef = useRef<ReturnType<typeof createSeekController> | null>(null);
+  const segmentStartsRef = useRef<number[]>([]);
+  const resumeAfterScrubRef = useRef(false);
+  const seekLoadingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Mobile idle tracking: last time the user touched or interacted with the player
   const lastInteractionRef = useRef<number>(Date.now());
-  const desktopControlRefs = useRef<Partial<Record<DesktopControlKey, HTMLElement | null>>>({});
-
-  const setDesktopControlRef = useCallback(
-    (key: DesktopControlKey, node: HTMLElement | null) => {
-      if (node) {
-        desktopControlRefs.current[key] = node;
-        return;
-      }
-
-      delete desktopControlRefs.current[key];
-    },
-    []
-  );
 
   const jwReady = useJWScript(onError);
+
+  useEffect(() => {
+    const host = playerHostRef.current;
+    if (!host) return;
+    const mediaVideo = { current: null as HTMLVideoElement | null };
+    const clearSeekLoading = () => {
+      if (seekLoadingTimerRef.current !== null) clearTimeout(seekLoadingTimerRef.current);
+      seekLoadingTimerRef.current = null;
+      setIsSeekLoading(false);
+    };
+    const media = createPlayerMediaHandle({
+      getVideo: () => {
+        const current = playerHostRef.current?.querySelector("video") ?? null;
+        return current === mediaVideo.current ? current : null;
+      },
+      requestSeek: (time) => seekControllerRef.current?.commit(time),
+      play: () => playerInstance.current?.play?.(true),
+      pause: () => playerInstance.current?.pause?.(true),
+    });
+    let announcedVideo: HTMLVideoElement | null = null;
+    const publishMediaReady = () => {
+      const video = host.querySelector("video");
+      if (!video || announcedVideo === video) return;
+      mediaVideo.current = video;
+      if (!media.canSeek()) return;
+      const mediaDuration = media.getDuration();
+      durationRef.current = mediaDuration;
+      setDuration(mediaDuration);
+      if (announcedVideo === video) return;
+      announcedVideo = video;
+      mediaReadyCallbackRef.current?.(media);
+    };
+    host.addEventListener("loadedmetadata", publishMediaReady, true);
+    host.addEventListener("durationchange", publishMediaReady, true);
+    host.addEventListener("canplay", publishMediaReady, true);
+    host.addEventListener("progress", publishMediaReady, true);
+    const mediaPoll = window.setInterval(publishMediaReady, 200);
+    const controller = createSeekController({
+      getVideo: () => host.querySelector("video"),
+      getDuration: () => durationRef.current || playerInstance.current?.getDuration?.() || 0,
+      getPreviewTime: (time) => {
+        const video = host.querySelector("video");
+        if (video) {
+          for (let index = 0; index < video.buffered.length; index++) {
+            if (time >= video.buffered.start(index) && time < video.buffered.end(index)) return time;
+          }
+        }
+        return getSegmentPreviewTime(time, segmentStartsRef.current);
+      },
+      fallbackSeek: (time) => playerInstance.current?.seek?.(time),
+      onTargetChange: (time) => {
+        setSeekTarget(time);
+        if (time === null) clearSeekLoading();
+      },
+      onSettled: (time) => {
+        setPosition(time);
+        if (!isScrubbingRef.current) {
+          const video = host.querySelector("video");
+          if (video && !video.seeking) {
+            isPlayingRef.current = !video.paused && !video.ended;
+            setIsPlaying(isPlayingRef.current);
+          }
+        }
+        setIsBuffering(false);
+        clearSeekLoading();
+      },
+    });
+    seekControllerRef.current = controller;
+    let video: HTMLVideoElement | null = null;
+    const onSeeking = () => {
+      if (seekLoadingTimerRef.current !== null) return;
+      // Keep the last decoded frame visible; don't flash a spinner on fast seeks.
+      seekLoadingTimerRef.current = setTimeout(() => {
+        seekLoadingTimerRef.current = null;
+        if (video?.seeking || video && video.readyState < 2) setIsSeekLoading(true);
+      }, 180);
+    };
+    const onSeeked = () => {
+      controller.complete();
+      if (!video?.seeking && video && video.readyState >= 2) clearSeekLoading();
+    };
+    const updateBuffered = () => {
+      if (!video) return;
+      const current = video.currentTime;
+      let end = current;
+      for (let index = 0; index < video.buffered.length; index++) {
+        if (current >= video.buffered.start(index) - 0.1 && current <= video.buffered.end(index) + 0.1) {
+          end = video.buffered.end(index);
+          break;
+        }
+      }
+      setBuffer(end);
+    };
+    const bindVideo = () => {
+      const next = host.querySelector("video");
+      if (next === video) return;
+      video?.removeEventListener("seeking", onSeeking);
+      video?.removeEventListener("seeked", onSeeked);
+      video?.removeEventListener("progress", updateBuffered);
+      video?.removeEventListener("timeupdate", updateBuffered);
+      video = next;
+      video?.addEventListener("seeking", onSeeking);
+      video?.addEventListener("seeked", onSeeked);
+      video?.addEventListener("progress", updateBuffered);
+      video?.addEventListener("timeupdate", updateBuffered);
+      updateBuffered();
+    };
+    bindVideo();
+    const observer = new MutationObserver(bindVideo);
+    observer.observe(host, { subtree: true, childList: true });
+    return () => {
+      observer.disconnect();
+      window.clearInterval(mediaPoll);
+      host.removeEventListener("loadedmetadata", publishMediaReady, true);
+      host.removeEventListener("durationchange", publishMediaReady, true);
+      host.removeEventListener("canplay", publishMediaReady, true);
+      host.removeEventListener("progress", publishMediaReady, true);
+      video?.removeEventListener("seeking", onSeeking);
+      video?.removeEventListener("seeked", onSeeked);
+      video?.removeEventListener("progress", updateBuffered);
+      video?.removeEventListener("timeupdate", updateBuffered);
+      mediaVideo.current = null;
+      controller.destroy();
+      seekControllerRef.current = null;
+      if (seekLoadingTimerRef.current !== null) clearTimeout(seekLoadingTimerRef.current);
+    };
+  }, [durationRef, isPlayingRef, isScrubbingRef, mediaReadyCallbackRef]);
+
+  useEffect(() => {
+    segmentStartsRef.current = [];
+    if (!isHls || !fileUrl) return;
+    const abort = new AbortController();
+    // Read only the small manifest; never start a second video/segment loader.
+    void fetch(fileUrl, { signal: abort.signal })
+      .then((response) => response.ok ? response.text() : "")
+      .then((manifest) => {
+        if (!abort.signal.aborted) segmentStartsRef.current = parseIndependentSegmentStarts(manifest);
+      })
+      .catch(() => { /* CORS/master playlists simply retain exact previews. */ });
+    return () => abort.abort();
+  }, [fileUrl, isHls]);
+
+  useEffect(() => {
+    seekControllerRef.current?.reset();
+    resumeAfterScrubRef.current = false;
+    isScrubbingRef.current = false;
+    setIsScrubbing(false);
+    setNextEpisodeDismissed(false);
+    setDuration(0);
+    setPosition(0);
+    setBuffer(0);
+  }, [fileUrl, isScrubbingRef]);
+
+  const beginScrubbing = useCallback(() => {
+    if (isScrubbingRef.current) return;
+    const video = playerHostRef.current?.querySelector("video");
+    resumeAfterScrubRef.current = video ? !video.paused && !video.ended : isPlayingRef.current;
+    if (resumeAfterScrubRef.current) {
+      isPlayingRef.current = true;
+      setIsPlaying(true);
+    }
+    isScrubbingRef.current = true;
+    setIsScrubbing(true);
+    seekControllerRef.current?.begin();
+    if (resumeAfterScrubRef.current) playerInstance.current?.pause?.(true);
+  }, [isPlayingRef, isScrubbingRef]);
+
+  const commitSeek = useCallback((time: number) => {
+    isScrubbingRef.current = false;
+    setIsScrubbing(false);
+    seekControllerRef.current?.commit(time);
+    if (resumeAfterScrubRef.current) {
+      resumeAfterScrubRef.current = false;
+      playerInstance.current?.play?.(true);
+    }
+    scheduleControlsAutohideRef.current?.();
+  }, [isScrubbingRef]);
+
   useEffect(() => {
     setLibReady(jwReady);
   }, [jwReady]);
@@ -439,7 +527,6 @@ const NJWPlayerComponent = ({
 
   useEffect(() => {
     if (isTouchDevice) {
-      setDesktopHudHeight(0);
       onHudHeightChange?.(0);
       return;
     }
@@ -450,7 +537,6 @@ const NJWPlayerComponent = ({
     const updateHudHeight = () => {
       const nextHeight = Math.ceil(hudNode.getBoundingClientRect().height);
       if (!Number.isFinite(nextHeight) || nextHeight <= 0) return;
-      setDesktopHudHeight(nextHeight);
       onHudHeightChange?.(nextHeight);
     };
 
@@ -469,7 +555,7 @@ const NJWPlayerComponent = ({
       observer.disconnect();
       window.removeEventListener("resize", updateHudHeight);
     };
-  }, [isTouchDevice, onHudHeightChange]);
+  }, [fileUrl, isTouchDevice, onHudHeightChange]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -563,31 +649,31 @@ const NJWPlayerComponent = ({
   }, [isIOS]);
 
   useEffect(() => {
-    const root = containerRef.current;
-    if (!root) return;
-
-    const apply = (v: HTMLVideoElement) => {
-      try {
-        v.crossOrigin = "anonymous";
-      } catch { }
-      v.setAttribute("playsinline", "");
-      v.setAttribute("webkit-playsinline", "");
-    };
+    // UI changes (including the context menu) must never reconfigure the video.
+    const host = playerHostRef.current;
+    if (!host) return;
+    const configuredVideos = new WeakSet<HTMLVideoElement>();
 
     const trySet = () => {
-      const v = root.querySelector("video") as HTMLVideoElement | null;
-      if (v) apply(v);
+      const video = host.querySelector("video");
+      if (!video || configuredVideos.has(video)) return;
+      configuredVideos.add(video);
+      try {
+        if (video.crossOrigin !== "anonymous") video.crossOrigin = "anonymous";
+      } catch { }
+      video.setAttribute("playsinline", "");
+      video.setAttribute("webkit-playsinline", "");
     };
 
     trySet();
-    const mo = new MutationObserver(trySet);
-    mo.observe(root, { subtree: true, childList: true });
-    return () => mo.disconnect();
+    const observer = new MutationObserver(trySet);
+    observer.observe(host, { subtree: true, childList: true });
+    return () => observer.disconnect();
   }, []);
 
   // JW setup / reload on file change
   useEffect(() => {
-    if (!isHls || !libReady || !playerRef.current) return;
+    if (!isHls || !libReady || !playerHostRef.current) return;
     const w = window as any;
     if (!w.jwplayer) return;
 
@@ -622,11 +708,17 @@ const NJWPlayerComponent = ({
       }
 
       const sources = [{ file: fileUrl, type: CONFIG.HLS_TYPE, default: true }];
-      playerInstance.current = w.jwplayer(playerRef.current).setup({
+      // JWPlayer replaces its target node. Keep that node inside a stable React-owned host.
+      const playerElement = document.createElement("div");
+      playerElement.id = "kana-player";
+      playerHostRef.current.replaceChildren(playerElement);
+      playerInstance.current = w.jwplayer(playerElement).setup({
         width: "100%",
         height: "100%",
         primary: CONFIG.PLAYER_PRIMARY,
         controls: false,
+        // Resume waits for real metadata/seekable ranges, even with autoplay held.
+        preload: "auto",
         // On mobile, start muted to satisfy autoplay policy and reduce stalls
         autostart: (isIOS || isAndroid) ? !!autoPlay : autoPlay,
         // Do NOT force mute on mobile; respect the passed-in prop
@@ -637,11 +729,12 @@ const NJWPlayerComponent = ({
           xhrSetup: (xhr: XMLHttpRequest) => {
             xhr.withCredentials = false;
           },
-          // Faster startup and fewer stalls on mobile
-          startLevel: 0, // begin with the lowest level to start playback quickly
+          // Retain nearby segments for quick ±10s/repeated seeks. Respect the
+          // player's byte budget instead of preloading the entire episode.
+          startLevel: 0,
           capLevelToPlayerSize: true,
-          maxBufferLength: 10,
-          backBufferLength: 30,
+          maxBufferLength: 30,
+          backBufferLength: 90,
           lowLatencyMode: false,
           // Conservative retries to fail fast and let our app handle fallback
           fragLoadingMaxRetry: 2,
@@ -675,15 +768,6 @@ const NJWPlayerComponent = ({
         }
         const d = p.getDuration?.() ?? 0;
         setDuration(isFinite(d) ? d : 0);
-        const qls = p.getQualityLevels?.() || [];
-        setLevels(
-          qls.map((q: any, idx: number) => ({
-            label: q.label || `Q${idx + 1}`,
-            index: idx,
-          }))
-        );
-        const curQ = p.getCurrentQuality?.();
-        setCurrentLevel(typeof curQ === "number" ? curQ : null);
 
         if (savedPositionRef.current > 0) {
           try {
@@ -768,6 +852,8 @@ const NJWPlayerComponent = ({
       });
 
       p.on("play", () => {
+        if (isScrubbingRef.current) return;
+        isPlayingRef.current = true;
         setIsPlaying(true);
         setIsBuffering(false);
         // Ensure autohide can kick in after resuming playback on mobile
@@ -786,32 +872,30 @@ const NJWPlayerComponent = ({
         }
       });
       p.on("pause", () => {
+        if (isScrubbingRef.current || seekControllerRef.current?.isPending() && isPlayingRef.current) return;
+        isPlayingRef.current = false;
         setIsPlaying(false);
         // When paused, we are not buffering for playback
         setIsBuffering(false);
       });
       p.on("time", (e: any) => {
-        setPosition(e?.position || 0);
+        if (!seekControllerRef.current?.isPending()) setPosition(e?.position || 0);
         if (typeof e?.duration === "number") setDuration(e.duration);
         // Any time update implies playback is progressing; clear buffering
         if (playerInstance.current?.getState?.() === "playing") {
           setIsBuffering(false);
         }
       });
-      p.on("buffer", (e: any) => {
-        setIsBuffering(true);
-        if (typeof e?.bufferPercent === "number") {
-          const dur = p.getDuration?.() || 0;
-          setBuffer((e.bufferPercent / 100) * dur);
-          // If buffer nearly full, avoid keeping spinner forever
-          if (e.bufferPercent >= 95) {
-            setIsBuffering(false);
-          }
-        }
+      p.on("buffer", () => {
+        if (!isScrubbingRef.current && !seekControllerRef.current?.isPending()) setIsBuffering(true);
       });
       // Idle/complete/firstFrame should never show buffering spinner
       p.on("idle", () => setIsBuffering(false));
-      p.on("complete", () => setIsBuffering(false));
+      p.on("complete", () => {
+        setIsPlaying(false);
+        setIsBuffering(false);
+        setControlsVisible(true);
+      });
       p.on("volume", (e: any) =>
         setVolumeState(
           typeof e?.volume === "number" ? e.volume : CONFIG.DEFAULT_VOLUME
@@ -839,19 +923,6 @@ const NJWPlayerComponent = ({
           }, 1000);
         }
       });
-      p.on("levels", () => {
-        const q = p.getQualityLevels?.() || [];
-        setLevels(
-          q.map((lv: any, idx: number) => ({
-            label: lv.label || `Q${idx + 1}`,
-            index: idx,
-          }))
-        );
-      });
-      p.on("levelsChanged", () => {
-        const cq = p.getCurrentQuality?.();
-        setCurrentLevel(typeof cq === "number" ? cq : null);
-      });
       p.on("firstFrame", () => {
         setIsBuffering(false);
         const pos = savedPositionRef.current;
@@ -877,7 +948,10 @@ const NJWPlayerComponent = ({
       p.on("setupError", (e: any) =>
         onError?.(e?.message || CONFIG.ERRORS.SETUP)
       );
-      p.on("error", (e: any) => onError?.(e?.message || CONFIG.ERRORS.GENERAL));
+      p.on("error", (e: any) => {
+        seekControllerRef.current?.reset();
+        onError?.(e?.message || CONFIG.ERRORS.GENERAL);
+      });
 
       prevFileUrlRef.current = fileUrl;
     } catch (e: any) {
@@ -895,6 +969,8 @@ const NJWPlayerComponent = ({
     isIOS,
     onLoad,
     onError,
+    isPlayingRef,
+    isScrubbingRef,
   ]);
 
   useEffect(() => {
@@ -916,159 +992,26 @@ const NJWPlayerComponent = ({
     return () => v.removeEventListener("volumechange", onVol);
   }, [isReady]);
 
+  // Keep the context menu mounted and dismiss it without touching playback.
   useEffect(() => {
-    if (!isReady || isTouchDevice) return;
-
-    const canvas = document.createElement("canvas");
-    canvas.width = 320;
-    canvas.height = 180;
-    const context = canvas.getContext("2d", { willReadFrequently: true });
-
-    if (!context) return;
-
-    const DARK_TO_LIGHT_THRESHOLD = 165;
-    const LIGHT_TO_DARK_THRESHOLD = 135;
-    const SETTLED_MS = 800;
-
-    const resolveToneWithHysteresis = (
-      currentTone: DesktopControlTone,
-      luminance: number
-    ): DesktopControlTone => {
-      if (currentTone === "dark" && luminance > DARK_TO_LIGHT_THRESHOLD)
-        return "light";
-      if (currentTone === "light" && luminance < LIGHT_TO_DARK_THRESHOLD)
-        return "dark";
-      return currentTone;
+    if (!showAboutMsg) return;
+    const dismissOutside = (event: PointerEvent) => {
+      const target = event.target as Element | null;
+      if (!target?.closest("[data-player-context-menu]")) setShowAboutMsg(false);
     };
-
-    // Refs for settled timer (survive across intervals)
-    const pendingToneRef: { current: DesktopControlTone | null } = { current: null };
-    const pendingSinceRef: { current: number } = { current: 0 };
-
-    const sampleLuminanceAtElement = (
-      element: HTMLElement,
-      videoRect: DOMRect
-    ): number | null => {
-      const iconAnchor = element.querySelector("svg") as SVGElement | null;
-      const rect = (iconAnchor?.getBoundingClientRect() ??
-        element.getBoundingClientRect()) as DOMRect;
-
-      if (rect.width < 1 || rect.height < 1 || videoRect.width < 1 || videoRect.height < 1) {
-        return null;
-      }
-
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
-
-      if (
-        centerX < videoRect.left ||
-        centerX > videoRect.right ||
-        centerY < videoRect.top ||
-        centerY > videoRect.bottom
-      ) {
-        return null;
-      }
-
-      const relativeX = (centerX - videoRect.left) / videoRect.width;
-      const relativeY = (centerY - videoRect.top) / videoRect.height;
-      const canvasX = Math.round(relativeX * (canvas.width - 1));
-      const canvasY = Math.round(relativeY * (canvas.height - 1));
-      const sampleWidth = Math.max(4, Math.min(canvas.width, Math.round((rect.width / videoRect.width) * canvas.width * 0.35)));
-      const sampleHeight = Math.max(4, Math.min(canvas.height, Math.round((rect.height / videoRect.height) * canvas.height * 0.35)));
-      const startX = Math.max(0, Math.min(canvas.width - sampleWidth, canvasX - Math.floor(sampleWidth / 2)));
-      const startY = Math.max(0, Math.min(canvas.height - sampleHeight, canvasY - Math.floor(sampleHeight / 2)));
-      const { data } = context.getImageData(startX, startY, sampleWidth, sampleHeight);
-
-      let luminanceTotal = 0;
-      let pixelCount = 0;
-
-      for (let index = 0; index < data.length; index += 4) {
-        const alpha = data[index + 3] / 255;
-        if (alpha < 0.2) continue;
-
-        luminanceTotal +=
-          (0.2126 * data[index] +
-            0.7152 * data[index + 1] +
-            0.0722 * data[index + 2]) *
-          alpha;
-        pixelCount += 1;
-      }
-
-      if (pixelCount === 0) return null;
-
-      return luminanceTotal / pixelCount;
+    const dismissOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      setShowAboutMsg(false);
     };
-
-    const sampleControlThemes = () => {
-      const video = containerRef.current?.querySelector(
-        "video"
-      ) as HTMLVideoElement | null;
-
-      if (!video || video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) {
-        return;
-      }
-
-      try {
-        const videoRect = video.getBoundingClientRect();
-        context.clearRect(0, 0, canvas.width, canvas.height);
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        setDesktopControlTones((previous) => {
-          const samples: number[] = [];
-
-          (Object.keys(DESKTOP_CONTROL_CLUSTER_MAP) as DesktopControlKey[]).forEach((key) => {
-            const element = desktopControlRefs.current[key];
-            if (!element || !element.isConnected) return;
-
-            const luminance = sampleLuminanceAtElement(element, videoRect);
-            if (luminance != null) samples.push(luminance);
-          });
-
-          if (samples.length === 0) return previous;
-
-          const averageLuminance =
-            samples.reduce((sum, value) => sum + value, 0) / samples.length;
-
-          // Use left as the unified current tone (left and right are always kept equal)
-          const currentTone = previous.left;
-          const proposedTone = resolveToneWithHysteresis(currentTone, averageLuminance);
-
-          if (proposedTone === currentTone) {
-            pendingToneRef.current = null;
-            pendingSinceRef.current = 0;
-            return previous;
-          }
-
-          const now = Date.now();
-          if (pendingToneRef.current !== proposedTone) {
-            pendingToneRef.current = proposedTone;
-            pendingSinceRef.current = now;
-            return previous;
-          }
-
-          if (now - pendingSinceRef.current < SETTLED_MS) {
-            return previous;
-          }
-
-          // Apply unified tone to both clusters
-          pendingToneRef.current = null;
-          pendingSinceRef.current = 0;
-          return { left: proposedTone, right: proposedTone };
-        });
-      } catch {
-        // Ignore sampling failures (e.g. transient cross-origin/decoder states)
-      }
-    };
-
-    const intervalMs = controlsVisible ? 1000 : 2000;
-    const initialTimeoutId = window.setTimeout(sampleControlThemes, 120);
-    const intervalId = window.setInterval(sampleControlThemes, intervalMs);
-
+    document.addEventListener("pointerdown", dismissOutside, true);
+    document.addEventListener("keydown", dismissOnEscape, true);
     return () => {
-      window.clearTimeout(initialTimeoutId);
-      window.clearInterval(intervalId);
+      document.removeEventListener("pointerdown", dismissOutside, true);
+      document.removeEventListener("keydown", dismissOnEscape, true);
     };
-  }, [controlsVisible, isReady, isTouchDevice]);
+  }, [showAboutMsg]);
 
   // teardown
   useEffect(
@@ -1119,6 +1062,12 @@ const NJWPlayerComponent = ({
           target.isContentEditable)
       )
         return;
+      // Respect native widgets and modal dialogs without disabling player
+      // shortcuts merely because a bottom-bar button retained focus.
+      if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.isComposing) return;
+      if (document.querySelector('[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]')) return;
+      if (target?.closest("[role='slider'], [role='menuitem'], [role='menu']")) return;
+      const focusedButton = target?.closest("button");
       const unforceMuteIfNeeded = () => {
         if (forcedAutoplayMuteRef.current && !muted) {
           try {
@@ -1129,7 +1078,12 @@ const NJWPlayerComponent = ({
       };
       switch (e.code) {
         case "Space":
+          // Space/Enter still activate a focused button normally; Arrow keys
+          // and M continue to control playback from that same focus position.
+          if (focusedButton) return;
           e.preventDefault();
+          setControlsVisible(true);
+          scheduleControlsAutohideRef.current?.();
           unforceMuteIfNeeded();
           p.getState?.() === "playing" ? p.pause?.() : p.play?.(true);
           break;
@@ -1165,20 +1119,18 @@ const NJWPlayerComponent = ({
       : CONFIG.CONTROLS_AUTOHIDE_MS_DESKTOP;
 
     controlsHideTimerRef.current = window.setTimeout(function tick() {
-      const isFS = isFullscreenRef.current;
       const scrubbing = isScrubbingRef.current;
-      const hovering = isHoveringRef.current;
       const hoveringCtl = isHoveringControlsRef.current;
       const isTouch = isTouchDeviceRef.current;
 
-      const shouldHide = isFS
-        ? !scrubbing && !hoveringCtl
-        : !scrubbing && (isTouch ? !hovering : !hovering && !hoveringCtl);
+      const shouldHide =
+        isPlayingRef.current &&
+        !scrubbing &&
+        !hoveringCtl &&
+        !(document.activeElement?.matches(":focus-visible") && containerRef.current?.contains(document.activeElement) && document.activeElement !== containerRef.current);
 
       if (shouldHide) {
         setControlsVisible(false);
-        // Keep center controls in sync on touch devices
-        if (isTouch) setCenterControlsVisible(false);
         if (!isTouch) setCursorHidden(true);
         controlsHideTimerRef.current = null;
       } else {
@@ -1187,46 +1139,15 @@ const NJWPlayerComponent = ({
     }, timeoutMs);
   }, [
     isTouchDeviceRef,
-    isFullscreenRef,
     isScrubbingRef,
-    isHoveringRef,
     isHoveringControlsRef,
+    isPlayingRef,
   ]);
 
   // Expose the scheduler to earlier effects via ref to avoid ordering issues
   useEffect(() => {
     scheduleControlsAutohideRef.current = scheduleControlsAutohide;
   }, [scheduleControlsAutohide]);
-
-  // Removed separate center-controls autohide; we synchronize with the main controls timer
-
-  // When generic controls visibility changes on touch, sync center controls logic (but keep independent timer)
-  useEffect(() => {
-    if (!isTouchDevice) return;
-    // Center controls visibility follows the main control bar
-    setCenterControlsVisible(!!controlsVisible);
-  }, [controlsVisible, isTouchDevice]);
-
-  // React to play/pause to show/hide center controls deterministically
-  // Center controls now mirror controlsVisible; no extra play/pause handling needed
-
-  // Orientation or fullscreen changes should reshow briefly then hide
-  useEffect(() => {
-    if (!isTouchDevice) return;
-    if (isFullscreen) {
-      // Briefly show controls when entering fullscreen; main timer will hide them
-      setCenterControlsVisible(true);
-    }
-  }, [isFullscreen, isTouchDevice]);
-
-  // User interactions that should reset timer
-  const bumpCenterControls = useCallback(() => {
-    if (!isTouchDeviceRef.current) return;
-    setCenterControlsVisible(true);
-    // rely on main controls timer
-  }, [isTouchDeviceRef]);
-
-  // No separate center-controls timer anymore
 
   useEffect(() => {
     if (controlsVisible) {
@@ -1250,10 +1171,10 @@ const NJWPlayerComponent = ({
         isPlayingRef.current &&
         !isScrubbingRef.current &&
         !isHoveringRef.current &&
-        !isHoveringControlsRef.current
+        !isHoveringControlsRef.current &&
+        !(document.activeElement?.matches(":focus-visible") && containerRef.current?.contains(document.activeElement) && document.activeElement !== containerRef.current)
       ) {
         setControlsVisible(false);
-        setCenterControlsVisible(false);
         if (!isTouchDeviceRef.current) setCursorHidden(true);
       }
     }, delay);
@@ -1270,7 +1191,6 @@ const NJWPlayerComponent = ({
       lastInteractionRef.current = Date.now();
       // Show on interaction and let the normal timer handle further hiding
       setControlsVisible(true);
-      setCenterControlsVisible(true);
       scheduleControlsAutohideRef.current?.();
     };
 
@@ -1284,11 +1204,11 @@ const NJWPlayerComponent = ({
       if (!isPlayingRef.current) return;
       const idle = Date.now() - lastInteractionRef.current;
       const threshold = isFullscreenRef.current ? 1500 : CONFIG.CONTROLS_AUTOHIDE_MS_TOUCH;
-      if (idle >= threshold && !isScrubbingRef.current) {
+      const focusedControl = document.activeElement?.matches(":focus-visible") && root.contains(document.activeElement) && document.activeElement !== root;
+      if (idle >= threshold && !isScrubbingRef.current && !focusedControl) {
         setIsHovering(false);
         setIsHoveringControls(false);
         setControlsVisible(false);
-        setCenterControlsVisible(false);
         if (controlsHideTimerRef.current) {
           window.clearTimeout(controlsHideTimerRef.current);
           controlsHideTimerRef.current = null;
@@ -1331,62 +1251,39 @@ const NJWPlayerComponent = ({
     };
   }, [scheduleControlsAutohide]);
 
-  // progress bar scrubbing (mouse)
-  useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      if (!isScrubbing || !progressBarRef.current) return;
-      const rect = progressBarRef.current.getBoundingClientRect();
-      const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
-      const pct = rect.width ? x / rect.width : 0;
-      const t = pct * (duration || 0);
-      setScrubPct(pct * 100);
-      setHoverTime({ x, t });
-      if (!playerInstance.current || !duration) return;
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      rafRef.current = requestAnimationFrame(() => {
-        playerInstance.current.seek?.(t);
-        rafRef.current = null;
-      });
-    };
-    const onUp = () => {
-      if (!isScrubbing) return;
-      setIsScrubbing(false);
-      scheduleControlsAutohide();
-    };
-    if (isScrubbing) {
-      document.addEventListener("mousemove", onMove);
-      document.addEventListener("mouseup", onUp);
-      return () => {
-        document.removeEventListener("mousemove", onMove);
-        document.removeEventListener("mouseup", onUp);
-      };
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isScrubbing, duration]);
-
   const seekBy = (sec: number) => {
     const p = playerInstance.current;
-    if (!p) return;
-    const pos = p.getPosition?.() || position;
-    const newPos = Math.max(0, Math.min(duration, pos + sec));
-    p.seek?.(newPos);
-    setSeekOverlay(
-      sec > 0
-        ? { type: "forward", seconds: Math.abs(sec) }
-        : { type: "back", seconds: Math.abs(sec) }
-    );
+    const mediaDuration = durationRef.current || p?.getDuration?.() || 0;
+    if (!p || !Number.isFinite(mediaDuration) || mediaDuration <= 0 || !Number.isFinite(sec) || sec === 0) return;
+    const pos = seekControllerRef.current?.getTarget() ?? p.getPosition?.() ?? position;
+    const newPos = Math.max(0, Math.min(mediaDuration, pos + sec));
+    const skipped = Math.abs(newPos - pos);
+    if (skipped < 0.05) return;
+    const displayedSeconds = Math.round(skipped * 10) / 10;
+    commitSeek(newPos);
+    setControlsVisible(true);
+    scheduleControlsAutohideRef.current?.();
+    const direction = sec > 0 ? "forward" : "back";
+    const id = ++seekFeedbackSequenceRef.current;
+    const now = performance.now();
+    const consecutive = now - seekFeedbackLastAtRef.current < 700;
+    seekFeedbackLastAtRef.current = now;
+    setSeekOverlay((previous) => ({
+      id,
+      direction,
+      seconds: consecutive && previous?.direction === direction
+        ? Math.round((previous.seconds + displayedSeconds) * 10) / 10
+        : displayedSeconds,
+    }));
     if (seekOverlayTimerRef.current)
       window.clearTimeout(seekOverlayTimerRef.current);
     seekOverlayTimerRef.current = window.setTimeout(() => {
-      setSeekOverlay(null as any);
+      setSeekOverlay(null);
       seekOverlayTimerRef.current = null;
-    }, 800);
+    }, 700);
   };
 
-  const [seekOverlay, setSeekOverlay] = useState<{
-    type: "back" | "forward";
-    seconds: number;
-  } | null>(null);
+  const [seekOverlay, setSeekOverlay] = useState<SeekFeedbackEvent | null>(null);
 
   const handleCaptureFrame = useCallback(() => {
     const videoEl = containerRef.current?.querySelector("video");
@@ -1426,71 +1323,34 @@ const NJWPlayerComponent = ({
     video.removeAttribute("controls");
   }, [isReady]);
 
-  // fallback for non-hls servers (kept for parity – iframe embed outside scope)
-  if (!isHls) {
-    // You can embed helvid/hydax here if needed; keeping return wrapper for layout consistency
-  }
-
-  const playedPct = duration ? (position / duration) * 100 : 0;
-  const bufferedPct = duration ? (buffer / duration) * 100 : 0;
-  const effectivePlayedPct =
-    isScrubbing && scrubPct !== null ? scrubPct : playedPct;
-  const remainingTime = Math.max(0, duration - position);
-  const getDesktopTone = (key: DesktopControlKey): DesktopControlTone =>
-    desktopControlTones[DESKTOP_CONTROL_CLUSTER_MAP[key]] ?? "dark";
-  const getDesktopControlButtonClass = (key: DesktopControlKey) =>
-    getDesktopTone(key) === "dark"
-      ? "rounded-2xl bg-black/78 p-2.5 text-white shadow-[0_12px_28px_rgba(15,23,42,0.52)] transition-all duration-200 hover:bg-black/84 hover:text-white hover:shadow-[0_12px_30px_rgba(236,72,153,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-300/60"
-      : "rounded-2xl bg-white/96 p-2.5 text-black shadow-[0_12px_28px_rgba(15,23,42,0.18)] transition-all duration-200 hover:bg-white hover:text-black hover:shadow-[0_12px_30px_rgba(236,72,153,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-300/50";
-  const getDesktopTooltipClass = (key: DesktopControlKey) =>
-    getDesktopTone(key) === "dark"
-      ? "rounded-xl bg-black/84 px-3 py-1.5 text-xs font-medium text-white shadow-[0_12px_30px_rgba(2,6,23,0.42)] backdrop-blur-xl"
-      : "rounded-xl bg-white/96 px-3 py-1.5 text-xs font-medium text-black shadow-[0_12px_30px_rgba(15,23,42,0.16)] backdrop-blur-xl";
-  const getDesktopVolumeGroupClass = (key: DesktopControlKey) =>
-    getDesktopTone(key) === "dark"
-      ? "group relative flex items-center overflow-hidden rounded-2xl bg-black/76 pr-0 shadow-[0_10px_24px_rgba(15,23,42,0.4)] transition-[padding] duration-300 hover:pr-2"
-      : "group relative flex items-center overflow-hidden rounded-2xl bg-white/96 pr-0 shadow-[0_10px_24px_rgba(15,23,42,0.18)] transition-[padding] duration-300 hover:pr-2";
-  const getDesktopTimePillClass = (key: DesktopControlKey) =>
-    getDesktopTone(key) === "dark"
-      ? "flex select-none items-center gap-2 rounded-2xl bg-black/76 px-3 py-2 text-xs font-medium text-white shadow-[0_10px_24px_rgba(15,23,42,0.4)] transition-all duration-200 hover:bg-black/84 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-300/60 sm:text-sm md:gap-2"
-      : "flex select-none items-center gap-2 rounded-2xl bg-white/96 px-3 py-2 text-xs font-medium text-black shadow-[0_10px_24px_rgba(15,23,42,0.18)] transition-all duration-200 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-300/50 sm:text-sm md:gap-2";
-  const getDesktopMutedTextClass = (key: DesktopControlKey) =>
-    getDesktopTone(key) === "dark" ? "text-white/55" : "text-black/55";
-  const getDesktopSecondaryTextClass = (key: DesktopControlKey) =>
-    getDesktopTone(key) === "dark" ? "text-white/72" : "text-black/72";
-  const getDesktopIconToneClass = (key: DesktopControlKey) =>
-    getDesktopTone(key) === "dark" ? "text-white" : "text-black";
-
   return (
     <div
-      className={`relative overflow-hidden rounded-[1.35rem] border border-white/10 bg-slate-950 shadow-[0_32px_90px_rgba(2,6,23,0.7)] ${className}`}
+      className={`relative overflow-hidden rounded-xl bg-black ${className}`}
     >
-      {/* Loading / buffering overlay */}
-      {(!isReady || isBuffering) && (
-        <div
-          className="pointer-events-none absolute inset-x-0 top-0 z-[5] flex items-center justify-center bg-slate-950/34 backdrop-blur-[2px] transition-[bottom] duration-200"
-          style={{ bottom: !isTouchDevice ? `${desktopHudHeight}px` : 0 }}
-        >
-          <div
-            className="relative flex h-16 w-16 items-center justify-center rounded-full border border-white/10 bg-black/40 shadow-[0_18px_50px_rgba(2,6,23,0.55)] md:h-24 md:w-24"
-            style={{ transform: !isTouchDevice ? `translateY(${desktopHudHeight / 2}px)` : undefined }}
-          >
-            <div className="absolute inset-1 rounded-full bg-[radial-gradient(circle,rgba(244,114,182,0.25),transparent_70%)]" />
-            <LoaderPinwheel className="relative h-8 w-8 animate-spin text-pink-300 drop-shadow-[0_0_20px_rgba(244,114,182,0.55)] md:h-12 md:w-12" />
-          </div>
-        </div>
-      )}
-
         <div
           ref={containerRef}
           className={
             isIOS
-              ? "relative w-full aspect-video overflow-hidden bg-black [transform:translateZ(0)]"
+              ? "relative w-full aspect-video scroll-mt-16 overflow-hidden bg-black [transform:translateZ(0)]"
               : isFullscreen
                 ? "fixed left-0 top-0 z-50 box-border flex h-[100vh] w-[100vw] items-center justify-center overflow-hidden bg-black"
-                : "relative w-full aspect-video overflow-hidden bg-black [transform:translateZ(0)]"
+                : "relative w-full aspect-video scroll-mt-16 overflow-hidden bg-black"
           }
+        onContextMenu={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (isTouchDevice) return;
+          if (aboutHideTimerRef.current) window.clearTimeout(aboutHideTimerRef.current);
+          const rect = event.currentTarget.getBoundingClientRect();
+          setAboutPos({
+            x: Math.max(8, Math.min(rect.width - 224, event.clientX - rect.left)),
+            y: Math.max(8, Math.min(rect.height - 48, event.clientY - rect.top)),
+          });
+          setShowAboutMsg(true);
+        }}
         tabIndex={0}
+        aria-label="Trình phát video"
+        onFocus={() => setControlsVisible(true)}
         onMouseEnter={() => {
           setIsHovering(true);
           setControlsVisible(true);
@@ -1502,7 +1362,9 @@ const NJWPlayerComponent = ({
           if (!isTouchDevice && cursorHidden) setCursorHidden(false);
         }}
         onMouseLeave={() => {
-          setControlsVisible(false);
+          if (!containerRef.current?.contains(document.activeElement)) {
+            setControlsVisible(false);
+          }
           setIsHovering(false);
           setCursorHidden(false);
           if (controlsHideTimerRef.current) {
@@ -1515,23 +1377,20 @@ const NJWPlayerComponent = ({
             setIsHovering(true);
             setControlsVisible(true);
             scheduleControlsAutohide();
-            bumpCenterControls();
           }
         }}
         onTouchEnd={() => setIsHovering(false)}
         >
-          {!isFullscreen && !isTouchDevice && (
-            <>
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(244,114,182,0.16),transparent_30%),radial-gradient(circle_at_bottom,rgba(59,130,246,0.12),transparent_28%)]" />
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-white/10 via-white/[0.04] to-transparent" />
-            </>
+          {(!isReady || (seekTarget !== null || isScrubbing ? isSeekLoading : isBuffering)) && (
+            <div role="status" aria-label="Đang tải video" className="pointer-events-none absolute inset-0 z-[25] flex items-center justify-center">
+              <LoaderCircle className="h-10 w-10 animate-spin text-white/85 drop-shadow-md" />
+            </div>
           )}
           {isIOS && !supportsAspectRatio && (
             <div style={{ paddingTop: "56.25%" }} />
           )}
         <div
-          id="kana-player"
-          ref={playerRef}
+          ref={playerHostRef}
           className={
             isFullscreen
               ? "w-[100vw] h-[100vh] z-0"
@@ -1548,8 +1407,8 @@ const NJWPlayerComponent = ({
             WebkitTapHighlightColor: "transparent",
             touchAction: "manipulation",
           }}
-          onMouseDown={() => {
-            containerRef.current?.focus?.();
+          onMouseDown={(event) => {
+            if (event.button === 0) containerRef.current?.focus?.({ preventScroll: true });
           }}
           onClick={() => {
             const p = playerInstance.current;
@@ -1590,16 +1449,6 @@ const NJWPlayerComponent = ({
               setIsHovering(false);
             }
           }}
-          onContextMenu={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (!containerRef.current) return;
-            const rect = containerRef.current.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            setAboutPos({ x, y });
-            setShowAboutMsg(true);
-          }}
           onDoubleClick={(e) => {
             e.preventDefault();
             const p = playerInstance.current;
@@ -1621,52 +1470,27 @@ const NJWPlayerComponent = ({
             setIsHovering(true);
             setControlsVisible(true);
             scheduleControlsAutohide();
-            bumpCenterControls();
           }}
           onPointerDown={(e) => {
             if (e.pointerType === "touch") {
               setIsHovering(true);
               setControlsVisible(true);
               scheduleControlsAutohide();
-              bumpCenterControls();
             }
           }}
         />
 
-        {/* Seek overlay */}
-        {seekOverlay && (
-          <>
-            {seekOverlay.type === "back" && (
-              <div className="absolute left-0 top-0 bottom-0 z-[15] flex items-center pl-4 md:pl-8 pointer-events-none">
-                <div className="animate-fade select-none rounded-2xl border border-white/10 bg-slate-900/78 px-4 py-2.5 text-base font-semibold text-white shadow-[0_18px_40px_rgba(2,6,23,0.52)] backdrop-blur-xl md:text-lg">
-                  <div className="flex items-center gap-2">
-                  <Rewind className="h-6 w-6 animate-bounce-left text-pink-300 md:h-8 md:w-8" />
-                  <span>Lùi {seekOverlay.seconds} giây</span>
-                  </div>
-                </div>
-              </div>
-            )}
-            {seekOverlay.type === "forward" && (
-              <div className="absolute right-0 top-0 bottom-0 z-[15] flex items-center justify-end pr-4 md:pr-8 pointer-events-none">
-                <div className="animate-fade select-none rounded-2xl border border-white/10 bg-slate-900/78 px-4 py-2.5 text-base font-semibold text-white shadow-[0_18px_40px_rgba(2,6,23,0.52)] backdrop-blur-xl md:text-lg">
-                  <div className="flex items-center gap-2">
-                  <span>Tiến {seekOverlay.seconds} giây</span>
-                  <FastForward className="h-6 w-6 animate-bounce-right text-pink-300 md:h-8 md:w-8" />
-                  </div>
-                </div>
-              </div>
-            )}
-          </>
-        )}
+        <SeekFeedback feedback={seekOverlay} />
 
         {/* About popup (desktop) */}
-        {!isTouchDevice && showAboutMsg && aboutPos && (
+        {!isTouchDevice && (
           <div
-            className="absolute z-40 whitespace-nowrap rounded-2xl border border-white/10 bg-slate-950/92 px-3.5 py-2.5 text-xs text-white shadow-[0_18px_40px_rgba(2,6,23,0.48)] backdrop-blur-xl"
+            data-player-context-menu=""
+            aria-hidden={!showAboutMsg}
+            className={`absolute z-[60] rounded-xl border border-white/10 bg-zinc-950 px-3.5 py-3 text-xs text-white shadow-lg ${showAboutMsg ? "visible pointer-events-auto" : "invisible pointer-events-none"}`}
             style={{
-              top: aboutPos.y,
-              left: aboutPos.x,
-              transform: "translate(-50%, -50%)",
+              top: aboutPos?.y ?? 0,
+              left: aboutPos?.x ?? 0,
             }}
             onClick={(e) => {
               e.stopPropagation();
@@ -1694,512 +1518,96 @@ const NJWPlayerComponent = ({
           </div>
         )}
 
-        {/* Mobile centered controls */}
-        {isTouchDevice && (
-          <div
-            className={`absolute inset-0 z-30 flex items-center justify-center transition-opacity duration-200 ${centerControlsVisible ? "opacity-100" : "opacity-0"
-              } pointer-events-none`}
+        {nextEpisode && !nextEpisodeDismissed && isReady && !isScrubbing && seekTarget === null && shouldShowNextEpisode(duration, position) && (
+          <aside
+            aria-label="Tập tiếp theo"
+            className="absolute right-3 top-3 z-40 flex max-w-[calc(100%-1.5rem)] items-center gap-1 rounded-xl border border-white/15 bg-zinc-950/95 p-1.5 text-white shadow-lg sm:right-5 sm:top-5 sm:p-2"
+            onClick={(event) => event.stopPropagation()}
+            onMouseDown={(event) => event.stopPropagation()}
           >
-            <div
-              className="pointer-events-auto flex items-center gap-4 sm:gap-6"
-              onTouchEnd={() => {
-                // Let main timer hide after interactions
-                setIsHovering(false);
-                scheduleControlsAutohide();
-              }}
-              onTouchCancel={() => setIsHovering(false)}
+            <button
+              type="button"
+              onClick={nextEpisode.onSelect}
+              className="flex min-h-11 items-center gap-3 rounded-lg px-2.5 py-1.5 text-left transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+              aria-label={`Xem ${nextEpisode.label}`}
             >
-              <button
-                aria-label={CONFIG.LABELS.BACK_X(CONFIG.SKIP_SECONDS)}
-                className="flex items-center justify-center p-1 rounded-full bg-white/10 transition-colors duration-200 drop-shadow-lg"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  seekBy(-CONFIG.SKIP_SECONDS);
-                  scheduleControlsAutohide();
-                  bumpCenterControls();
-                }}
-                onTouchEnd={() => setIsHovering(false)}
-              >
-                <BackwardIcon className="h-7 w-7 text-white" />
-              </button>
-              <button
-                aria-label={
-                  isPlaying ? CONFIG.LABELS.PAUSE : CONFIG.LABELS.PLAY
-                }
-                className="flex items-center justify-center p-1 rounded-full bg-white/10 transition-colors duration-200 drop-shadow-lg"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const p = playerInstance.current;
-                  if (!p) return;
-                  if (forcedAutoplayMuteRef.current && !muted) {
-                    try {
-                      p.setMute?.(false);
-                    } catch { }
-                    forcedAutoplayMuteRef.current = false;
-                  }
-                  isPlaying ? p.pause?.() : p.play?.(true);
-                  scheduleControlsAutohide();
-                  bumpCenterControls();
-                }}
-                onTouchEnd={() => setIsHovering(false)}
-              >
-                <div className="transition-opacity duration-300 ease-in-out">
-                  {isPlaying ? (
-                    <PauseIcon className="h-8 w-8 text-white" />
-                  ) : (
-                    <PlayIcon className="h-8 w-8 pl-1 text-white" />
-                  )}
-                </div>
-              </button>
-              <button
-                aria-label={CONFIG.LABELS.FORWARD_X(CONFIG.SKIP_SECONDS)}
-                className="flex items-center justify-center p-1 rounded-full bg-white/10 transition-colors duration-200 drop-shadow-lg"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  seekBy(CONFIG.SKIP_SECONDS);
-                  scheduleControlsAutohide();
-                  bumpCenterControls();
-                }}
-                onTouchEnd={() => setIsHovering(false)}
-              >
-                <ForwardIcon className="h-7 w-7 text-white" />
-              </button>
-            </div>
-          </div>
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-zinc-950"><SkipForward className="h-4 w-4" /></span>
+              <span className="min-w-0"><span className="block text-[11px] text-white/55">TẬP TIẾP THEO</span><span className="block truncate text-sm font-medium">{nextEpisode.label}</span></span>
+            </button>
+            <button type="button" aria-label="Ẩn gợi ý tập tiếp theo" onClick={() => setNextEpisodeDismissed(true)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white/50 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"><X className="h-4 w-4" /></button>
+          </aside>
         )}
 
-        {/* Bottom control bar */}
-        <div
+        <PlayerControls
+          key={fileUrl}
           ref={bottomHudRef}
-          className={`${isIOS ? "absolute" : isFullscreen ? "fixed" : "absolute"
-            } inset-x-0 bottom-0 z-30 flex flex-col gap-2.5 text-white transition-opacity duration-300 ${controlsVisible
-              ? "opacity-100 pointer-events-auto"
-              : "opacity-0 pointer-events-none"
-            } bg-gradient-to-t from-slate-950/92 via-slate-950/46 to-transparent px-4 pb-[calc(0.55rem+env(safe-area-inset-bottom))] pt-10`}
-          onClick={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-          onMouseEnter={() => setIsHoveringControls(true)}
-          onMouseLeave={() => setIsHoveringControls(false)}
-          onContextMenu={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (!containerRef.current) return;
-            const rect = containerRef.current.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            setAboutPos({ x, y });
-            setShowAboutMsg(true);
+          visible={controls && (controlsVisible || !isPlaying)}
+          isTouchDevice={isTouchDevice}
+          isPlaying={isPlaying}
+          isReady={isReady}
+          isBuffering={isBuffering}
+          isMuted={isMuted}
+          isFullscreen={isFullscreen}
+          isInPip={isInPip}
+          pipSupported={pipSupported}
+          canCapture={!isAndroid || !isFullscreen}
+          hasChapters={chapters.length > 0}
+          position={seekTarget ?? position}
+          duration={duration}
+          buffered={buffer}
+          volume={volume}
+          onTogglePlay={() => {
+            const p = playerInstance.current;
+            if (!p) return;
+            if (forcedAutoplayMuteRef.current && !muted) {
+              p.setMute?.(false);
+              forcedAutoplayMuteRef.current = false;
+            }
+            isPlaying ? p.pause?.() : p.play?.(true);
           }}
-        >
-          {/* progress bar */}
-          <div
-            className={`relative cursor-pointer group ${controlsVisible ? "" : "pointer-events-none"
-              }`}
-            ref={progressBarRef}
-            style={{ height: isTouchDevice ? 10 : 8 }}
-            onMouseMove={(e) => {
-              if (!progressBarRef.current) return;
-              const rect = progressBarRef.current.getBoundingClientRect();
-              const x = Math.max(
-                0,
-                Math.min(rect.width, e.clientX - rect.left)
-              );
-              const pct = rect.width ? x / rect.width : 0;
-              const t = pct * (duration || 0);
-              setHoverTime({ x, t });
-              if (isScrubbing) setScrubPct(pct * 100);
-            }}
-            onMouseLeave={() => setHoverTime(null)}
-            onMouseDown={(e) => {
-              if (!progressBarRef.current) return;
-              const rect = progressBarRef.current.getBoundingClientRect();
-              const x = Math.max(
-                0,
-                Math.min(rect.width, e.clientX - rect.left)
-              );
-              const pct = rect.width ? x / rect.width : 0;
-              const t = pct * (duration || 0);
-              setHoverTime({ x, t });
-              setIsScrubbing(true);
-              setScrubPct(pct * 100);
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-            onMouseUp={() => {
-              if (!isScrubbing) return;
-              setIsScrubbing(false);
-              setIsHovering(false);
-              scheduleControlsAutohide();
-            }}
-            onClick={(e) => {
-              const p = playerInstance.current;
-              if (!p || !duration || !progressBarRef.current) return;
-              const rect = progressBarRef.current.getBoundingClientRect();
-              const x = Math.max(
-                0,
-                Math.min(rect.width, e.clientX - rect.left)
-              );
-              const pct = rect.width ? x / rect.width : 0;
-              const sec = Math.max(0, Math.min(duration, pct * duration));
-              p.seek?.(sec);
-              setTimeout(() => setHoverTime(null), 800);
-              scheduleControlsAutohide();
-            }}
-            onTouchStart={(e) => {
-              if (!progressBarRef.current) return;
-              const touch = e.touches?.[0];
-              if (!touch) return;
-              const rect = progressBarRef.current.getBoundingClientRect();
-              const x = Math.max(
-                0,
-                Math.min(rect.width, touch.clientX - rect.left)
-              );
-              const pct = rect.width ? x / rect.width : 0;
-              const t = pct * (duration || 0);
-              setHoverTime({ x, t });
-              setIsScrubbing(true);
-              setScrubPct(pct * 100);
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-            onTouchMove={(e) => {
-              if (!isScrubbing || !progressBarRef.current) return;
-              const touch = e.touches?.[0];
-              if (!touch) return;
-              const rect = progressBarRef.current.getBoundingClientRect();
-              const x = Math.max(
-                0,
-                Math.min(rect.width, touch.clientX - rect.left)
-              );
-              const pct = rect.width ? x / rect.width : 0;
-              setScrubPct(pct * 100);
-              const t = pct * (duration || 0);
-              setHoverTime({ x, t });
-              const p = playerInstance.current;
-              if (p && duration) p.seek?.(t);
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-            onTouchEnd={() => {
-              if (!progressBarRef.current) return;
-              const pct = typeof scrubPct === "number" ? scrubPct / 100 : 0;
-              const sec = Math.max(0, Math.min(duration, pct * duration));
-              const p = playerInstance.current;
-              if (p && duration) p.seek?.(sec);
-              setIsScrubbing(false);
-              setIsHovering(false);
-              if (controlsHideTimerRef.current) {
-                window.clearTimeout(controlsHideTimerRef.current);
-                controlsHideTimerRef.current = null;
-              }
-              controlsHideTimerRef.current = window.setTimeout(() => {
-                setControlsVisible(false);
-                controlsHideTimerRef.current = null;
-              }, CONFIG.CONTROLS_AUTOHIDE_MS_TOUCH);
-              setTimeout(() => setHoverTime(null), 1200);
-            }}
-          >
-            <div className="absolute inset-0 rounded-full border border-white/10 bg-white/10 transition-all duration-200 group-hover:scale-y-125 origin-center" />
-            <div
-              className="absolute inset-y-0 left-0 rounded-full bg-white/18 transition-all duration-200"
-              style={{ width: `${Math.min(100, bufferedPct)}%` }}
-            />
-            <div
-              className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-fuchsia-400 via-pink-400 to-orange-300 shadow-[0_0_18px_rgba(244,114,182,0.45)] transition-all duration-200 group-hover:scale-y-125 origin-center"
-              style={{ width: `${Math.min(100, effectivePlayedPct)}%` }}
-            />
-            {!isTouchDevice && (
-              <div
-                className="absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full border border-white/80 bg-white shadow-[0_0_20px_rgba(255,255,255,0.5)] transition-transform duration-150 group-hover:scale-110"
-                style={{ left: `calc(${Math.min(100, effectivePlayedPct)}% - 7px)` }}
-              />
-            )}
-            {hoverTime && (
-              <div
-                className={`pointer-events-none absolute -top-10 -translate-x-1/2 rounded-xl px-3 py-1.5 text-xs font-medium shadow-[0_12px_30px_rgba(2,6,23,0.28)] ${getDesktopTone("time") === "dark"
-                  ? "bg-slate-950/92 text-white"
-                  : "bg-white/88 text-slate-950"
-                  } ${hoverTime ? "opacity-100 scale-100" : "opacity-0 scale-95"
-                  } transition-all duration-100 ease-in-out`}
-                style={{ left: hoverTime?.x }}
-              >
-                {formatTime(hoverTime.t)}
-              </div>
-            )}
+          onSkip={seekBy}
+          onSeekPreview={(seconds) => seekControllerRef.current?.preview(seconds)}
+          onSeekCommit={commitSeek}
+          onScrubStart={beginScrubbing}
+          onToggleMute={() => playerInstance.current?.setMute?.(!isMuted)}
+          onVolumeChange={(value) => {
+            const p = playerInstance.current;
+            if (!p) return;
+            p.setVolume?.(value);
+            p.setMute?.(value === 0);
+            setVolumeState(value);
+          }}
+          onNextChapter={() => {
+            const p = playerInstance.current;
+            if (!p) return;
+            const current = seekControllerRef.current?.getTarget() ?? p.getPosition?.() ?? position;
+            const next = [...chapters]
+              .filter((time) => Number.isFinite(time) && time > current + 0.25)
+              .sort((a, b) => a - b)[0];
+            if (next !== undefined) commitSeek(Math.min(duration || next, next));
+          }}
+          onCapture={handleCaptureFrame}
+          onTogglePip={() => pipCtrlRef.current?.toggle()}
+          onToggleFullscreen={() => controllerRef.current?.toggle()}
+          onInteraction={() => {
+            lastInteractionRef.current = Date.now();
+            setControlsVisible(true);
+            setCursorHidden(false);
+            scheduleControlsAutohide();
+          }}
+          onHoverChange={(hovering) => {
+            isHoveringControlsRef.current = hovering;
+            setIsHoveringControls(hovering);
+          }}
+        />
+
+        {showImagePreview && capturedImage && (
+          <div className="pointer-events-none absolute right-4 top-4 z-40 w-40 overflow-hidden rounded-lg border border-white/20 bg-black/80 shadow-lg sm:w-56">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={capturedImage} alt="Ảnh vừa chụp" className="aspect-video w-full object-contain" />
+            <p className="px-3 py-2 text-xs text-white/80">Đã lưu ảnh chụp</p>
           </div>
-
-          {/* bottom row */}
-          <div
-            className={`flex items-center justify-between gap-2 md:gap-4 ${isIOS && "pb-4"
-              }`}
-          >
-            <div className="flex items-center gap-1 md:gap-3">
-              {!isTouchDevice && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        ref={(node) => setDesktopControlRef("play", node)}
-                        aria-label={
-                          isPlaying ? CONFIG.LABELS.PAUSE : CONFIG.LABELS.PLAY
-                        }
-                        onClick={() => {
-                          const p = playerInstance.current;
-                          if (!p) return;
-                          isPlaying ? p.pause?.() : p.play?.(true);
-                        }}
-                        className={getDesktopControlButtonClass("play")}
-                      >
-                        {isPlaying ? (
-                          <PauseIcon className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7" />
-                        ) : (
-                          <PlayIcon className="h-5 w-5 pl-1 sm:h-6 sm:w-6 md:h-7 md:w-7" />
-                        )}
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" sideOffset={15}>
-                      <div className={getDesktopTooltipClass("play")}>
-                        {isPlaying ? CONFIG.LABELS.PAUSE : CONFIG.LABELS.PLAY}
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-              {!isTouchDevice && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        ref={(node) => setDesktopControlRef("backward", node)}
-                        aria-label={CONFIG.LABELS.BACK_X(CONFIG.SKIP_SECONDS)}
-                        className={getDesktopControlButtonClass("backward")}
-                        onClick={() => {
-                          seekBy(-CONFIG.SKIP_SECONDS);
-                          scheduleControlsAutohide();
-                        }}
-                      >
-                        <BackwardIcon className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" sideOffset={15}>
-                      <div className={getDesktopTooltipClass("backward")}>
-                        {CONFIG.TOOLTIPS.BACKWARD}
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-              {!isTouchDevice && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        ref={(node) => setDesktopControlRef("forward", node)}
-                        aria-label={CONFIG.LABELS.FORWARD_X(
-                          CONFIG.SKIP_SECONDS
-                        )}
-                        className={getDesktopControlButtonClass("forward")}
-                        onClick={() => {
-                          seekBy(CONFIG.SKIP_SECONDS);
-                          scheduleControlsAutohide();
-                        }}
-                      >
-                        <ForwardIcon className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" sideOffset={15}>
-                      <div className={getDesktopTooltipClass("forward")}>
-                        {CONFIG.TOOLTIPS.FORWARD}
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-
-              {Array.isArray(chapters) && chapters.length > 0 && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        ref={(node) => setDesktopControlRef("chapter", node)}
-                        aria-label={CONFIG.LABELS.NEXT_CHAPTER}
-                        onClick={() => {
-                          const p = playerInstance.current;
-                          if (!p) return;
-                          const current = p.getPosition?.() || position;
-                          const sorted = [...chapters]
-                            .filter(
-                              (t) =>
-                                typeof t === "number" && isFinite(t) && t >= 0
-                            )
-                            .sort((a, b) => a - b);
-                          const EPS = 0.25;
-                          const next = sorted.find((t) => t > current + EPS);
-                          if (typeof next === "number") {
-                            const target = Math.max(
-                              0,
-                              Math.min(duration || next, next)
-                            );
-                            p.seek?.(target);
-                            scheduleControlsAutohide();
-                          }
-                        }}
-                        className={getDesktopControlButtonClass("chapter")}
-                      >
-                        <Flag className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" sideOffset={15}>
-                      <div className={getDesktopTooltipClass("chapter")}>
-                        {CONFIG.TOOLTIPS.NEXT_CHAPTER}
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-
-              {/* Volume */}
-              <div
-                ref={(node) => setDesktopControlRef("volume", node)}
-                className={getDesktopVolumeGroupClass("volume")}
-              >
-                <button
-                  aria-label={CONFIG.LABELS.MUTE}
-                  onClick={() => {
-                    const p = playerInstance.current;
-                    if (!p) return;
-                    p.setMute?.(!isMuted);
-                    scheduleControlsAutohide();
-                  }}
-                  className={getDesktopControlButtonClass("volume")}
-                >
-                  {isMuted || volume === 0 ? (
-                    <VolumeOff className={`h-5 w-5 sm:h-5 sm:w-5 md:h-6 md:w-6 ${getDesktopIconToneClass("volume")}`} />
-                  ) : !isMuted && volume > 50 ? (
-                    <Volume2 className={`h-5 w-5 sm:h-5 sm:w-5 md:h-6 md:w-6 ${getDesktopIconToneClass("volume")}`} />
-                  ) : (
-                    <Volume1 className={`h-5 w-5 sm:h-5 sm:w-5 md:h-6 md:w-6 ${getDesktopIconToneClass("volume")}`} />
-                  )}
-                </button>
-                {!isTouchDevice && (
-                    <div className="left-12 hidden w-0 items-center pl-0 opacity-0 transition-all duration-300 group-hover:w-28 group-hover:pl-2 group-hover:opacity-100 sm:flex">
-                      <Slider
-                        className="w-24 md:w-28"
-                      max={100}
-                      step={1}
-                      value={[isMuted ? 0 : volume]}
-                      onValueChange={(vals) => {
-                        const vRaw = Array.isArray(vals) ? vals[0] : 0;
-                        const v = Math.max(
-                          0,
-                          Math.min(100, Math.round(vRaw || 0))
-                        );
-                        const p = playerInstance.current;
-                        if (!p) return;
-                        p.setVolume?.(v);
-                        if (v === 0 && !isMuted) p.setMute?.(true);
-                        if (v > 0 && isMuted) p.setMute?.(false);
-                        setVolumeState(v);
-                        scheduleControlsAutohide();
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
-
-              <button
-                ref={(node) => setDesktopControlRef("time", node)}
-                type="button"
-                onClick={() => setShowRemainingTime((prev) => !prev)}
-                className={getDesktopTimePillClass("time")}
-                aria-label={showRemainingTime ? "Hiển thị thời gian hiện tại" : "Hiển thị thời gian còn lại"}
-                title={showRemainingTime ? "Bấm để hiện thời gian hiện tại" : "Bấm để hiện thời gian còn lại"}
-              >
-                <span className="tabular-nums">{showRemainingTime ? `-${formatTime(remainingTime)}` : formatTime(position)}</span>
-                <span className={getDesktopMutedTextClass("time")}>/</span>
-                <span className={`tabular-nums ${getDesktopSecondaryTextClass("time")}`}>{formatTime(duration)}</span>
-              </button>
-            </div>
-
-            <div className="flex items-center gap-1 md:gap-3">
-              {(!isAndroid || (isAndroid && !isFullscreen)) && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        ref={(node) => setDesktopControlRef("screenshot", node)}
-                        aria-label="Capture video frame"
-                        onClick={handleCaptureFrame}
-                        className={getDesktopControlButtonClass("screenshot")}
-                      >
-                        <Camera className="h-5 w-5 pb-1 sm:h-5 sm:w-5 md:h-6 md:w-6" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" sideOffset={15}>
-                      <div className={getDesktopTooltipClass("screenshot")}>
-                        {CONFIG.TOOLTIPS.SCREENSHOT}
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-
-              {pipSupported && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        ref={(node) => setDesktopControlRef("pip", node)}
-                        id="pip-button"
-                        aria-label={CONFIG.LABELS.PIP}
-                        onClick={() => {
-                          pipCtrlRef.current?.toggle();
-                        }}
-                        className={getDesktopControlButtonClass("pip")}
-                      >
-                        <PictureInPicture2 className="h-5 w-5 sm:h-5 sm:w-5 md:h-6 md:w-6" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" sideOffset={15}>
-                      <div className={getDesktopTooltipClass("pip")}>
-                        {CONFIG.TOOLTIPS.PIP}
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-
-              {/* Fullscreen */}
-              <button
-                ref={(node) => setDesktopControlRef("fullscreen", node)}
-                aria-label={CONFIG.LABELS.FULLSCREEN}
-                onClick={() => controllerRef.current?.toggle()}
-                className={getDesktopControlButtonClass("fullscreen")}
-              >
-                <div className="transition-opacity duration-300 ease-in-out">
-                  {isIOS ? (
-                    <Maximize2 className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
-                  ) : isFullscreen ? (
-                    <Minimize2 className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
-                  ) : (
-                    <Maximize2 className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
-                  )}
-                </div>
-              </button>
-
-              {showImagePreview && capturedImage && (
-                <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/60">
-                  {/* eslint-disable-next-line */}
-                  <img
-                    src={capturedImage}
-                    alt="Captured frame"
-                    className="max-w-[80vw] max-h-[80vh] rounded-lg shadow-2xl border-2 border-white"
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

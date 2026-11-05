@@ -23,7 +23,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Play, RotateCcw } from 'lucide-react';
+import { Play, RotateCcw, LoaderCircle } from 'lucide-react';
 
 interface ResumeDialogProps {
   /** Whether dialog is open */
@@ -36,7 +36,9 @@ interface ResumeDialogProps {
   savedTime: number;
   
   /** Callback when user chooses to continue */
-  onContinue: () => void;
+  onContinue: () => void | Promise<boolean>;
+  pending?: boolean;
+  error?: string | null;
   
   /** Callback when user chooses to start over */
   onStartOver: () => void;
@@ -66,6 +68,8 @@ export function ResumeDialog({
   onContinue,
   onStartOver,
   onClose,
+  pending = false,
+  error,
 }: ResumeDialogProps) {
   const [isOpen, setIsOpen] = useState(open);
 
@@ -73,29 +77,33 @@ export function ResumeDialog({
     setIsOpen(open);
   }, [open]);
 
-  const handleContinue = useCallback(() => {
-    setIsOpen(false);
-    onContinue();
-  }, [onContinue]);
+  const handleContinue = useCallback(async () => {
+    if (pending) return;
+    const success = await onContinue();
+    if (success !== false) setIsOpen(false);
+  }, [onContinue, pending]);
 
   const handleStartOver = useCallback(() => {
+    if (pending) return;
     setIsOpen(false);
     onStartOver();
-  }, [onStartOver]);
+  }, [onStartOver, pending]);
 
   const handleOpenChange = useCallback((open: boolean) => {
+    if (pending) return;
     setIsOpen(open);
     if (!open) {
-      // Backdrop click or Escape pressed = treat as "Start over"
-      onClose?.() || onStartOver();
+      if (onClose) onClose();
+      else onStartOver();
     }
-  }, [onClose, onStartOver]);
+  }, [onClose, onStartOver, pending]);
 
   // Keyboard shortcuts
   useEffect(() => {
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement | null)?.closest('button')) return;
       if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
         handleContinue();
@@ -126,10 +134,12 @@ export function ResumeDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
         <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-3">
           <Button
             variant="outline"
             onClick={handleStartOver}
+            disabled={pending}
             className="w-full sm:w-auto order-2 sm:order-1 h-12"
             aria-label="Xem tập từ đầu"
           >
@@ -137,13 +147,15 @@ export function ResumeDialog({
             Xem từ đầu
           </Button>
           <Button
-            onClick={handleContinue}
+            onClick={() => void handleContinue()}
+            disabled={pending}
+            aria-busy={pending}
             className="w-full sm:w-auto order-1 sm:order-2 h-12"
             autoFocus
             aria-label={`Tiếp tục từ ${formatTime(savedTime)}`}
           >
-            <Play className="mr-2 h-4 w-4" />
-            Tiếp tục
+            {pending ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
+            {pending ? "Đang tiếp tục…" : "Tiếp tục"}
           </Button>
         </DialogFooter>
       </DialogContent>
